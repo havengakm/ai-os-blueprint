@@ -165,6 +165,116 @@ Assumes: blended $3,500/client/month with retainer growth, 5% monthly churn.
 
 ---
 
+## Revenue Growth: Upsell, Cross-Sell & Order Bumps
+
+### Natural upsell path (retainer growth)
+
+Every client starts with Scout (outbound). As results come in, the next system is a natural conversation:
+
+| Month | System added | Retainer increase | Trigger |
+|---|---|---|---|
+| 1-2 | Scout (outbound) | $2,500 (base) | Setup complete, first meetings booked |
+| 3-4 | Beacon (inbound response) | +$500-750 | "We're getting inbound enquiries too but responding slowly" |
+| 4-5 | LinkedIn Outreach | +$500-750 | "Can we also reach them on LinkedIn?" |
+| 5-6 | Content OS | +$500-750 | "We need to post more consistently" |
+| 6-8 | Ad Copy + Optimisation | +$750-1,000 | "We're running ads but the copy is generic" |
+| 8-10 | Reporting Dashboard | +$500 | "Can my team see what's happening?" |
+| 10-12 | Full AgencyOSX | At $5,000+ | All systems live, maximum value |
+
+**Key:** Never pitch the next system. Wait until the client ASKS or the data shows the gap. "Your inbound response time is 4 hours. Every hour costs you 10% conversion. Want me to fix that?"
+
+### Cross-sell opportunities
+
+| Opportunity | When | Price |
+|---|---|---|
+| Additional niche/vertical | Client wants to target a second market | +$500-1,000/mo (new campaigns) |
+| International expansion | Client ready for US/UK/AU | +$500-1,000/mo (new geography) |
+| Client's clients | Agency client wants the same system for their own business | New client ($5K setup + retainer) |
+| Team training | Client's team wants to understand AI systems | $2-5K one-time |
+
+### Order bumps (at point of sale)
+
+| Bump | When offered | Price | Why they say yes |
+|---|---|---|---|
+| Priority onboarding | At signing | +$1,000 | "Go live 1 week faster" |
+| Extra sending domains (5 instead of 3) | At signing | +$500 | "More volume from day 1" |
+| Competitor monitoring setup | At signing | +$500 | "Know when your competitors get mentioned" |
+| Monthly strategy call (add-on) | After month 1 | +$500/mo | "Direct line to me for strategy" |
+
+### Referral programme
+
+| Referral type | Reward | Why it works |
+|---|---|---|
+| Client refers another agency | 1 month free retainer | Low CAC, warm intro, trust transferred |
+| Client refers to a different niche | $500 cash or credit | Expands addressable market |
+| Partner referral (consultant, coach) | 10% ongoing commission | Aligns incentives long-term |
+
+---
+
+## Margin Protection Strategies
+
+### Cost discipline
+
+1. **Client pays their own API key.** Anthropic costs scale with THEIR usage, not yours. Never subsidise.
+2. **Client pays hosting directly.** Railway, Supabase, domains. Your margin never gets eaten by their infrastructure.
+3. **Enrichment rebilled at 2-2.5x.** Prospeo, ZeroBounce, Twilio. Cost + markup. Never absorb.
+4. **Track variable costs per client monthly.** Build into weekly report. Flag if margin drops below 60%.
+5. **Mandatory tier upgrade at volume thresholds.** Client can't stay on Starter while using Growth-level resources.
+
+### Pricing power
+
+1. **Never discount the retainer. Discount the setup fee.** Retainer is recurring value. Setup is one-time. Better to waive $5K setup than discount $500/mo forever.
+2. **Annual commitment = 2 months free.** Locks in revenue, reduces churn, client saves 17%. Win-win.
+3. **Price increases after 12 months.** Justified by accumulated intelligence: "Your system is 10x smarter than month 1."
+4. **Premium for speed.** Priority onboarding, faster response times, dedicated Slack channel = justifies higher tier.
+
+### Churn prevention
+
+1. **Growing retainer model.** Each new system adds value AND revenue. Hard to leave when 5 systems are running.
+2. **Switching costs compound.** 12 months of accumulated intelligence, decision patterns, and context can't be recreated.
+3. **Results dashboard.** Client sees ROI every day. Not just meetings booked, but revenue attributed.
+4. **Monthly strategy call.** Personal relationship, not just a system. They're paying for Kirsten's brain, not just code.
+5. **Quarterly business review.** Show total ROI, projected growth, and what's coming next.
+
+---
+
+## Personal Brand & Authenticity
+
+### Why personal brand matters
+
+CLYMB isn't a faceless SaaS. It's Kirsten + an AI system. The personal brand IS the differentiator. When 10 AI outreach companies pitch the same agency, they pick the one they trust. Trust comes from authenticity.
+
+### Brand pillars
+
+1. **Shared experience.** "I ran an agency. I know the feast-or-famine cycle. I built this for myself first." This is genuine. Never fabricate or exaggerate.
+
+2. **Builder, not seller.** Show the work. Share the process. "Here's how the system actually works" not "imagine the possibilities." LinkedIn posts about real results, real failures, real learnings.
+
+3. **Radical transparency.** Pricing on the website. No hidden fees. Month-to-month contracts. Handover available. "I don't need to lock you in because the results speak for themselves."
+
+4. **Warm, direct, human.** Emails sound like a person, not a company. No corporate speak. No "leverage synergies." Just: "I saw your work. It's good. Curious how you're finding new clients."
+
+5. **South African hustle.** International quality from an unexpected place. Being from SA is a differentiator in a market dominated by US agencies. It's memorable. Lean into it.
+
+### Content strategy (when ready)
+
+| Platform | Content type | Frequency | Purpose |
+|---|---|---|---|
+| LinkedIn | Behind-the-scenes of building CLYMB | 2-3x/week | Thought leadership, attract inbound |
+| YouTube | System walkthroughs, results breakdowns | 1x/week | Long-form proof, SEO |
+| Loom/Video | Personalised for prospects | As needed | Sales tool, warm up cold leads |
+| Newsletter | Weekly insights for agency founders | 1x/week | Nurture, stay top of mind |
+
+### Authenticity rules
+
+- Never claim results you haven't achieved. "100+ service businesses" is from past agency work. Make this clear.
+- Share failures alongside wins. "Here's what didn't work this week" builds more trust than polished case studies.
+- Don't try to sound like Nick Saraev or Alex Hormozi. Sound like Kirsten. Warm, direct, honest, slightly informal.
+- Show the system, don't just describe it. Screenshots, Loom videos, real dashboards.
+- Acknowledge the learning curve. "I'm building this in real-time. Here's what I'm learning."
+
+---
+
 ## Risks and Mitigations
 
 | Risk | Likelihood | Impact | Mitigation |
