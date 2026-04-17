@@ -1,6 +1,9 @@
 # ── Private data (never shared between instances) ──
-# NOTE: context/ IS committed in the blueprint template repo.
-# In client forks, add "context/" to .gitignore after initial setup.
+#
+# BLUEPRINT TEMPLATE: context/ is committed (example/template content).
+# CLIENT FORKS: After initial setup, uncomment the line below to stop
+# tracking client-specific context changes:
+# context/
 data/captures/
 data/outputs/
 .env

@@ -43,8 +43,17 @@ systems/scout/
 
 ## Status
 
-Sprint 1: COMPLETE (in base-camp-agents repo)
-Migration: PENDING (code exists, needs to be restructured to use BaseSystem)
+- Sprint 1 code: COMPLETE (lives in base-camp-agents repo)
+- Foundation integration: DONE (skill.py extends BaseSystem with foundation hooks)
+- Pipeline migration: PENDING (scripts need to move from base-camp-agents/scripts/ into pipeline/)
+- Handler implementation: PENDING (currently returns placeholders)
+
+### To complete migration:
+1. Copy pipeline scripts from base-camp-agents/scripts/ into systems/scout/pipeline/
+2. Update imports to use os/foundation modules (DecisionLogger, PatternMatcher, etc.)
+3. Wire handlers in skill.py to call pipeline scripts
+4. Create systems/scout/sql/ with Scout-specific migrations (contacts, drafts, templates, etc.)
+5. Test end-to-end with foundation integration
 
 ## Tier
 
