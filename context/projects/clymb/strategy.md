@@ -9,13 +9,17 @@
 3. **United Kingdom** — strong agency scene, English-speaking, similar timezone to SA
 4. **Canada / Australia / NZ** — secondary English-speaking markets
 
-### Target Niches (validated via Reddit research, April 2026)
+### Target Niches (priority order)
 
-| Niche | Why | Deal size |
-|---|---|---|
-| Shopify/eCommerce agencies | High ticket, rich websites for icebreakers, clear ROI | $10-50K projects |
-| CRO/Growth Marketing agencies | Data-driven, understand ROI, need pipeline | $5-15K/mo retainers |
-| Creative/Branding agencies | Highest ticket, founded by creatives not salespeople | $15-50K+ projects |
+| # | Niche | Why | Deal size | Status |
+|---|---|---|---|---|
+| 1 | Digital agencies (Shopify, CRO, Creative) | Proven ICP, 8,735 scraped, research done | $5-50K+ | Active — first emails Q2 2026 |
+| 2 | Boutique DMCs & luxury travel | Passion niche. B2B (sell to travel agents). High ticket. Relationship-driven. | $10-50K+ per booking | Research done. Launch Q3 2026. |
+| 3 | Fractional executives | High ticket, solo, referral-dependent | $5-25K/mo | Scraped. Launch after agencies proven. |
+| 4 | Recruiting/staffing | Client shortage is #1 problem (23%) | $5-30K placements | Future |
+| 5 | MSP/cybersecurity | Hate sales, technical founders | $5-15K/mo retainers | Future |
+
+DMCs are niche #2 because Kirsten loves travel and wants to work in the industry long-term. The same AIOS foundation powers both agency and DMC outreach — different ICP, templates, and icebreakers, same system.
 
 ### Core Offer
 
