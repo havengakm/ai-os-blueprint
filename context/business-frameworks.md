@@ -7,7 +7,7 @@ These are non-negotiable constraints and preferences that shape every business d
 ## Business Constraints (non-negotiable)
 
 ### Revenue model
-- **High ticket only.** No product under $297. No $29/month SaaS. No low-margin volume plays. One $5K client beats 100 $50 subscribers.
+- **High ticket only.** No low-margin volume plays. One $5K client beats 100 $50 subscribers. Exception: low-ticket front-end products ($29-97) are fine IF they feed a high-ticket backend (AIOS retainer) or generate affiliate revenue. The low-ticket product must be a gateway, never the destination.
 - **Recurring revenue first.** Monthly retainers over project fees. Predictable cash flow beats sporadic windfalls.
 - **60%+ gross margins minimum.** If a client's variable costs exceed 40% of their retainer, the pricing is wrong. Fix it or fire the client.
 - **Setup fees cover onboarding costs.** Never subsidise the install. The setup fee exists so day-one is profitable.
