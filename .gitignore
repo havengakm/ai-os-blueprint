@@ -1,5 +1,6 @@
-# ── Private data (never committed, never shared between instances) ──
-context/
+# ── Private data (never shared between instances) ──
+# NOTE: context/ IS committed in the blueprint template repo.
+# In client forks, add "context/" to .gitignore after initial setup.
 data/captures/
 data/outputs/
 .env
