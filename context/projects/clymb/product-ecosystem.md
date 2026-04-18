@@ -27,20 +27,43 @@ F45 names everything: Romans, Firestorm, Panthers, Hollywood. Each workout has a
 
 Every system gets a name. Not "outbound prospecting module" but a proper name.
 
-| System | Name | Why |
-|---|---|---|
-| Outbound Prospecting | **Scout** | Scouts ahead, finds opportunities before you see them |
-| Inbound Response | **Beacon** | Guides people in, responds to signals |
-| Deal Acceleration | **Closer** | Closes the gap between interest and commitment |
-| LinkedIn Outreach | **Signal** | Sends and reads signals on the platform |
-| Content Creation | **Voice** | Amplifies the founder's voice at scale |
-| Ad Copywriting | **Spark** | Ignites attention in paid channels |
-| Ad Optimisation | **Fuel** | Fuels growth by optimising ad spend |
-| Market Research | **Radar** | Scans the market for opportunities and threats |
-| Performance Analytics | **Compass** | Points to what's working and what's not |
-| Client Onboarding | **Base Camp** | Where every journey begins |
-| Reporting Dashboard | **Summit** | The view from the top — see everything |
-| Client Fulfilment | **Sherpa** | Guides the delivery journey |
+| System | Name | Why | Pain bucket |
+|---|---|---|---|
+| Outbound Prospecting | **Scout** | Scouts ahead, finds opportunities before you see them | B1: Pipeline |
+| Inbound Response | **Beacon** | Guides people in, responds to signals | B1: Pipeline |
+| LinkedIn Outreach | **Signal** | Sends and reads signals on the platform | B1: Pipeline |
+| AI Proposal Writer | **Blueprint** | Drafts proposals, quotes, CIMs in minutes | B2: Proposals |
+| Smart Follow-Up | **Pulse** | Never lose a deal to silence | B2: Proposals |
+| Deal Acceleration | **Closer** | Closes the gap between interest and commitment | B2: Proposals |
+| Content Creation | **Voice** | Amplifies the founder's voice at scale | B5: Content |
+| Multi-Client Dashboard | **Compass** | One view across all clients and projects | B3: Operations |
+| Vendor/Supplier Coordinator | **Sherpa** | Manages 30+ vendors without the chaos | B3: Operations |
+| Scope & Deliverable Tracker | **Gauge** | Never over-service again | B3: Operations |
+| Client Health Monitor | **Pulse** | Know who's about to churn before they do | B6: Retention |
+| Reactivation Engine | **Revive** | Wake up dormant databases worth millions | B6: Retention |
+| Post-Delivery Follow-Up | **Echo** | Feedback, testimonials, referrals, rebooking. Automatically. | B6: Retention |
+| Reporting Dashboard | **Summit** | The view from the top — see everything | B3: Operations |
+| Daily Intelligence Brief | **Dawn** | Wake up knowing exactly what matters today | B7: Burnout |
+| Market Research | **Radar** | Scans the market for opportunities and threats | B5: Content |
+| Ad Copywriting | **Spark** | Ignites attention in paid channels | B5: Content |
+| Ad Optimisation | **Fuel** | Fuels growth by optimising ad spend | B4: Pricing |
+| Client Onboarding | **Base Camp** | Where every journey begins | B3: Operations |
+| Pricing Intelligence | **Scale** | Know exactly what to charge | B4: Pricing |
+| Delegation System | **Relay** | AI handles 80%, you handle the 20% that matters | B7: Burnout |
+
+### Named Niche Products (AIOS per vertical)
+
+| Niche | Product name | Entry system | Why this entry |
+|---|---|---|---|
+| Fractional Executives | **FractionalOS** | Scout (pipeline) | Pipeline is #1 pain. Zero regulation, fast sale. |
+| DMCs & Luxury Travel | **DestinationOS** | Blueprint (proposals) | Proposals are #1 pain. 8-20 hours each. |
+| Digital Agencies | **AgencyOS** | Scout (pipeline) | Feast-famine is universal. |
+| M&A Advisory | **DealOS** | Blueprint (CIMs) | CIMs take 40-80 hours. |
+| Specialty Recruitment | **RecruitOS** | Scout + Revive | Dual pain: pipeline + dormant database. |
+| Wellness Retreats | **RetreatOS** | Echo (post-delivery) | Rebooking is #1 revenue lever. |
+| Boutique Consulting | **AdvisoryOS** | Scout (pipeline) | Referral-dependent, 80% from network. |
+| Event Planners | **EventOS** | Sherpa (vendor mgmt) | 15-30 vendors per event is the daily nightmare. |
+| Property Management | **PropertyOS** | Compass (dashboard) | Daily high-volume tasks across locations. |
 
 ### Product Tier Names
 

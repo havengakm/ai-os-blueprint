@@ -48,64 +48,78 @@ Last updated: April 2026
 
 ## Margin Analysis Per Client
 
-### Starter Tier ($2,500/month retainer)
+### Founding Tier ($3,000/month retainer — first 3 per niche)
 
 | | Low | High |
 |---|---|---|
-| Revenue | $2,500 | $2,500 |
-| Variable costs | $570 | $640 |
-| **Gross profit** | **$1,860** | **$1,930** |
-| **Margin** | **74%** | **77%** |
+| Revenue | $3,000 | $3,000 |
+| Variable costs | $570 | $700 |
+| **Gross profit** | **$2,300** | **$2,430** |
+| **Margin** | **77%** | **81%** |
 
-### Growth Tier ($3,500/month retainer)
+Lower setup fee ($3K) accepted for case studies + testimonials.
 
-| | Low | High |
-|---|---|---|
-| Revenue | $3,500 | $3,500 |
-| Variable costs | $930 | $1,090 |
-| **Gross profit** | **$2,410** | **$2,570** |
-| **Margin** | **69%** | **73%** |
-
-### Scale Tier ($5,000/month retainer)
+### Standard Tier ($5,000/month retainer)
 
 | | Low | High |
 |---|---|---|
 | Revenue | $5,000 | $5,000 |
-| Variable costs | $1,410 | $1,760 |
-| **Gross profit** | **$3,240** | **$3,590** |
-| **Margin** | **65%** | **72%** |
+| Variable costs | $930 | $1,100 |
+| **Gross profit** | **$3,900** | **$4,070** |
+| **Margin** | **78%** | **81%** |
 
-**Target: 60%+ gross margin across all tiers.** Currently achieving 65-77%.
+### Growth Tier ($7,000-$10,000/month retainer)
+
+| | Low | High |
+|---|---|---|
+| Revenue | $7,000 | $10,000 |
+| Variable costs | $1,200 | $1,800 |
+| **Gross profit** | **$5,800** | **$8,200** |
+| **Margin** | **83%** | **82%** |
+
+### Premium Tier ($10,000-$15,000/month retainer)
+
+| | Low | High |
+|---|---|---|
+| Revenue | $10,000 | $15,000 |
+| Variable costs | $1,800 | $2,500 |
+| **Gross profit** | **$8,200** | **$12,500** |
+| **Margin** | **82%** | **83%** |
+
+**Target: 60%+ gross margin across all tiers.** Currently achieving 77-83% at updated pricing.
 
 ---
 
 ## Revenue Projections
 
-### Year 1 (May 2026 - April 2027)
+### Year 1 (May 2026 - April 2027) — Updated Pricing
 
-| Month | New clients | Total clients | Churn | MRR | Setup fees | Total |
-|---|---|---|---|---|---|---|
-| May 26 | 1 | 1 | 0 | $2,500 | $5,000 | $7,500 |
-| Jun 26 | 1 | 2 | 0 | $5,000 | $5,000 | $10,000 |
-| Jul 26 | 1 | 3 | 0 | $8,500 | $5,000 | $13,500 |
-| Aug 26 | 1 | 4 | 0 | $12,000 | $5,000 | $17,000 |
-| Sep 26 | 1 | 5 | 0 | $15,000 | $5,000 | $20,000 |
-| Oct 26 | 1 | 6 | 0 | $19,000 | $5,000 | $24,000 |
-| Nov 26 | 1 | 7 | 0 | $23,000 | $5,000 | $28,000 |
-| Dec 26 | 1 | 8 | 0 | $26,000 | $5,000 | $31,000 |
-| Jan 27 | 1 | 8 | 1 | $26,000 | $5,000 | $31,000 |
-| Feb 27 | 2 | 9 | 0 | $30,000 | $10,000 | $40,000 |
-| Mar 27 | 2 | 10 | 1 | $33,000 | $10,000 | $43,000 |
-| Apr 27 | 2 | 11 | 1 | $36,000 | $10,000 | $46,000 |
+| Month | New | Total | Churn | MRR | Setup | Total | Notes |
+|---|---|---|---|---|---|---|---|
+| May 26 | 1 | 1 | 0 | $3,000 | $3,000 | $6,000 | Founding client #1 |
+| Jun 26 | 1 | 2 | 0 | $6,000 | $3,000 | $9,000 | Founding #2 |
+| Jul 26 | 1 | 3 | 0 | $9,000 | $3,000 | $12,000 | Founding #3 (case studies) |
+| Aug 26 | 1 | 4 | 0 | $14,000 | $5,000 | $19,000 | Standard pricing starts |
+| Sep 26 | 1 | 5 | 0 | $19,000 | $5,000 | $24,000 | Retainer growth on early clients |
+| Oct 26 | 1 | 6 | 0 | $26,000 | $5,000 | $31,000 | Some clients upgrade tiers |
+| Nov 26 | 1 | 7 | 0 | $33,000 | $5,000 | $38,000 | |
+| Dec 26 | 1 | 8 | 0 | $40,000 | $5,000 | $45,000 | |
+| Jan 27 | 1 | 8 | 1 | $42,000 | $5,000 | $47,000 | First churn, new higher-tier client |
+| Feb 27 | 1 | 8 | 1 | $44,000 | $7,000 | $51,000 | Growth tier clients |
+| Mar 27 | 1 | 9 | 0 | $51,000 | $7,000 | $58,000 | |
+| Apr 27 | 1 | 10 | 0 | $58,000 | $7,000 | $65,000 | |
 
-**Year 1 total: ~$310,000**
-**Year 1 average MRR: ~$20,000**
+**Year 1 total: ~$405,000**
+**Year 1 ending MRR: ~$58,000**
+**Year 1 ARR run rate: ~$696,000**
 
 Assumes:
-- 1 new client/month for first 8 months, then 2/month
-- Blended $3,500/client with retainer growth
-- 5% monthly churn starting month 9 (first clients hitting 6-month mark)
-- $5,000 setup fee per client
+- 1 new client/month (conservative)
+- First 3 at founding rate ($3K setup + $3K/mo)
+- Standard from client 4 ($5K setup + $5K/mo)
+- Retainer growth: clients add systems → $5K becomes $7K becomes $10K
+- 5% monthly churn starting month 9
+- Blended MRR per client grows from $3K to $6.5K over 12 months
 
 ### Year 1 Costs
 
@@ -126,13 +140,27 @@ Assumes:
 | Metric | Value |
 |---|---|
 | Monthly fixed costs | ~$128 |
-| Monthly variable cost per client | ~$800 (blended) |
-| Average revenue per client | ~$3,500/month |
-| Contribution per client | ~$2,700/month |
+| Monthly variable cost per client | ~$1,000 (blended at new pricing) |
+| Average revenue per client | ~$5,800/month (blended with retainer growth) |
+| Contribution per client | ~$4,800/month |
 | Break-even clients | 1 (first client covers all fixed costs) |
-| Break-even MRR | $2,500 |
+| Break-even MRR | $3,000 |
 
-**Break-even on month 1 with first client.**
+**Break-even on month 1 with first founding client.**
+
+### Seven-figure path
+
+| Milestone | Clients | MRR | ARR | When |
+|---|---|---|---|---|
+| Break-even | 1 | $3K | $36K | Month 1 |
+| Full-time viable | 3 | $9K | $108K | Month 3 |
+| Hire VA | 6 | $26K | $312K | Month 6 |
+| Hire junior | 8 | $40K | $480K | Month 8 |
+| First $50K month | 10 | $58K | $696K | Month 12 |
+| $1M ARR | 12-14 | $83K+ | $1M | Month 14-18 |
+
+At updated pricing with retainer growth, $1M ARR is achievable with 12-14 clients.
+Previous pricing required 20+ clients for the same revenue.
 
 ---
 
