@@ -112,8 +112,12 @@ def _scale(raw: int, raw_max: int, cap: int) -> int:
 def _score_fit(contact: dict[str, Any], icp: dict[str, Any], cap: int) -> int:
     raw = 0
     industries: list[str] = icp.get("industries") or []
-    contact_industry: str = (contact.get("industry") or "").strip().lower()
-    if contact_industry and contact_industry in {i.strip().lower() for i in industries}:
+    contact_industry: str = (contact.get("industry") or "").lower()
+    # Substring match (config term in contact industry) — same direction as title
+    # and geography. ICP authors broad terms ("consulting"); vendor data returns
+    # specific taxonomy ("management consulting", "IT consulting") — substring
+    # bridges the two.
+    if contact_industry and any(i.lower() in contact_industry for i in industries if i):
         raw += _RAW_FIT_INDUSTRY
 
     titles: list[str] = icp.get("titles") or []

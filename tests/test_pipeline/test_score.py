@@ -91,14 +91,27 @@ def test_score_v1_industry_match_is_case_insensitive():
     assert score == 15  # industry fit only, nothing else set
 
 
-def test_score_v1_industry_mismatch_still_fails():
-    """Case-insensitive, but not substring — 'software' should not match 'SaaS'."""
+def test_score_v1_industry_broad_term_matches_specific():
+    """ICP authors broad terms ('consulting'), vendor data returns specific taxonomy
+    ('management consulting'). Substring match bridges the two."""
+    config = {
+        "weights": _BASE_CONFIG["weights"],
+        "tier_thresholds": _BASE_CONFIG["tier_thresholds"],
+        "icp": {**_BASE_CONFIG["icp"], "industries": ["consulting"]},
+    }
+    contact = _contact(industry="management consulting")
+    score = score_v1(contact, config)
+    assert score == 15  # industry fit only
+
+
+def test_score_v1_industry_unrelated_still_fails():
+    """Substring match must NOT fire on unrelated industries."""
     config = {
         "weights": _BASE_CONFIG["weights"],
         "tier_thresholds": _BASE_CONFIG["tier_thresholds"],
         "icp": {**_BASE_CONFIG["icp"], "industries": ["SaaS"]},
     }
-    contact = _contact(industry="software services")
+    contact = _contact(industry="manufacturing")
     score = score_v1(contact, config)
     assert score == 0
 
