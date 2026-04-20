@@ -60,9 +60,18 @@ class StorageBackend(Protocol):
         source_id: str | None = None,
         company_domain: str | None = None,
     ) -> bool:
-        """True if a contact already exists matching either (source, source_id)
-        OR company_domain (normalised). Either pair can be omitted if not
-        known — caller passes what it has."""
+        """Advisory dedup check — True if a contact already exists matching
+        EITHER (source, source_id) OR company_domain (normalised).
+
+        Preconditions: at least one of (source_id, company_domain) must be
+        provided. Calling with all identifiers None is a programmer error.
+
+        Advisory only: ultimate uniqueness is enforced by
+        `UNIQUE (client_id, source, source_id)` in 002_scout.sql. Real
+        Task-17 implementations should use `INSERT ... ON CONFLICT DO NOTHING`
+        and treat this method as a pre-filter for counters, not a lock.
+        Between this check and a subsequent insert_contact call, a parallel
+        run for the same client_id can race."""
         ...
 
     async def insert_contact(
@@ -79,10 +88,13 @@ class StorageBackend(Protocol):
         *,
         decision_type: str,
         decision: str,
+        context: dict[str, Any],  # required, matches the NOT NULL DB schema
         reasoning: str | None = None,
-        context: dict[str, Any] | None = None,
+        confidence: float | None = None,  # matches real DecisionLogger signature
     ) -> None:
-        """Append an entry to decision_log."""
+        """Append an entry to decision_log. `context` is required (DB column is
+        NOT NULL). `confidence` feeds the learning loop; orchestrator passes a
+        ratio-based proxy where applicable."""
         ...
 
 
@@ -117,6 +129,16 @@ class PullOrchestrator:
           to everything in `client_config.active_directories`.
         - `adapter_kwargs`: per-adapter keyword args forwarded to `pull()`.
           e.g. `{"csv_ingest": {"csv_content": "..."}}`.
+
+        Priority + tie-break semantics (documented per 2026-04-20 code review):
+        - Adapters run in construction order (NOT in `storage.active_directories` order)
+        - On a dedup tie (same domain / same company name across sources), the
+          FIRST adapter to produce the row wins. Later matches become
+          `skipped_duplicate`. This favours whichever adapter you registered first
+          in the PullOrchestrator constructor — typically the higher-quality source.
+        - If two sources have overlapping coverage and you want the richer source
+          to win, register it first. Merge-on-conflict semantics are deliberately
+          out of scope for Plan 1.
         """
         result = PullResult(client_id=client_id, dry_run=dry_run)
 
@@ -131,8 +153,13 @@ class PullOrchestrator:
         ghost_names = [name for name in active if name not in self._adapters_by_name]
         adapter_kwargs = adapter_kwargs or {}
 
-        # Track domains seen within this run for intra-run dedup
+        # Intra-run dedup keys. Priority order:
+        #   1. normalised company_domain (if present)
+        #   2. (source, source_id) tuple — cross-source but same source_id identifier
+        #   3. lower-cased company name — fallback when domain is null and source_id
+        #      differs (happens for Clutch rows from two categories featuring the same company)
         seen_domains_in_run: set[str] = set()
+        seen_name_fallback: set[str] = set()
 
         for adapter_name in ordered_active + ghost_names:
             adapter = self._adapters_by_name.get(adapter_name)
@@ -172,9 +199,15 @@ class PullOrchestrator:
 
             for row in rows:
                 normalised = normalize_domain(row.company_domain)
+                name_key = (row.company or "").strip().lower()
 
                 # Intra-run dedup on domain
                 if normalised and normalised in seen_domains_in_run:
+                    summary.skipped_duplicate += 1
+                    continue
+
+                # Intra-run dedup on company name (fallback when domain is null)
+                if not normalised and name_key and name_key in seen_name_fallback:
                     summary.skipped_duplicate += 1
                     continue
 
@@ -192,16 +225,27 @@ class PullOrchestrator:
                 if not dry_run:
                     await self._storage.insert_contact(client_id, row)
 
+                # Mark seen in intra-run sets
                 if normalised:
                     seen_domains_in_run.add(normalised)
+                elif name_key:
+                    seen_name_fallback.add(name_key)
                 summary.inserted += 1
 
+            confidence = summary.inserted / max(summary.pulled, 1)
             await self._storage.log_decision(
                 client_id,
                 decision_type="enrichment_choice",
                 decision="source_adapter_pulled",
                 reasoning=f"pulled={summary.pulled} inserted={summary.inserted} skipped={summary.skipped_duplicate}",
-                context={"adapter_name": adapter_name, "dry_run": dry_run},
+                context={
+                    "adapter_name": adapter_name,
+                    "dry_run": dry_run,
+                    "pulled": summary.pulled,
+                    "inserted": summary.inserted,
+                    "skipped_duplicate": summary.skipped_duplicate,
+                },
+                confidence=confidence,
             )
             result.per_source.append(summary)
 

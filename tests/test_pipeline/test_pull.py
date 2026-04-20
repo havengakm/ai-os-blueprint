@@ -33,12 +33,13 @@ class _FakeStorage:
     async def insert_contact(self, client_id, contact) -> None:
         self.inserted.append(contact)
 
-    async def log_decision(self, client_id, *, decision_type, decision, reasoning=None, context=None) -> None:
+    async def log_decision(self, client_id, *, decision_type, decision, context, reasoning=None, confidence=None) -> None:
         self.decisions.append({
             "decision_type": decision_type,
             "decision": decision,
             "reasoning": reasoning,
-            "context": context or {},
+            "context": context,
+            "confidence": confidence,
         })
 
 
@@ -200,3 +201,22 @@ async def test_orchestrator_logs_summary_decision_per_source():
         d["decision"] == "source_adapter_pulled" and d["context"]["adapter_name"] == "csv_ingest"
         for d in storage.decisions
     )
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_dedups_null_domain_rows_with_same_company():
+    """C1 regression — two Clutch-style rows with null domain but different source_ids
+    but same underlying company must dedup within a run."""
+    clutch_a = _adapter("clutch:developers/shopify", [
+        _row("Acme Co", source="clutch:developers/shopify", source_id="shopify-acme", domain=None),
+    ])
+    clutch_b = _adapter("clutch:developers/wordpress", [
+        _row("Acme Co", source="clutch:developers/wordpress", source_id="wp-acme", domain=None),
+    ])
+    storage = _FakeStorage(active=["clutch:developers/shopify", "clutch:developers/wordpress"])
+    orch = PullOrchestrator([clutch_a, clutch_b], storage)
+    result = await orch.run("clymb")
+
+    assert result.total_pulled == 2
+    assert result.total_inserted == 1  # second was deduped by company name
+    assert result.total_skipped_duplicate == 1
