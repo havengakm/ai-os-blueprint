@@ -20,7 +20,7 @@ HUNTER_DOMAIN_SEARCH_URL = "https://api.hunter.io/v2/domain-search"
 # (score, compiled pattern) — evaluated in order, first match wins
 _SENIORITY_RULES: list[tuple[int, re.Pattern[str]]] = [
     (100, re.compile(r"\bco[-\s]?founder\b|\bfounder\b", re.I)),
-    (90,  re.compile(r"\bceo\b|\bchief executive\b|\bpresident\b(?!.*\bvice\b)", re.I)),
+    (90,  re.compile(r"\bceo\b|\bchief executive\b|\bpresident\b", re.I)),
     (80,  re.compile(r"\bcfo\b|\bcoo\b|\bcto\b|\bchief\b.+\bofficer\b|\bchief operating\b|\bchief financial\b|\bchief technology\b", re.I)),
     (75,  re.compile(r"\bowner\b|\bmanaging director\b|\bmanaging partner\b", re.I)),
     (60,  re.compile(r"\bvp\b|\bvice president\b", re.I)),
@@ -71,7 +71,7 @@ def _pick_best_entry(emails: list[dict[str, Any]]) -> dict[str, Any] | None:
         if score == 0:
             continue
 
-        confidence = entry.get("confidence", 0)
+        confidence = entry.get("confidence") or 0
         has_linkedin = bool(entry.get("linkedin"))
 
         if (
@@ -143,7 +143,7 @@ class HunterDomainAdapter:
                 email=best["value"],
                 linkedin_url=best.get("linkedin") or None,
                 source=self.name,
-                confidence=float(best.get("confidence", 0)) / 100.0,
+                confidence=float(best.get("confidence") or 0) / 100.0,
                 sources_attempted=sources_attempted,
             )
         finally:

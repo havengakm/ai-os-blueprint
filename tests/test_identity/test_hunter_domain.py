@@ -177,3 +177,81 @@ async def test_hunter_request_shape(_env):
     params = call.kwargs.get("params", {})
     assert params.get("api_key") == "hunter-test-key"
     assert params.get("domain") == "foo.com"
+
+
+# C1 — null confidence
+@pytest.mark.asyncio
+async def test_hunter_handles_null_confidence(_env):
+    """confidence: null in Hunter payload must not crash the adapter."""
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _mock_response([
+        {
+            "value": "ceo@foo.com",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "position": "CEO",
+            "confidence": None,
+        },
+    ])
+    adapter = HunterDomainAdapter(http_client=mock_client)
+    result = await adapter.resolve(company="Foo Inc", company_domain="foo.com")
+
+    assert result is not None
+    assert result.confidence == 0.0
+
+
+# I3 — tiebreaker: higher confidence wins
+@pytest.mark.asyncio
+async def test_hunter_tiebreaker_prefers_higher_confidence(_env):
+    """Equal seniority score: entry with higher Hunter confidence is returned."""
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _mock_response([
+        {
+            "value": "ceo1@foo.com",
+            "first_name": "Low",
+            "last_name": "Conf",
+            "position": "CEO",
+            "confidence": 70,
+        },
+        {
+            "value": "ceo2@foo.com",
+            "first_name": "High",
+            "last_name": "Conf",
+            "position": "CEO",
+            "confidence": 95,
+        },
+    ])
+    adapter = HunterDomainAdapter(http_client=mock_client)
+    result = await adapter.resolve(company="Foo Inc", company_domain="foo.com")
+
+    assert result is not None
+    assert result.email == "ceo2@foo.com"
+
+
+# I3 — tiebreaker: linkedin presence wins when confidence is equal
+@pytest.mark.asyncio
+async def test_hunter_tiebreaker_prefers_linkedin_when_confidence_equal(_env):
+    """Equal score + equal confidence: entry with linkedin URL is returned."""
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _mock_response([
+        {
+            "value": "ceo1@foo.com",
+            "first_name": "No",
+            "last_name": "LinkedIn",
+            "position": "CEO",
+            "confidence": 90,
+        },
+        {
+            "value": "ceo2@foo.com",
+            "first_name": "Has",
+            "last_name": "LinkedIn",
+            "position": "CEO",
+            "confidence": 90,
+            "linkedin": "https://www.linkedin.com/in/haslinkedin",
+        },
+    ])
+    adapter = HunterDomainAdapter(http_client=mock_client)
+    result = await adapter.resolve(company="Foo Inc", company_domain="foo.com")
+
+    assert result is not None
+    assert result.email == "ceo2@foo.com"
