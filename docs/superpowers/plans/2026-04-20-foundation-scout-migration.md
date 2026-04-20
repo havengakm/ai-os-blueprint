@@ -2,6 +2,33 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Resume guide (for a fresh session picking up execution)
+
+**State at plan commit (2026-04-20):**
+- Design spec committed: [docs/superpowers/specs/2026-04-20-aios-clymb-deployment-design.md](../specs/2026-04-20-aios-clymb-deployment-design.md)
+- This plan committed
+- On branch `main` at commit `0fc3312` (plan added). No worktree yet.
+- `uv 0.11.7` installed at `~/.local/bin/uv` (run `source $HOME/.local/bin/env` to enable)
+- Base-camp-agents migration source: `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/base-camp-agents/` (confirmed accessible)
+- Memories saved in `/home/kirsten/.claude/projects/-home-kirsten-01-PERSONAL-10-PERSONAL-PROJECTS-ai-os-blueprint/memory/` covering: copy architecture, client UX, SOP discipline, ship quality over speed, cost management, value-first efficiency, improvement backlog, productised service, offer score framework, expert knowledge library
+
+**Start a fresh session like this:**
+
+1. Open a new Claude Code session in `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/`.
+2. Tell Claude: *"Execute the plan at [docs/superpowers/plans/2026-04-20-foundation-scout-migration.md](../plans/2026-04-20-foundation-scout-migration.md) using `superpowers:subagent-driven-development`. Start from Task 1 (worktree setup). `uv` is installed at ~/.local/bin/uv — run `source $HOME/.local/bin/env` first."*
+3. Claude will invoke the skill, create a worktree, dispatch subagents per task with two-stage review (spec compliance + code quality), and work through all 19 tasks.
+4. After each task completes, Claude marks the checkbox complete in its TodoWrite.
+
+**What this plan does NOT need from prior context:**
+- The brainstorm conversation is archived in memory + committed spec
+- All decisions are in the spec's "Key decisions locked in" table (Section 0-11)
+- The productisation principle (no custom code per client) is the most load-bearing constraint — memory will remind the agent
+- If the agent asks clarifying questions, default to what's already in the spec; if not covered there, ask Kirsten
+
+**If execution stalls:**
+- Budget: plan estimates ~19 tasks × (1 implementer + 2 reviewers) ≈ 57 subagent dispatches. If context pressure mounts, the agent can checkpoint with a completion note in this file and resume in yet another fresh session.
+- Fallback: switch to `superpowers:executing-plans` (inline execution, no subagent dispatch per task) — cheaper in subagent calls, heavier on session context.
+
 **Goal:** Build Plan 1 from the design spec — a pipeline that takes Clymb contacts from DB → rendered drafts (no QA, no send) in full BaseSystem-conformant fashion. End-to-end dry-run on 10 real contacts.
 
 **Architecture:** Migrate Scout's outbound pipeline from `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/base-camp-agents` into the blueprint's `systems/scout/` directory. Every stage extends `BaseSystem`, calls `load_foundation()`, logs decisions, and queries pattern_matcher/knowledge before acting. New template architecture replaces base-camp-agents' `generate_outreach.py` (templates + AI placeholder fills, not free-form generation).
