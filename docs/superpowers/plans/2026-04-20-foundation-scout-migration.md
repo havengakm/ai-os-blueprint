@@ -2,7 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **AMENDMENT 1 (2026-04-20):** Tasks 3.6, 3.7 added; Tasks 9 / 10 / 12 / 14 RESHAPED per the lead-sourcing + tiered-enrichment architecture decision. **Before touching any of those tasks**, read the decision record: [`docs/superpowers/decisions/2026-04-20-lead-sourcing-architecture.md`](../decisions/2026-04-20-lead-sourcing-architecture.md). The decision record is the authoritative contract for those tasks' shape. Tasks 1–3.5, 4–8, 11, 13, 15–19 are unchanged and can be executed against the original task body below.
+> **AMENDMENT 1 (2026-04-20):** Tasks 3.6, 3.7 added; Tasks 9 / 10 / 12 / 14 RESHAPED per the lead-sourcing + tiered-enrichment architecture decision.
+>
+> **AMENDMENT 2 (2026-04-20, same day):** **Drop Manus** from the stack; Claude API (Anthropic SDK) replaces it as primary research executor. **Add Task 9.5 (Decision-Maker Discovery)** between Tasks 9 and 10 — Apollo People Search → Hunter Domain Search → Claude scraper fallback, hard-fails contacts without resolved decision-maker. **Add Task 3.8** (`004_contacts_extensions.sql`) adding 9 new operator-facing + compliance columns to `contacts` (timezone, prospecting_method, buying_signals JSONB, key_pain_point, phone_source, phone_consent_basis, phone_found_at, sms_opted_out, identity_source). **Patch Task 3.7** to remove `MANUS_API_KEY` from Settings + `.env.example` + tests.
+>
+> **Before touching Tasks 9, 9.5, 10, 12, 14**, read the decision record: [`docs/superpowers/decisions/2026-04-20-lead-sourcing-architecture.md`](../decisions/2026-04-20-lead-sourcing-architecture.md). The decision record is the authoritative contract for those tasks' shape. Tasks 1–3.5, 4–8, 11, 13, 15–19 are unchanged.
 
 ## Resume guide (for a fresh session picking up execution)
 
@@ -674,6 +678,89 @@ Expected: 4 passed (2 existing + 2 new).
 git add .env.example config/settings.py tests/test_config_settings.py
 git commit -m "Add lead-stack API keys to Settings + .env.example"
 ```
+
+---
+
+## Task 3.7.1: Amendment-2 patch — remove `MANUS_API_KEY` from Settings
+
+**Why (Amendment 2):** Manus is no longer in the Scout stack — Claude API replaces it. Remove the `MANUS_API_KEY` field + env line + any test that references it. This is a small corrective patch to Task 3.7.
+
+**Files:**
+- Modify: `config/settings.py` (remove `manus_api_key` field from the "Lead stack (primary)" block)
+- Modify: `.env.example` (remove `MANUS_API_KEY=` line from the primary block)
+- Modify: `tests/test_config_settings.py` (remove `assert s.manus_api_key == ""` + the MANUS-setenv assertions; keep the other three key assertions)
+
+- [ ] **Step 1:** Remove the `manus_api_key: str = ""` line from `config/settings.py`. The "Lead stack (primary)" comment now has only `lusha_api_key`.
+
+- [ ] **Step 2:** Remove the `MANUS_API_KEY=` line from `.env.example`. Renaming the "Lead stack (primary)" section header to just `# === Lead stack (mobile + verification) ===` since only `LUSHA_API_KEY` remains there.
+
+- [ ] **Step 3:** Update `tests/test_config_settings.py`:
+  - `test_settings_lead_stack_keys_default_empty` — remove the `assert s.manus_api_key == ""` line; keep the three others.
+  - `test_settings_lead_stack_keys_override` — remove the `MANUS_API_KEY` monkeypatch + assertion; keep LUSHA.
+
+- [ ] **Step 4:** Run tests to confirm 11/11 still pass (or 10/10 if one test was tighter on the count — either way, green).
+
+- [ ] **Step 5:** Commit:
+
+```bash
+git add .env.example config/settings.py tests/test_config_settings.py
+git commit -m "Remove MANUS_API_KEY per Amendment 2 (Claude API replaces Manus)"
+```
+
+---
+
+## Task 3.8: Contacts table extensions (operator-facing + compliance)
+
+**Why (Amendment 2):** The operator-facing column shape from Kirsten's existing research CSV (Company, Website, Founder/CEO, Email, Phone, LinkedIn, Location, Timezone, Revenue, Employees, Prospecting Method, Buying Signals, AIOS Fit Score, Key Pain Point) needs 4 new columns on `contacts`. Plus 5 compliance + audit columns per the phone/SMS SOP and Task 9.5 identity-lookup stage. One migration adds all 9.
+
+**Files:**
+- Create: `scripts/sql/004_contacts_extensions.sql`
+
+- [ ] **Step 1:** Create `scripts/sql/004_contacts_extensions.sql` with EXACTLY this content:
+
+```sql
+-- 004_contacts_extensions.sql
+-- Operator-facing fields (timezone, prospecting_method, buying_signals, key_pain_point)
+-- + compliance audit fields (phone_source, phone_consent_basis, phone_found_at,
+-- sms_opted_out) + identity_source (which tool resolved the decision-maker).
+-- Depends on 002_scout.sql (contacts table).
+-- Amendment 2 of the 2026-04-20 lead-sourcing architecture decision.
+
+BEGIN;
+
+ALTER TABLE contacts
+    ADD COLUMN IF NOT EXISTS timezone TEXT,
+    ADD COLUMN IF NOT EXISTS prospecting_method TEXT,
+    ADD COLUMN IF NOT EXISTS buying_signals JSONB DEFAULT '[]',
+    ADD COLUMN IF NOT EXISTS key_pain_point TEXT,
+    ADD COLUMN IF NOT EXISTS phone_source TEXT,
+    ADD COLUMN IF NOT EXISTS phone_consent_basis TEXT,
+    ADD COLUMN IF NOT EXISTS phone_found_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS sms_opted_out BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS identity_source TEXT;
+
+COMMENT ON COLUMN contacts.prospecting_method IS
+    'How the prospect currently acquires their own customers (e.g., "Referral-based webinars", "Digital marketing content") — research output that signals whether outbound help is needed';
+COMMENT ON COLUMN contacts.buying_signals IS
+    'Array of observed intent signals: [{signal, source_url, observed_at}]';
+COMMENT ON COLUMN contacts.key_pain_point IS
+    'Single most salient pain point extracted by research — drives outreach hook selection';
+COMMENT ON COLUMN contacts.phone_consent_basis IS
+    'Legal basis for SMS-eligible phone number: legitimate_interest | explicit_consent | public_source';
+COMMENT ON COLUMN contacts.identity_source IS
+    'Tool that resolved decision-maker identity: apollo | hunter | claude_scraper | manual';
+
+COMMIT;
+```
+
+- [ ] **Step 2:** Commit:
+
+```bash
+git add scripts/sql/004_contacts_extensions.sql
+git commit -m "Add contacts table extensions — operator columns + compliance audit"
+```
+
+**Note:** no tests — same rationale as Task 3.6. This is a pure DDL migration; the decision record + phone/SMS SOP are the quality-review documentation.
 
 ---
 
@@ -1567,30 +1654,33 @@ git commit -m "Add pipeline trigger endpoint stub"
 
 ## Task 9: Migrate pull.py into systems/scout/pipeline/
 
-> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — this task's shape changed materially after the lead-sourcing architecture decision. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+> ⚠️ **RESHAPED PER AMENDMENTS 1 + 2 (2026-04-20)** — this task's shape changed materially. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
 >
 > **New shape (supersedes the original task body below for files + design):**
-> - Create a `systems/scout/sources/` package with one adapter per source: `clutch.py` (port from base-camp-agents reference code), `manus_directory.py` (generic, driven by a `directory_spec.yaml` per directory), `apollo.py` (fallback — not primary), `csv_ingest.py` (for uploaded seed lists)
+> - Create a `systems/scout/sources/` package with one adapter per source: `clutch.py` (port from base-camp-agents reference code), `directory_scraper.py` (generic, driven by a `directory_spec.yaml` per directory + Claude API for structured HTML extraction), `apollo_company.py` (company-level search, NOT people — that's Task 9.5), `csv_ingest.py` (for uploaded seed lists)
 > - `systems/scout/pipeline/pull.py` becomes a thin orchestrator: reads `client_config.active_directories`, dispatches each active source adapter in priority order, dedups against existing `contacts` by `(client_id, source, source_id)`, logs every dispatch to `decision_log`
-> - Every inserted contact's `source` column names the specific adapter (e.g., `"clutch_agencies"`, `"manus_directory:fca_register"`, `"apollo"`, `"csv:{upload_id}"`)
-> - **Apollo is a fallback only** — original task body used it as primary; that is now wrong
+> - Every inserted contact's `source` column names the specific adapter (e.g., `"clutch_agencies"`, `"directory:fca_register"`, `"apollo_company"`, `"csv:{upload_id}"`)
+> - **Produces company-level data only** — first_name, last_name, email, phone, linkedin_url may all be null at this stage. Task 9.5 Identity Lookup fills those.
+> - **Manus is NOT used** (Amendment 2) — Claude API + Python scrapers replace it
 >
 > **Interface contract each source adapter must implement:**
 > ```python
-> class SourceAdapter(Protocol):
+> class CompanySourceAdapter(Protocol):
 >     async def pull(
 >         self,
 >         client_id: str,
 >         icp_spec: ICPSpec,
 >         max_contacts: int,
 >         dry_run: bool = False,
->     ) -> list[RawContact]: ...
+>     ) -> list[RawCompanyContact]: ...
 > ```
-> — `RawContact` is a typed dict/pydantic model with first_name, last_name, title, company, company_domain, linkedin_url, email (if public), source_id, raw_data. See decision record Layer 2 table for expected field provenance per adapter.
+> — `RawCompanyContact` is a pydantic model with: company, company_domain, company_website, industry, employees, revenue_usd, city, state, geography, source, source_id, raw_data. **NOT expected**: first_name, last_name, email, phone, linkedin_url, title — those come from Task 9.5. See decision record Layer 2 table.
 >
 > **Base-camp-agents reference:** `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/base-camp-agents/` contains the original Clutch scraping logic — port behaviour, not verbatim code. The blueprint adapter must follow BaseSystem conventions (log decisions, read foundation context, respect autonomy level).
 >
-> Tests: at least one test per adapter (mock HTTP / mock Manus) + one orchestrator-level test (adapters dispatch in priority order, dedup on conflict). Follow TDD as in the original task body.
+> **`directory_scraper.py` design:** loads a YAML spec from `data/reference/directory_specs/{key}.yaml` describing the URL pattern, pagination rules, CSS selectors, and expected fields. Runs httpx + selectolax for static HTML; Playwright for JS-heavy sites. Uses Claude Haiku via Anthropic SDK for structured extraction when the HTML is messy (prompt returns JSON matching `RawCompanyContact`).
+>
+> Tests: at least one test per adapter (mock HTTP + snapshot HTML fixtures for Clutch) + one orchestrator-level test (adapters dispatch in priority order, dedup on conflict). Follow TDD as in the original task body.
 >
 > The original task body below remains for reference only (Apollo-as-primary shape) — do not follow it for files or design. The logging, decision-log, and foundation-loading requirements ARE still applicable.
 
@@ -1910,6 +2000,91 @@ Expected: 2 passed.
 git add systems/scout/pipeline/__init__.py systems/scout/pipeline/pull.py tests/test_pipeline/__init__.py tests/test_pipeline/test_pull.py
 git commit -m "Migrate pull_leads to BaseSystem-conformant PullStage"
 ```
+
+---
+
+## Task 9.5: Decision-Maker Discovery (NEW in Amendment 2)
+
+> ⚠️ **NEW TASK — Amendment 2 (2026-04-20).** Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.
+
+**Why:** Task 9 produces company-level contacts without a named decision-maker. Without a named person + direct email, cold outreach fails at scale (77% "Unknown" rate in a real research pass — see project CSV). This stage resolves the decision-maker via a purpose-built people-lookup waterfall BEFORE any enrichment spend fires, and hard-fails contacts where no one resolves (archives instead of burning Tier A/B/C budget on un-contactable rows).
+
+**Files:**
+- Create: `systems/scout/identity/__init__.py`
+- Create: `systems/scout/identity/apollo_people.py` — Apollo People Search adapter
+- Create: `systems/scout/identity/hunter_domain.py` — Hunter Domain Search adapter (for partner-firm cases)
+- Create: `systems/scout/identity/claude_identity_scraper.py` — Playwright + Claude fallback scraper
+- Create: `systems/scout/identity/orchestrator.py` — waterfall dispatcher
+- Create: `systems/scout/pipeline/identity.py` — pipeline stage wrapper (BaseSystem-conformant)
+- Create: `tests/test_identity/__init__.py`
+- Create: `tests/test_identity/test_apollo_people.py`
+- Create: `tests/test_identity/test_hunter_domain.py`
+- Create: `tests/test_identity/test_claude_scraper.py`
+- Create: `tests/test_identity/test_orchestrator.py`
+
+**Interface contract each identity adapter implements:**
+
+```python
+class IdentityAdapter(Protocol):
+    async def resolve(self, contact: Contact) -> IdentityResult | None: ...
+
+class IdentityResult(BaseModel):
+    first_name: str
+    last_name: str
+    title: str
+    email: str                    # work email (NOT info@ / contact@ / hello@ — adapter rejects these)
+    linkedin_url: str | None
+    source: str                   # "apollo" | "hunter" | "claude_scraper"
+    confidence: float             # 0-1
+    sources_attempted: list[str]  # URLs/API calls made
+```
+
+**Waterfall order in `orchestrator.py`:**
+1. `apollo_people.resolve(contact)` — Apollo People Search by `company_domain` + seniority filter (Founder, CEO, President, CxO, VP)
+2. `hunter_domain.resolve(contact)` — Hunter Domain Search on `company_domain`, returns all name+email pairs, picks the highest-seniority match
+3. `claude_identity_scraper.resolve(contact)` — Playwright-driven scrape of company Team/About/Leadership pages + LinkedIn company "People" filter + Google search `"{company} CEO OR founder"`, then Claude extracts structured JSON
+4. If all three return None → `contact.status = 'archived_no_decision_maker'`, `decision_log` entry with `decision_type='enrichment_choice'`, reasoning `"no_decision_maker_resolved"`, full `sources_attempted` list for audit
+
+**Rejection criteria in each adapter:**
+- Never return `info@`, `contact@`, `hello@`, `sales@`, `team@`, `admin@` as `email`
+- Never return a blank or `"Unknown"` for `first_name`/`last_name`
+- Never invent a title — if the source doesn't give one, return None
+
+**Hard rule enforced at pipeline stage:**
+- Identity lookup runs for every contact with `icp_score >= archive_floor` (default 35) — even Tier D gets identity lookup (cheap via Apollo), because without identity there's nothing to outreach to
+- Contacts that successfully resolve populate `contacts.first_name`, `last_name`, `title`, `email`, `linkedin_url`, `identity_source` (which tool resolved)
+- Contacts that fail resolution go to `status='archived_no_decision_maker'` — not retried automatically (operator can manually override)
+
+**Tests (TDD):**
+- `test_apollo_people.py`: mock Apollo HTTP, assert correct seniority filter, correct rejection of `info@`, correct `IdentityResult` shape
+- `test_hunter_domain.py`: mock Hunter HTTP, assert seniority selection logic, rejection of generic emails
+- `test_claude_scraper.py`: mock Playwright + Claude API, use snapshot HTML fixtures, verify structured extraction + rejection criteria
+- `test_orchestrator.py`: dispatch order (Apollo first), all-three-miss → archive, first-hit-wins, foundation/decision-log integration
+
+**Step-by-step implementation order (follow TDD throughout):**
+
+- [ ] **Step 1:** Create `tests/test_identity/__init__.py` + the 4 test files with failing tests for the minimum happy-path and one rejection case per adapter. Run, expect failures.
+
+- [ ] **Step 2:** Implement `apollo_people.py` using Apollo's people-search API (docs at https://docs.apollo.io/reference/people-search). Adapter reads `APOLLO_API_KEY` from settings, filters by domain + seniority, rejects generic emails. Tests pass.
+
+- [ ] **Step 3:** Implement `hunter_domain.py` using Hunter's Domain Search API (docs at https://hunter.io/api-documentation). Adapter reads `HUNTER_API_KEY` from settings, picks highest-seniority match via title keyword scoring. Tests pass.
+
+- [ ] **Step 4:** Implement `claude_identity_scraper.py` — Playwright headless browser fetches public pages (company Team page, LinkedIn company overview, Google SERP), passes HTML to Claude Haiku for structured extraction. Throttled 1 request per 15s. Tests use snapshot HTML.
+
+- [ ] **Step 5:** Implement `orchestrator.py` — waterfall dispatch, decision_log entries per call + per archive. Test verifies order + archive behavior.
+
+- [ ] **Step 6:** Implement `systems/scout/pipeline/identity.py` as the BaseSystem-conformant stage that the pipeline trigger endpoint (Task 8) can dispatch. Load foundation, iterate contacts with `icp_score >= archive_floor`, call orchestrator, update contacts row.
+
+- [ ] **Step 7:** Run full suite — expect all previous tests + 4 new identity test files green.
+
+- [ ] **Step 8:** Commit:
+
+```bash
+git add systems/scout/identity/ systems/scout/pipeline/identity.py tests/test_identity/
+git commit -m "Add Task 9.5 Decision-Maker Discovery stage (Apollo + Hunter + Claude waterfall)"
+```
+
+**Expected decision-maker resolution rate:** >75% after all three adapters. Track via `decision_log` — if Apollo+Hunter combined resolve <70%, that's signal to add a Phase-4 LinkedIn/Clearbit adapter. Archive rate > 25% consistently → ICP or sourcing pass needs review.
 
 ---
 
@@ -2440,14 +2615,14 @@ git commit -m "Migrate screen_contacts to BaseSystem-conformant ScreenStage"
 
 ## Task 12: Migrate enrich.py (merged with verify_emails.py)
 
-> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — tier-gated waterfall enrich now required. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+> ⚠️ **RESHAPED PER AMENDMENTS 1 + 2 (2026-04-20)** — tier-gated waterfall enrich with Claude-based research. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
 >
 > **New shape:**
-> - Create `systems/scout/enrich/` package with one adapter per vendor: `manus_research.py`, `apollo_enrich.py`, `lusha.py`, `zerobounce.py`
+> - Create `systems/scout/enrich/` package with one adapter per vendor: **`claude_research.py`** (Anthropic SDK, replaces any `manus_research.py`), `apollo_enrich.py`, `lusha.py`, `zerobounce.py`
 > - `systems/scout/pipeline/enrich.py` becomes a **tier-gated orchestrator**: reads the contact's tier, reads `client_config.tier_thresholds` + `tier_budgets_cents`, dispatches only the allowed adapters for that tier per the decision record's Layer 2 waterfall table
 > - **Hard gates enforced at orchestrator (not adapter):**
 >   - Phone lookup (`lusha.py`) only fires for `icp_score >= client_config.tier_thresholds.phone_gate` (default 50)
->   - Manus research only fires for `icp_score >= client_config.tier_thresholds.research_gate` (default 50)
+>   - Claude research only fires for `icp_score >= client_config.tier_thresholds.research_gate` (default 50)
 >   - Any blocked dispatch logs to `decision_log` with `decision_type='enrichment_choice'`, reasoning `"below_{gate}_gate"`, so the learning loop sees wasted-call patterns
 > - Each adapter gets its own file and its own test file; the orchestrator has its own test covering tier dispatch + gate enforcement + budget overflow handling
 > - ZeroBounce runs on every tier (A through D) — email verification is mandatory pre-send per the compliance SOP
@@ -3055,27 +3230,38 @@ git commit -m "Add template store: parse, validate, sync to DB"
 
 ## Task 14: Research module — per-contact placeholder research
 
-> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — Manus-driven structured research now required. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+> ⚠️ **RESHAPED PER AMENDMENTS 1 + 2 (2026-04-20)** — Claude-driven structured research (NOT Manus). **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
 >
-> **New shape:**
-> - Research is implemented in `systems/scout/enrich/manus_research.py` (already a Task 12 adapter) — this task defines the **structured output schema** that the adapter returns and the **prompt templates** that drive it
+> **New shape (Amendment 2):**
+> - Research is implemented in `systems/scout/enrich/claude_research.py` (a Task 12 adapter) using the Anthropic SDK — **Haiku for batch structured extraction, Sonnet for complex synthesis when Haiku output is malformed**
+> - This task defines the **structured output schema** that the adapter returns and the **prompt templates** that drive it
 > - Research depth is tier-pegged:
 >   - Tier A — all sub-fields populated
->   - Tier B — `hook_candidates` + `decision_maker_recent_activity` + `open_roles` only
->   - Tier C — `hook_candidates` only (max 1)
+>   - Tier B — `hook_candidates` + `decision_maker_recent_activity` + `open_roles` + `buying_signals` only
+>   - Tier C — `hook_candidates` (max 1) + `key_pain_point` only
 >   - Tier D — no research (adapter not called by orchestrator)
-> - Manus prompt templates live in `data/reference/manus_prompts/` so they're productised per CLAUDE.md "customisation is data, not code"
+> - Prompt templates live in `data/reference/research_prompts/` (NOT `manus_prompts/`) so they're productised per CLAUDE.md "customisation is data, not code"
 > - Every field in the output has a source URL for audit (factuality verification in Plan 2 QA agent depends on this)
 >
-> **Required output schema (pydantic model in `systems/scout/enrich/manus_research_schema.py`):**
+> **Rejection criteria built into the prompt (Amendment 2):**
+> - Reject `info@`, `contact@`, `hello@`, `sales@` as primary email — if only these exist, return `email: null` with `failure_reason` in sources
+> - Reject `"Available on website"` or vague phone values — return `phone: null` with `failure_reason` + `attempted_sources`
+> - Reject `"Unknown"` for decision-maker name — return `decision_maker: null` with `failure_reason` + `attempted_sources` (note: decision-maker discovery is Task 9.5's job; if Task 9.5 already resolved it, Task 14 research takes the name as input and enriches around it)
+> - Every field carries: value + source_url + confidence OR explicit `null` + `failure_reason` + `attempted_sources`
+>
+> **Required output schema (pydantic model in `systems/scout/enrich/claude_research_schema.py`):**
 > ```python
-> class ManusResearchResult(BaseModel):
+> class ResearchResult(BaseModel):
 >     company_summary: str
 >     recent_events: list[CompanyEvent]        # funding, hiring, leadership, product, M&A
 >     tech_stack_signals: list[str]
 >     decision_maker_recent_activity: list[ActivityItem]  # last ~10 public LinkedIn posts, podcasts, talks
 >     open_roles: list[JobPosting]             # from company careers page + LinkedIn Jobs
 >     hook_candidates: list[HookCandidate]     # angle + supporting evidence URL
+>     prospecting_method: str | None           # Amendment 2 — how the prospect currently acquires their own customers
+>     buying_signals: list[BuyingSignal]       # Amendment 2 — structured {signal, source_url, observed_at}
+>     key_pain_point: str | None               # Amendment 2 — single most salient pain
+>     timezone: str | None                     # Amendment 2 — derived from location via pytz
 >     buying_intent_score: int                 # 0-100 — feeds score_v2 intent category
 >     sources: list[str]                       # full URL list for factuality audit
 >
@@ -3083,13 +3269,20 @@ git commit -m "Add template store: parse, validate, sync to DB"
 >     angle: str
 >     evidence_url: str
 >     confidence: float                        # 0-1
+>
+> class BuyingSignal(BaseModel):
+>     signal: str                              # e.g., "Recruiting Area Presidents", "At capacity with $675MM AUM"
+>     source_url: str
+>     observed_at: datetime
 > ```
 >
-> **LinkedIn access rules (per `feedback_intent_signals` memory):**
-> - Public-view only by default
-> - If auth required: use dedicated burner LinkedIn account (NEVER Kirsten's or a real-person account)
-> - Throttle: 1 profile visit per 15–30 seconds
-> - Every LinkedIn visit logs to `decision_log` for audit
+> **Research writes directly into the new contacts columns added by Task 3.8** — `prospecting_method`, `buying_signals` (JSONB), `key_pain_point`, `timezone`. The enrich orchestrator is responsible for the UPDATE; `claude_research.py` returns the structured object only.
+>
+> **LinkedIn access rules (Amendment 2):**
+> - Identity data (name, title, email, LinkedIn URL) comes from Task 9.5's Apollo + Hunter + Claude-scraper waterfall — NOT from this research module
+> - This module only reads public LinkedIn posts for Tier A/B contacts where the decision-maker is already resolved
+> - Public-view only; throttle 1 visit per 15–30 seconds; every visit logs to `decision_log`
+> - If authenticated scraping is ever needed, use a dedicated burner LinkedIn account (NEVER Kirsten's or a real-person account)
 >
 > **Tests:** unit tests with mocked Manus responses validating schema parse, tier-gate enforcement, source-URL presence. An integration-ish test dispatching a stub Manus that returns well-formed JSON + verifies the adapter handles it.
 >
