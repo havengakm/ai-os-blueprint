@@ -156,13 +156,25 @@ Task 3.6 added `tier_budgets_cents` JSONB which supersedes the single `enrichmen
 
 ## Design input: Plans 3 / 4 scope seeds (do not touch in Plan 1)
 
-### 16. LinkedIn as first-class channel (future LinkedIn plan)
+### 16. LinkedIn as first-class channel — PLAN 3 PRIORITY
 
 **Raised by:** User video input 2026-04-20 (Victoria AI / Vapi / Make.com walkthrough)
-**Severity:** Future scope, NOT Plan 1 or Plan 2
+**Upgraded to Plan 3 priority:** 2026-04-20 (Kirsten): "LinkedIn must remain and is more valuable than voice for connecting with high-ticket prospects."
+**Severity:** Scheduled for Plan 3 (next major build after Beacon, which is Plan 2)
 **Source:** `data/reference/design_inputs/2026-04-20-multichannel-outbound-methodology.md`
 
-LinkedIn connection request then conditional message flow (accepted = LinkedIn msgs + cross-reference emails, rejected = email-only path) is a full channel, not a Plan 1 bolt-on. Needs: LinkedIn account pool, per-account daily quotas, session/cookie/proxy management, connection-acceptance webhook or poll, outgoing message adapter, reply routing into Beacon. Write a dedicated LinkedIn plan after Beacon is shipping reply-handling in production.
+With the AI voice agent rejected (decision 2026-04-20), LinkedIn becomes the next-priority outbound channel after email. Rationale: high-ticket buyers (CFOs, founders, agency owners) live on LinkedIn; cold email open-rates are declining; LinkedIn's "Accept the connection request" gate signals intent and qualifies the prospect before any message cost is incurred.
+
+**Plan 3 scope (not yet written):**
+- LinkedIn account pool per client, per-account daily quotas (platform rules, not TCPA)
+- Session management: cookies, proxies, fingerprint rotation
+- Connection-request adapter (message-less and with-note variants)
+- Connection-acceptance webhook or poll
+- Outgoing message adapter (LinkedIn DM, same template architecture as email — human-written templates + AI placeholder fills)
+- Reply routing into Beacon's reply handler (same autoresponder drives both channels)
+- Conditional sequence engine: if connected = LinkedIn messages + cross-reference emails; if rejected after 3d = email-only path
+
+**Sequencing:** write Plan 3 after Beacon's reply classifier is live in production (so LinkedIn replies have a working destination). Do not delay Plan 3 further than that — this is the primary channel for the high-ticket book, not a future nice-to-have.
 
 ### 17. Voice callback system — REJECTED
 
