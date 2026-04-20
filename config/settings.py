@@ -40,8 +40,7 @@ class Settings(BaseSettings):
     anymail_finder_api_key: str = ""
     zerobounce_api_key: str = ""
 
-    # --- Lead stack (primary, per 2026-04-20 architecture decision) ---
-    manus_api_key: str = ""         # primary scraping + research executor
+    # --- Lead stack (mobile phone, per 2026-04-20 architecture) ---
     lusha_api_key: str = ""         # mobile phone lookup (score >= 50 only)
 
     # --- Lead stack (escalation — enable only when triggers fire) ---
