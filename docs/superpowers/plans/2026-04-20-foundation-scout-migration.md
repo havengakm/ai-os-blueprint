@@ -450,6 +450,67 @@ git commit -m "Add Settings loader + .env.example"
 
 ---
 
+## Task 3.5: Patch foundation schema — add `clients` table + `pgcrypto`
+
+**Why:** `002_scout.sql` declares FKs to `clients(id)` across 14 tables, and `setup_client.sh` (Task 17) upserts into `clients`, but `scripts/sql/001_foundation.sql` never defines the `clients` table. Every `gen_random_uuid()` call also depends on `pgcrypto` — relying on Supabase's default project enablement makes the blueprint non-portable. This task adds both to the foundation schema so later Supabase migrations succeed and the blueprint stays portable beyond Supabase's defaults.
+
+**Files:**
+- Modify: `scripts/sql/001_foundation.sql`
+
+- [ ] **Step 1: Enable pgcrypto alongside vector**
+
+Replace the `-- Enable vector extension` block (top of file) with:
+
+```sql
+-- Enable required extensions
+create extension if not exists vector;
+create extension if not exists pgcrypto;
+```
+
+- [ ] **Step 2: Add `clients` table after the extension block, before `context_registry`**
+
+Insert this block:
+
+```sql
+-- ── Clients ───────────────────────────────────────────────────────────────────
+-- Identity row for the deployed client. Every productised deployment has exactly
+-- one row here (the client whose AIOS this is). All other tables FK to clients(id)
+-- so cascade deletes propagate cleanly when a client record is removed.
+
+create table if not exists clients (
+    id              text primary key,
+    name            text not null,
+    status          text not null default 'active' check (
+        status in ('active', 'paused', 'churned')
+    ),
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+alter table clients enable row level security;
+```
+
+- [ ] **Step 3: Add `clients_updated_at` trigger alongside the existing two**
+
+Insert this trigger immediately before the `context_registry_updated_at` trigger (around line ~224):
+
+```sql
+create or replace trigger clients_updated_at
+    before update on clients
+    for each row execute function update_updated_at();
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add scripts/sql/001_foundation.sql
+git commit -m "Add clients table + pgcrypto to foundation schema"
+```
+
+**Note:** existing foundation tables (`context_registry`, `knowledge_base`, `decision_log`, `autonomy_rules`) do NOT get retrofitted with FKs to `clients` in this change — that's a larger consistency pass and out of scope. Only the `clients` table and extension are added.
+
+---
+
 ## Task 4: Supabase schema — 002_scout.sql
 
 **Files:**
