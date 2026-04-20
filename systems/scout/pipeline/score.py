@@ -71,6 +71,8 @@ _RAW_REACH_VERIFIED_EMAIL = 10
 _RAW_REACH_UNVERIFIED_EMAIL = 5
 _RAW_REACH_LINKEDIN = 5
 _RAW_REACH_PHONE = 5
+# Unverified email is excluded from the sum because it is mutually exclusive
+# with verified email in _score_reach; adding both would inflate the scaling max.
 _DEFAULT_REACH_RAW_MAX = _RAW_REACH_VERIFIED_EMAIL + _RAW_REACH_LINKEDIN + _RAW_REACH_PHONE  # 20
 
 _RAW_RECENCY_FUNDING = 5
