@@ -2,6 +2,8 @@
 
 Source: YouTube walkthrough building Victoria AI + Vapi + Make.com three-channel outbound (email, LinkedIn, voice callback). Captured 2026-04-20 as an input for Plans 2–4. Not a spec. Not a vendor endorsement.
 
+> **AMENDMENT (2026-04-20, same day):** **AI voice agent REJECTED** from the roadmap. See [`docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md`](../../../docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md). This note's "Voice callback triggered by positive reply" section and the "Vendor questions to resolve before the Voice plan" section are historical. The email + LinkedIn portions remain valid design inputs. Beacon's reply handler sends the Calendly link directly; a human closer takes the call.
+
 ## What the video demonstrates
 
 1. **Lead CSV with first name, last name, company name, company website, personal email, LinkedIn URL, company phone.** Company website and LinkedIn URL are mandatory because they are the research substrate.

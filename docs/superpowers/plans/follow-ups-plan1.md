@@ -164,21 +164,21 @@ Task 3.6 added `tier_budgets_cents` JSONB which supersedes the single `enrichmen
 
 LinkedIn connection request then conditional message flow (accepted = LinkedIn msgs + cross-reference emails, rejected = email-only path) is a full channel, not a Plan 1 bolt-on. Needs: LinkedIn account pool, per-account daily quotas, session/cookie/proxy management, connection-acceptance webhook or poll, outgoing message adapter, reply routing into Beacon. Write a dedicated LinkedIn plan after Beacon is shipping reply-handling in production.
 
-### 17. Voice callback system (future Voice plan)
+### 17. Voice callback system — REJECTED
 
 **Raised by:** User video input 2026-04-20
-**Severity:** Future scope, NOT Plan 1 or Plan 2
-**Source:** `data/reference/design_inputs/2026-04-20-multichannel-outbound-methodology.md`
+**Severity:** REJECTED (2026-04-20)
+**Decision record:** [`docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md`](../decisions/2026-04-20-reject-ai-voice-agent.md)
 
-Outbound voice call 60 to 120 seconds after a positive reply, passing `first_name` and `phone_number` into the voice agent's dynamic prompt. Plan after Beacon's reply classifier is live, so the trigger has a real source.
+Dropped from the roadmap. Call volume too low to justify the build; high-ticket closing needs a human, not an AI voice agent; downside risk of a fumbled objection on a warm prospect exceeds the upside of faster booking. Replaced by Beacon sending the Calendly link directly on positive reply, human closer takes the call.
 
-### 18. Voice vendor decision (research before writing the Voice plan)
+### 18. Voice vendor decision — REJECTED
 
 **Raised by:** Kirsten 2026-04-20 after reviewing video
-**Severity:** Research task, blocks writing the Voice plan, does not block Plan 1 / 2
-**Source:** `data/reference/design_inputs/2026-04-20-multichannel-outbound-methodology.md` (section "Vendor questions to resolve before the Voice plan")
+**Severity:** REJECTED (2026-04-20)
+**Decision record:** [`docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md`](../decisions/2026-04-20-reject-ai-voice-agent.md)
 
-Vapi is adequate for simple thank-and-text-Calendly calls but possibly not for a high-ticket qualifying call that needs to hold a conversation under objections. Research Vapi vs Dan Martell's voice product (name to confirm) vs Bland, Retell, Synthflow, ElevenLabs Conversational AI. Score each on: conversational sophistication under objection, naturalness + latency, prompt + knowledge-base ergonomics, transcript-to-decision-log pipeline, per-minute cost vs tier caps, TCPA + state consent, fallback to SMS or email on call failure. Produce a decision record (pattern of `2026-04-20-lead-sourcing-architecture.md`) before writing the Voice plan. Keep Vapi as the placeholder vendor in conceptual notes until the decision record lands.
+Voice vendor research is not needed; the voice system itself is dropped. Item 17 explains why.
 
 ## Identity scraper lifecycle hardening
 

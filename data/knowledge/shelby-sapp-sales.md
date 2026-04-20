@@ -16,7 +16,7 @@ Shelby's approach is built on Identity Selling and Authority Positioning. You ar
 
 **Saying Less is More:** amateurs talk themselves out of deals; masters listen their way into fortunes. Silence is a powerful negotiation tool, especially after the price drop.
 
-**How to apply:** every AIOS discovery call template enforces the 80/20 rule via script cues (open-ended questions, pauses marked in the script, "listen back" moments). Identity-selling language gets woven into reply drafts and voice-agent prompts when the prospect has revealed a self-concept to anchor to.
+**How to apply:** every AIOS discovery call template enforces the 80/20 rule via script cues (open-ended questions, pauses marked in the script, "listen back" moments). Identity-selling language gets woven into reply drafts (Beacon autoresponder) when the prospect has revealed a self-concept to anchor to. Live-call application is human closer only (see decision [`reject-ai-voice-agent.md`](../../docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md)).
 
 ---
 
@@ -46,7 +46,7 @@ Goal: quantify the Dream Outcome.
 
 Key Question: "When we implement the AIOS and you're getting 15+ qualified meetings a month on autopilot, what does that allow you to do that you can't do now?"
 
-**How to apply:** AIOS discovery-call SOPs must walk the three buckets in order, never skip one. Replies from Beacon (the AI autoresponder system) should push prospects into a discovery booking rather than answering pricing or scope questions in-channel, because the three-bucket tension only works on a live call. Voice agents that pre-qualify should ask Bucket 1 + 2 only, then hand off to a human (or AI closer) for Bucket 3 and the drop.
+**How to apply:** AIOS discovery-call SOPs must walk the three buckets in order, never skip one. Replies from Beacon (the AI autoresponder system) should push prospects into a discovery booking rather than answering pricing or scope questions in-channel, because the three-bucket tension only works on a live call with a human closer.
 
 ---
 
@@ -66,7 +66,7 @@ From the "Big Deal" Podcast, these are the high-stakes moves for closing $5k+ re
 
 **Retention-Over-Acquisition Thinking:** position the AIOS as a long-term infrastructure play that increases the LTV of their *own* clients, not just a one-time lead gen tool.
 
-**How to apply:** AIOS voice-agent prompts and human closer scripts should load the Doctor/DJ tonal instructions when entering the close phase. Pricing pages and proposals must always present Price and Cost side by side, never Price alone. Retention framing is standard in renewal and expansion conversations.
+**How to apply:** human closer scripts and training materials load the Doctor/DJ tonal instructions when entering the close phase. Pricing pages and proposals must always present Price and Cost side by side, never Price alone. Retention framing is standard in renewal and expansion conversations.
 
 ---
 
@@ -83,7 +83,7 @@ Shelby reframes objections as "limiting beliefs" that require leadership to over
 | **"Is this a scam? / Bad reviews"** | Volume & Statistics. | "We have 4,000 clients. If there are 2 bad reviews, that's a 0.0001% negative rate. I'd say those are pretty good odds for your success." |
 | **"I'm not ready / I'm scared"** | The Gray Area. | "The best decisions are made in the gray area. You don't make life-changing moves when everything is 100% certain. Now is the best time to act." |
 
-**How to apply:** Beacon's reply-classifier maps inbound objections to one of these six categories and either (a) routes the prospect back to a live call with the matched reframe pre-loaded for the human/AI closer, or (b) for low-friction objections, drafts a reply template using the matched script adapted to AIOS context. Voice agents doing qualification must recognize all six triggers and invoke the reframe inline.
+**How to apply:** Beacon's reply-classifier maps inbound objections to one of these six categories and either (a) routes the prospect back to a live call with the matched reframe pre-loaded for the human closer, or (b) for low-friction objections, drafts a reply template using the matched script adapted to AIOS context.
 
 ---
 
@@ -98,7 +98,7 @@ Six-step sequence for live closing conversations, $5k+ deals:
 5. **The Drop & Silence:** state the price clearly and stop talking. The first person to speak after the drop usually loses the negotiation.
 6. **Handle Limiting Beliefs:** use the Objection Playbook to lead them through their fears.
 
-**How to apply:** this is the canonical script spine for all AIOS discovery-to-close calls. Every human closer and every AI voice agent built on Voice Plan (future) must follow this six-step arc. Deviations get flagged in post-call QA and drive continuous improvement. Track drop-off rate at each step to identify where prospects exit, then tune.
+**How to apply:** this is the canonical script spine for all AIOS discovery-to-close calls. Every human closer follows this six-step arc. Deviations get flagged in post-call QA (recording review) and drive continuous improvement. Track drop-off rate at each step to identify where prospects exit, then tune the script.
 
 ---
 
@@ -108,7 +108,7 @@ Six-step sequence for live closing conversations, $5k+ deals:
 
 **Identity language over feature language.** "Decisive leader" beats "customer who needs a solution." AIOS copy-generation prompts should prefer identity-anchored phrases over feature-anchored ones when the prospect has given identity cues.
 
-**Silence is a tool.** Scripts for humans should include explicit "pause 4 seconds" cues. Voice agents need the same: after the price drop, the agent should hold silence until the prospect speaks, rather than filling the gap.
+**Silence is a tool.** Scripts for human closers include explicit "pause 4 seconds" cues, especially after the price drop. The first person to speak usually loses the negotiation.
 
 **The "gray area" frame.** Best decisions are made under uncertainty. AIOS closing sequences should surface this frame when the prospect hesitates, rather than trying to eliminate their uncertainty (which is impossible and undermines authority).
 
@@ -120,7 +120,7 @@ This file is the canonical reference for:
 
 - **Discovery call SOPs** (`data/reference/sops/discovery-call-*.md` when drafted)
 - **Beacon reply classifier** (Plan 2+) objection-to-reframe mapping
-- **Voice agent prompts** (future Voice plan) for qualification and thank-and-book calls
+- **Human closer training and script spine** (AI voice closing is REJECTED; see `docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md`)
 - **Proposal templates** (future) for Price-vs-Cost framing and retention pitches
 - **Weekly QA review** of call recordings against the six-step close arc
 
