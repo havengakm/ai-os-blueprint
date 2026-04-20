@@ -170,8 +170,7 @@ def test_screen_rejects_blacklisted_company():
         ICP_CONFIG,
     )
     assert passed is False
-    assert reason.startswith("blacklisted_company:")
-    assert "bad corp" in reason.lower()
+    assert reason == "blacklisted_company:bad corp"
 
 
 def test_screen_rejects_blacklisted_domain():
@@ -185,7 +184,7 @@ def test_screen_rejects_blacklisted_domain():
         ICP_CONFIG,
     )
     assert passed is False
-    assert reason.startswith("blacklisted_domain:")
+    assert reason == "blacklisted_domain:EVIL.IO"
 
 
 def test_screen_handles_missing_icp_block():
@@ -278,11 +277,11 @@ async def test_screen_stage_dry_run_skips_persistence():
 
 @pytest.mark.asyncio
 async def test_screen_stage_mixed_batch_buckets():
-    """4 contacts: 1 pass, 1 missing_name, 1 blacklisted_company, 1 blacklisted_domain.
-    rejections_by_reason has correct counts per bucket."""
+    """5 contacts: 1 pass + all 4 rejection buckets exercised exactly once."""
     contacts = [
         valid_contact("c-pass"),
         no_name_contact("c-name"),
+        no_company_contact("c-noco"),
         blacklisted_company_contact("c-co"),
         blacklisted_domain_contact("c-dom"),
     ]
@@ -291,12 +290,12 @@ async def test_screen_stage_mixed_batch_buckets():
 
     result = await stage.run("client-1")
 
-    assert result.total_eligible == 4
+    assert result.total_eligible == 5
     assert result.total_passed == 1
-    assert result.total_rejected == 3
+    assert result.total_rejected == 4
     assert result.total_errored == 0
     assert result.rejections_by_reason["missing_name"] == 1
-    assert result.rejections_by_reason["missing_company"] == 0
+    assert result.rejections_by_reason["missing_company"] == 1
     assert result.rejections_by_reason["blacklisted_company"] == 1
     assert result.rejections_by_reason["blacklisted_domain"] == 1
 
@@ -316,6 +315,25 @@ async def test_screen_stage_persist_error_continues():
     assert result.total_passed == 0
     # Loop did not abort after first error
     assert len(storage.passed) == 0
+
+
+@pytest.mark.asyncio
+async def test_screen_stage_reject_persist_error_continues():
+    """mark_contact_rejected raises. Loop continues, total_errored correct."""
+    contacts = [
+        blacklisted_company_contact("c-blk1"),
+        blacklisted_company_contact("c-blk2"),
+    ]
+    storage = FakeStorage(config=ICP_CONFIG, contacts=contacts)
+    storage.raise_on_reject = RuntimeError("reject db down")
+    stage = ScreenStage(storage)
+
+    result = await stage.run("client-1")
+
+    assert result.total_eligible == 2
+    assert result.total_errored == 2
+    assert result.total_rejected == 0
+    assert len(storage.rejected) == 0
 
 
 @pytest.mark.asyncio
