@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **AMENDMENT 1 (2026-04-20):** Tasks 3.6, 3.7 added; Tasks 9 / 10 / 12 / 14 RESHAPED per the lead-sourcing + tiered-enrichment architecture decision. **Before touching any of those tasks**, read the decision record: [`docs/superpowers/decisions/2026-04-20-lead-sourcing-architecture.md`](../decisions/2026-04-20-lead-sourcing-architecture.md). The decision record is the authoritative contract for those tasks' shape. Tasks 1–3.5, 4–8, 11, 13, 15–19 are unchanged and can be executed against the original task body below.
+
 ## Resume guide (for a fresh session picking up execution)
 
 **State at plan commit (2026-04-20):**
@@ -508,6 +510,170 @@ git commit -m "Add clients table + pgcrypto to foundation schema"
 ```
 
 **Note:** existing foundation tables (`context_registry`, `knowledge_base`, `decision_log`, `autonomy_rules`) do NOT get retrofitted with FKs to `clients` in this change — that's a larger consistency pass and out of scope. Only the `clients` table and extension are added.
+
+---
+
+## Task 3.6: Extend `client_config` for tiered enrichment + directory sourcing
+
+**Why:** The 2026-04-20 lead-sourcing architecture decision requires per-tier budgets, tier thresholds, scoring weights, and an `active_directories` list on `client_config`. Instead of editing the committed `002_scout.sql`, ship a new migration that ALTERs the table. See [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) for the full architecture.
+
+**Files:**
+- Create: `scripts/sql/003_client_config_extensions.sql`
+
+- [ ] **Step 1: Create `scripts/sql/003_client_config_extensions.sql`**
+
+Full migration — paste verbatim:
+
+```sql
+-- 003_client_config_extensions.sql
+-- Extends client_config for the lead-sourcing + tiered-enrichment architecture
+-- (decision 2026-04-20). Adds active_directories, scoring weights, per-tier budgets,
+-- and tier thresholds. Depends on 002_scout.sql (client_config table).
+
+BEGIN;
+
+-- Active directories per client (list of directory keys this client pulls from)
+ALTER TABLE client_config
+    ADD COLUMN IF NOT EXISTS active_directories TEXT[] DEFAULT '{}';
+-- Example: '{"clutch_agencies","g2_saas_buyers","fca_register"}'
+
+-- Scoring weights (overrides code defaults)
+ALTER TABLE client_config
+    ADD COLUMN IF NOT EXISTS weights JSONB DEFAULT '{
+        "fit": 40,
+        "intent": 30,
+        "reach": 20,
+        "recency": 10
+    }';
+
+-- Per-tier enrichment budgets in cents per contact
+-- Supersedes the single enrichment_budget_per_contact_cents column
+ALTER TABLE client_config
+    ADD COLUMN IF NOT EXISTS tier_budgets_cents JSONB DEFAULT '{
+        "A": 30,
+        "B": 15,
+        "C": 10,
+        "D": 5,
+        "archive": 0
+    }';
+
+-- Tier thresholds (score ranges + hard gates)
+-- phone_gate and research_gate are the hard gates enforced by the enrich orchestrator
+ALTER TABLE client_config
+    ADD COLUMN IF NOT EXISTS tier_thresholds JSONB DEFAULT '{
+        "A": 80,
+        "B": 65,
+        "C": 50,
+        "D": 35,
+        "phone_gate": 50,
+        "research_gate": 50,
+        "archive_floor": 35
+    }';
+
+COMMIT;
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add scripts/sql/003_client_config_extensions.sql
+git commit -m "Add client_config extensions for tiered enrichment + directory sourcing"
+```
+
+**Note:** the old `enrichment_budget_per_contact_cents` column from 002_scout.sql remains — it's not removed. Code reads `tier_budgets_cents` going forward; the legacy column can be dropped in a future cleanup migration after confirming no read paths.
+
+---
+
+## Task 3.7: Extend `Settings` + `.env.example` for lead-stack API keys
+
+**Why:** Amendment-1 architecture introduces Manus + Lusha as baseline vendors and Hunter + Cognism as escalation-only vendors. Settings + `.env.example` need the new keys. See [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md).
+
+**Files:**
+- Modify: `.env.example` (add 4 keys in a new "Lead stack" section)
+- Modify: `config/settings.py` (add 4 optional string fields)
+- Modify: `tests/test_config_settings.py` (add one test asserting new defaults)
+
+- [ ] **Step 1: Update `.env.example`**
+
+Add a new section between the existing "Enrichment" and "Communication" blocks:
+
+```bash
+# === Lead stack (primary — baseline for first 1–3 clients) ===
+MANUS_API_KEY=
+LUSHA_API_KEY=
+
+# === Lead stack (escalation — enable only when triggers fire per vendor-stack memory) ===
+HUNTER_API_KEY=
+COGNISM_API_KEY=
+```
+
+- [ ] **Step 2: Update `config/settings.py`**
+
+Insert these four fields inside `class Settings(BaseSettings)`, grouped under a new comment section, after the existing `# --- Enrichment ---` block:
+
+```python
+    # --- Lead stack (primary, per 2026-04-20 architecture decision) ---
+    manus_api_key: str = ""         # primary scraping + research executor
+    lusha_api_key: str = ""         # mobile phone lookup (score >= 50 only)
+
+    # --- Lead stack (escalation — enable only when triggers fire) ---
+    hunter_api_key: str = ""        # second-pass email finder (escalation)
+    cognism_api_key: str = ""       # compliance-grade mobile (escalation)
+```
+
+- [ ] **Step 3: Add a new test to `tests/test_config_settings.py`**
+
+Append:
+
+```python
+def test_settings_lead_stack_keys_default_empty(monkeypatch):
+    monkeypatch.setenv("CLIENT_ID", "test-client")
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+    monkeypatch.setenv("CRON_SECRET", "test-cron")
+
+    from config.settings import get_settings
+    get_settings.cache_clear()
+    s = get_settings()
+
+    assert s.manus_api_key == ""
+    assert s.lusha_api_key == ""
+    assert s.hunter_api_key == ""
+    assert s.cognism_api_key == ""
+
+
+def test_settings_lead_stack_keys_override(monkeypatch):
+    monkeypatch.setenv("CLIENT_ID", "test-client")
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+    monkeypatch.setenv("CRON_SECRET", "test-cron")
+    monkeypatch.setenv("MANUS_API_KEY", "m-key")
+    monkeypatch.setenv("LUSHA_API_KEY", "l-key")
+
+    from config.settings import get_settings
+    get_settings.cache_clear()
+    s = get_settings()
+
+    assert s.manus_api_key == "m-key"
+    assert s.lusha_api_key == "l-key"
+```
+
+- [ ] **Step 4: Run tests — must pass**
+
+```bash
+uv run pytest tests/test_config_settings.py -v
+```
+
+Expected: 4 passed (2 existing + 2 new).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .env.example config/settings.py tests/test_config_settings.py
+git commit -m "Add lead-stack API keys to Settings + .env.example"
+```
 
 ---
 
@@ -1401,6 +1567,38 @@ git commit -m "Add pipeline trigger endpoint stub"
 
 ## Task 9: Migrate pull.py into systems/scout/pipeline/
 
+> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — this task's shape changed materially after the lead-sourcing architecture decision. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+>
+> **New shape (supersedes the original task body below for files + design):**
+> - Create a `systems/scout/sources/` package with one adapter per source: `clutch.py` (port from base-camp-agents reference code), `manus_directory.py` (generic, driven by a `directory_spec.yaml` per directory), `apollo.py` (fallback — not primary), `csv_ingest.py` (for uploaded seed lists)
+> - `systems/scout/pipeline/pull.py` becomes a thin orchestrator: reads `client_config.active_directories`, dispatches each active source adapter in priority order, dedups against existing `contacts` by `(client_id, source, source_id)`, logs every dispatch to `decision_log`
+> - Every inserted contact's `source` column names the specific adapter (e.g., `"clutch_agencies"`, `"manus_directory:fca_register"`, `"apollo"`, `"csv:{upload_id}"`)
+> - **Apollo is a fallback only** — original task body used it as primary; that is now wrong
+>
+> **Interface contract each source adapter must implement:**
+> ```python
+> class SourceAdapter(Protocol):
+>     async def pull(
+>         self,
+>         client_id: str,
+>         icp_spec: ICPSpec,
+>         max_contacts: int,
+>         dry_run: bool = False,
+>     ) -> list[RawContact]: ...
+> ```
+> — `RawContact` is a typed dict/pydantic model with first_name, last_name, title, company, company_domain, linkedin_url, email (if public), source_id, raw_data. See decision record Layer 2 table for expected field provenance per adapter.
+>
+> **Base-camp-agents reference:** `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/base-camp-agents/` contains the original Clutch scraping logic — port behaviour, not verbatim code. The blueprint adapter must follow BaseSystem conventions (log decisions, read foundation context, respect autonomy level).
+>
+> Tests: at least one test per adapter (mock HTTP / mock Manus) + one orchestrator-level test (adapters dispatch in priority order, dedup on conflict). Follow TDD as in the original task body.
+>
+> The original task body below remains for reference only (Apollo-as-primary shape) — do not follow it for files or design. The logging, decision-log, and foundation-loading requirements ARE still applicable.
+
+---
+
+### Original task body (SUPERSEDED — see banner above)
+
+
 **Files:**
 - Create: `systems/scout/pipeline/__init__.py`
 - Create: `systems/scout/pipeline/pull.py`
@@ -1716,6 +1914,26 @@ git commit -m "Migrate pull_leads to BaseSystem-conformant PullStage"
 ---
 
 ## Task 10: Migrate score.py
+
+> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — two-phase scoring now required. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+>
+> **New shape:**
+> - `systems/scout/pipeline/score.py` exposes TWO functions: `score_v1(contact, client_config) -> int` and `score_v2(contact, client_config) -> int`
+> - `score_v1` runs AFTER pull, BEFORE enrich — uses only fit/reach/recency signals available from the pull payload (max 70 points)
+> - `score_v2` runs AFTER enrich — adds intent signals from Manus research + any accumulated `activity_log` webhook data (adds up to 30 points → max 100)
+> - **Weights read from `client_config.weights` JSON** (defaults from Task 3.6 migration); code never hardcodes the weights
+> - **Tier assignment helper:** `assign_tier(score, client_config) -> str` reads `client_config.tier_thresholds` and returns `'A'|'B'|'C'|'D'|'archive'`
+> - Score below `archive_floor` (default 35) → contact marked `status='archived'`, no further pipeline work
+> - Every scoring run logs a `decision_log` entry with `decision_type='icp_threshold'` and context (scores per category + final)
+>
+> **Tests:** unit tests for score_v1 + score_v2 + assign_tier with hand-constructed contacts covering each tier boundary. Weight-override test (client_config has custom weights → score reflects them). Follow TDD as in original.
+>
+> The original task body below is reference only — its single-phase scoring model is superseded, but foundation-loading, decision-logging patterns still apply.
+
+---
+
+### Original task body (SUPERSEDED — see banner above)
+
 
 **Files:**
 - Create: `systems/scout/pipeline/score.py`
@@ -2221,6 +2439,42 @@ git commit -m "Migrate screen_contacts to BaseSystem-conformant ScreenStage"
 ---
 
 ## Task 12: Migrate enrich.py (merged with verify_emails.py)
+
+> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — tier-gated waterfall enrich now required. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+>
+> **New shape:**
+> - Create `systems/scout/enrich/` package with one adapter per vendor: `manus_research.py`, `apollo_enrich.py`, `lusha.py`, `zerobounce.py`
+> - `systems/scout/pipeline/enrich.py` becomes a **tier-gated orchestrator**: reads the contact's tier, reads `client_config.tier_thresholds` + `tier_budgets_cents`, dispatches only the allowed adapters for that tier per the decision record's Layer 2 waterfall table
+> - **Hard gates enforced at orchestrator (not adapter):**
+>   - Phone lookup (`lusha.py`) only fires for `icp_score >= client_config.tier_thresholds.phone_gate` (default 50)
+>   - Manus research only fires for `icp_score >= client_config.tier_thresholds.research_gate` (default 50)
+>   - Any blocked dispatch logs to `decision_log` with `decision_type='enrichment_choice'`, reasoning `"below_{gate}_gate"`, so the learning loop sees wasted-call patterns
+> - Each adapter gets its own file and its own test file; the orchestrator has its own test covering tier dispatch + gate enforcement + budget overflow handling
+> - ZeroBounce runs on every tier (A through D) — email verification is mandatory pre-send per the compliance SOP
+> - Drop AnymailFinder from primary path (per vendor stack decision); it remains as an optional escalation vendor only
+>
+> **Interface contract each enrich adapter implements:**
+> ```python
+> class EnrichAdapter(Protocol):
+>     async def enrich(self, contact: Contact) -> EnrichmentResult: ...
+>
+> class EnrichmentResult(BaseModel):
+>     fields_updated: dict[str, Any]     # e.g., {"phone": "+27...", "phone_consent_basis": "legitimate_interest"}
+>     sources: list[str]                 # URLs / vendor refs for audit
+>     cost_cents: int                    # actual or estimated
+>     adapter_name: str
+> ```
+>
+> **Phone lookup compliance:** every Lusha call + any future Cognism call MUST populate `phone_consent_basis`, `phone_source`, `phone_found_at` per the [phone/SMS compliance SOP](../../../data/reference/sops/compliance/phone-sms-compliance.md). Adapter must raise if it can't supply a consent basis.
+>
+> **Tests:** per-adapter happy-path + one failure-mode test (vendor 429 / timeout). Orchestrator tests: tier A gets all adapters, tier D gets email+verify only, phone adapter never called below score 50 (verify by mocking Lusha and asserting mock not invoked). Follow TDD as in original.
+>
+> The original task body below (AnymailFinder-centric single-pass enrich) is superseded — foundation/decision-log patterns still apply.
+
+---
+
+### Original task body (SUPERSEDED — see banner above)
+
 
 **Files:**
 - Create: `systems/scout/pipeline/enrich.py`
@@ -2800,6 +3054,51 @@ git commit -m "Add template store: parse, validate, sync to DB"
 ---
 
 ## Task 14: Research module — per-contact placeholder research
+
+> ⚠️ **RESHAPED PER AMENDMENT 1 (2026-04-20)** — Manus-driven structured research now required. **Read [the decision record](../decisions/2026-04-20-lead-sourcing-architecture.md) before starting.**
+>
+> **New shape:**
+> - Research is implemented in `systems/scout/enrich/manus_research.py` (already a Task 12 adapter) — this task defines the **structured output schema** that the adapter returns and the **prompt templates** that drive it
+> - Research depth is tier-pegged:
+>   - Tier A — all sub-fields populated
+>   - Tier B — `hook_candidates` + `decision_maker_recent_activity` + `open_roles` only
+>   - Tier C — `hook_candidates` only (max 1)
+>   - Tier D — no research (adapter not called by orchestrator)
+> - Manus prompt templates live in `data/reference/manus_prompts/` so they're productised per CLAUDE.md "customisation is data, not code"
+> - Every field in the output has a source URL for audit (factuality verification in Plan 2 QA agent depends on this)
+>
+> **Required output schema (pydantic model in `systems/scout/enrich/manus_research_schema.py`):**
+> ```python
+> class ManusResearchResult(BaseModel):
+>     company_summary: str
+>     recent_events: list[CompanyEvent]        # funding, hiring, leadership, product, M&A
+>     tech_stack_signals: list[str]
+>     decision_maker_recent_activity: list[ActivityItem]  # last ~10 public LinkedIn posts, podcasts, talks
+>     open_roles: list[JobPosting]             # from company careers page + LinkedIn Jobs
+>     hook_candidates: list[HookCandidate]     # angle + supporting evidence URL
+>     buying_intent_score: int                 # 0-100 — feeds score_v2 intent category
+>     sources: list[str]                       # full URL list for factuality audit
+>
+> class HookCandidate(BaseModel):
+>     angle: str
+>     evidence_url: str
+>     confidence: float                        # 0-1
+> ```
+>
+> **LinkedIn access rules (per `feedback_intent_signals` memory):**
+> - Public-view only by default
+> - If auth required: use dedicated burner LinkedIn account (NEVER Kirsten's or a real-person account)
+> - Throttle: 1 profile visit per 15–30 seconds
+> - Every LinkedIn visit logs to `decision_log` for audit
+>
+> **Tests:** unit tests with mocked Manus responses validating schema parse, tier-gate enforcement, source-URL presence. An integration-ish test dispatching a stub Manus that returns well-formed JSON + verifies the adapter handles it.
+>
+> The original task body below (simpler name-casualisation + placeholder stubs) is partially superseded — the tier-gated research is the new primary; name casualisation logic can remain as a utility invoked by the renderer (Task 15) instead.
+
+---
+
+### Original task body (SUPERSEDED — see banner above)
+
 
 **Files:**
 - Create: `systems/scout/outreach/research.py`
