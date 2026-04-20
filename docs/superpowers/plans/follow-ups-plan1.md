@@ -64,6 +64,52 @@ Any future test that does `from api.main import app` at module top-level will tr
 
 `Settings.model_config` sets `case_sensitive=False`. Add one test locking that in against regression — `monkeypatch.setenv("manus_api_key", "m-key")` (lowercase) should resolve same as uppercase. Add on the first task in Plan 1 that actually relies on case-insensitive resolution, not before.
 
+## Source adapter hardening — address before first live Clutch run
+
+### 9. Distinguish "empty page" vs "CAPTCHA / rate-limit / layout-change" in ClutchAdapter pagination
+
+**Raised by:** Task 9c code-quality review (2026-04-20)
+**Severity:** Important
+**File:** `systems/scout/sources/clutch.py` (termination logic around the empty-parse branch)
+
+Current behaviour: when a Clutch page returns HTML but regexes match nothing, adapter treats it as end of listings and silently stops. A CAPTCHA interstitial, soft-block page, or layout change would masquerade as a successful-but-empty run in decision_log.
+
+Fix: emit a `scout.source.empty_first_page` decision-log entry when page 0 yields 0 rows, treat it as a failed pull. Consider a response-length / marker-string check to distinguish real empty-state pages from error interstitials.
+
+### 10. Handle HTTP 429 / 403 / 503 gracefully instead of aborting the pull
+
+**Raised by:** Task 9c code-quality review
+**Severity:** Important
+**File:** `systems/scout/sources/clutch.py` (per-page `get + raise_for_status`)
+
+Current behaviour: one rate-limit or soft-block mid-pull raises `httpx.HTTPStatusError` and the operator loses everything already scraped. Wrap the per-page block in `try/except httpx.HTTPStatusError` — on 429/403/503 (or any 5xx / network timeout), stop gracefully, return accumulated results, log a decision-log entry suggesting the ScraperAPI escalation trigger. Apply the same pattern to Apollo adapter while you're there.
+
+### 11. Pairing-by-index parser fragility on sponsored rows / ad insertions
+
+**Raised by:** Task 9c code-quality review
+**Severity:** Important (time-bomb)
+**File:** `systems/scout/sources/clutch.py::_parse_listing_page`
+
+Current parser pairs `_NAME_PATTERN` matches with `_PROFILE_URL_PATTERN` matches by index. If Clutch injects a sponsored row producing a `"name":"..."` match without a matching profile URL, every subsequent row misaligns (name-A pairs with profile-B, etc.). The n8n JS has the same bug — porting verbatim was the right call for fidelity, but it remains a time-bomb.
+
+Fix: extract `<div class="provider">` blocks first (selectolax / lxml) and regex within each block. Add a fixture with a mismatched count (4 names, 3 profile URLs) to lock in current behaviour until the block-based extractor lands.
+
+### 12. `company_website=profile_url` is semantically misleading
+
+**Raised by:** Task 9c code-quality review
+**Severity:** Suggestion
+**File:** `systems/scout/sources/clutch.py`
+
+Storing the Clutch profile URL in `company_website` makes downstream code think it has a usable company domain. Fix: move profile URL exclusively into `raw_data["profile_url"]` (already there) and set `company_website=None`. Task 9.5 identity lookup populates the real domain.
+
+### 13. Plan doc Protocol signature drift
+
+**Raised by:** Task 9c code-quality review
+**Severity:** Documentation fix
+**File:** `docs/superpowers/plans/2026-04-20-foundation-scout-migration.md` (Task 9 prose)
+
+Plan prose references `pull(client_id, icp_spec: ICPSpec, max_contacts, ...)`. Adopted Protocol in `systems/scout/sources/base.py` uses `max_companies` with no `icp_spec` arg (adapters accept source-specific filters via `**kwargs`). Update plan prose to match reality so the next executing agent doesn't get confused.
+
 ## Refactor — trigger at ~6 lead-stack keys
 
 ### 8. Move vendor config to `data/reference/vendor_stack.yaml`
