@@ -440,29 +440,3 @@ async def test_scraper_aclose_idempotent():
     fake_playwright_ctx.stop.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# Test 15: works as async context manager
-# ---------------------------------------------------------------------------
-@pytest.mark.asyncio
-async def test_scraper_works_as_async_context_manager():
-    """async with ClaudeIdentityScraper() should call aclose() on __aexit__."""
-    fake_browser = AsyncMock()
-    fake_playwright_ctx = AsyncMock()
-
-    async def _fake_start():
-        return fake_playwright_ctx
-
-    fake_playwright_ctx.chromium = AsyncMock()
-    fake_playwright_ctx.chromium.launch = AsyncMock(return_value=fake_browser)
-
-    with patch(
-        "systems.scout.identity.claude_identity_scraper.async_playwright",
-        return_value=AsyncMock(start=_fake_start),
-    ):
-        async with ClaudeIdentityScraper() as scraper:
-            await scraper._ensure_browser()
-            assert scraper._browser is fake_browser
-
-    # After exiting the context manager, the browser should be closed
-    fake_browser.close.assert_called_once()
-    fake_playwright_ctx.stop.assert_called_once()

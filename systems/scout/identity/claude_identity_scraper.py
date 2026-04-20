@@ -284,12 +284,6 @@ class ClaudeIdentityScraper:
             finally:
                 self._anthropic_client = None
 
-    async def __aenter__(self) -> "ClaudeIdentityScraper":
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
-        await self.aclose()
-
     async def resolve(
         self,
         company: str,
