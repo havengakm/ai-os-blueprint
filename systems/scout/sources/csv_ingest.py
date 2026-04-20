@@ -21,9 +21,9 @@ import hashlib
 from io import StringIO
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 from systems.scout.sources.base import CompanySourceAdapter, RawCompanyContact
+from systems.scout.sources.utils import normalize_domain, parse_int_safe
 
 
 COMPANY_NAME_COLS = ("Company Name", "company_name", "company", "Company")
@@ -44,39 +44,6 @@ def _pick(row: dict[str, str], candidates: tuple[str, ...]) -> str | None:
             return str(row[col]).strip()
     return None
 
-
-def _parse_int(value: str | None) -> int | None:
-    if not value:
-        return None
-    cleaned = value.replace(",", "").replace("$", "").strip()
-    # Handle suffixes like "$2M-$5M" — take the low end as a rough estimate
-    if "-" in cleaned:
-        cleaned = cleaned.split("-")[0].strip()
-    # Handle M/K suffixes
-    multiplier = 1
-    if cleaned.endswith("M"):
-        multiplier = 1_000_000
-        cleaned = cleaned[:-1]
-    elif cleaned.endswith("K"):
-        multiplier = 1_000
-        cleaned = cleaned[:-1]
-    try:
-        return int(float(cleaned) * multiplier)
-    except (ValueError, TypeError):
-        return None
-
-
-def _normalize_domain(website: str | None) -> str | None:
-    if not website:
-        return None
-    w = website.strip().lower()
-    if not w.startswith(("http://", "https://")):
-        w = "https://" + w
-    try:
-        netloc = urlparse(w).netloc
-        return netloc.removeprefix("www.") or None
-    except Exception:
-        return None
 
 
 class CSVIngestAdapter:
@@ -106,9 +73,9 @@ class CSVIngestAdapter:
             raise ValueError("Provide exactly one of csv_path or csv_content")
 
         if csv_path is not None:
-            text = Path(csv_path).read_text(encoding="utf-8")
+            text = Path(csv_path).read_text(encoding="utf-8-sig")
         else:
-            text = csv_content or ""
+            text = (csv_content or "").lstrip("\ufeff")
 
         reader = csv.DictReader(StringIO(text))
         upload_id = self.upload_id or hashlib.sha256(text.encode()).hexdigest()[:12]
@@ -127,7 +94,7 @@ class CSVIngestAdapter:
 
             website = _pick(row, WEBSITE_COLS)
             explicit_domain = _pick(row, DOMAIN_COLS)
-            domain = explicit_domain or _normalize_domain(website)
+            domain = normalize_domain(explicit_domain) or normalize_domain(website)
 
             dedup_key = (domain or company.lower()).strip()
             if dedup_key in seen_keys:
@@ -142,8 +109,8 @@ class CSVIngestAdapter:
                     company_domain=domain,
                     company_website=website,
                     industry=_pick(row, INDUSTRY_COLS),
-                    employees=_parse_int(_pick(row, EMPLOYEES_COLS)),
-                    revenue_usd=_parse_int(_pick(row, REVENUE_COLS)),
+                    employees=parse_int_safe(_pick(row, EMPLOYEES_COLS)),
+                    revenue_usd=parse_int_safe(_pick(row, REVENUE_COLS)),
                     city=_pick(row, CITY_COLS),
                     state=_pick(row, STATE_COLS),
                     geography=_pick(row, GEOGRAPHY_COLS),

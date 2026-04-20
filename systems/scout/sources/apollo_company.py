@@ -7,29 +7,16 @@ Identity lookup is Task 9.5's responsibility.
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 
 from config.settings import get_settings
 from systems.scout.sources.base import CompanySourceAdapter, RawCompanyContact
+from systems.scout.sources.utils import normalize_domain
 
 
 APOLLO_ORG_SEARCH_URL = "https://api.apollo.io/v1/organizations/search"
 DEFAULT_PER_PAGE = 25
-
-
-def _normalize_domain(website: str | None) -> str | None:
-    if not website:
-        return None
-    w = website.strip().lower()
-    if not w.startswith(("http://", "https://")):
-        w = "https://" + w
-    try:
-        netloc = urlparse(w).netloc
-        return netloc.removeprefix("www.") or None
-    except Exception:
-        return None
 
 
 def _org_to_contact(org: dict[str, Any]) -> RawCompanyContact | None:
@@ -40,7 +27,7 @@ def _org_to_contact(org: dict[str, Any]) -> RawCompanyContact | None:
         return None
 
     website = org.get("website_url")
-    domain = org.get("primary_domain") or _normalize_domain(website)
+    domain = normalize_domain(org.get("primary_domain")) or normalize_domain(website)
 
     # Revenue — Apollo gives either an int (annual_revenue) or printed string
     revenue_usd: int | None = None

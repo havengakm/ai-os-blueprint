@@ -85,3 +85,25 @@ async def test_csv_ingest_preserves_extra_columns_in_raw_data():
         csv_content=csv_text,
     )
     assert rows[0].raw_data.get("Custom Column") == "custom-value"
+
+
+@pytest.mark.asyncio
+async def test_csv_ingest_handles_utf8_bom():
+    """CQ issue C1 — Excel/Sheets/Numbers CSVs ship with BOM. Must still parse."""
+    bom_csv = "\ufeffCompany Name,Website\nFocusCFO,focuscfo.com\n"
+    adapter = CSVIngestAdapter(upload_id="bom")
+    rows = await adapter.pull(client_id="clymb", max_companies=10, csv_content=bom_csv)
+    assert len(rows) == 1
+    assert rows[0].company == "FocusCFO"
+    assert rows[0].company_domain == "focuscfo.com"
+
+
+@pytest.mark.asyncio
+async def test_csv_ingest_normalizes_explicit_domain_column():
+    """CQ issue I3 — company_domain column values must be normalised consistently."""
+    csv_text = "Company Name,company_domain\nAcme,https://www.ACME.COM\nBeta,beta.com\n"
+    adapter = CSVIngestAdapter(upload_id="dom")
+    rows = await adapter.pull(client_id="clymb", max_companies=10, csv_content=csv_text)
+    assert len(rows) == 2
+    assert rows[0].company_domain == "acme.com"
+    assert rows[1].company_domain == "beta.com"
