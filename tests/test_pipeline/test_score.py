@@ -271,3 +271,45 @@ def test_assign_tier_custom_thresholds():
     assert assign_tier(80, cfg) == "B"
     # 90 → 'A' with new thresholds
     assert assign_tier(90, cfg) == "A"
+
+
+# ---------------------------------------------------------------------------
+# score_v1 — reach and recency scaling regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_score_v1_custom_reach_weight():
+    """Doubling reach cap (40) scales a perfect-reach contact from 20 to 40."""
+    config = {
+        "weights": {"fit": 40, "intent": 30, "reach": 40, "recency": 10},
+        "tier_thresholds": _DEFAULT_THRESHOLDS,
+        # no icp key → fit = 0; keeps other categories at zero
+    }
+    contact = _contact(
+        email="a@b.com",
+        email_verified=True,
+        linkedin_url="https://linkedin.com/in/x",
+        phone="+441234567890",
+        # raw_data empty → recency = 0; research_data empty → intent = 0
+    )
+    score = score_v1(contact, config)
+    # reach raw = 10 + 5 + 5 = 20; default_reach_max = 20; cap = 40 → scaled = 40
+    # fit = 0 (no icp); recency = 0 → total = 40
+    assert score == 40
+
+
+def test_score_v1_custom_recency_weight():
+    """Doubling recency cap (20) scales a perfect-recency contact from 10 to 20."""
+    config = {
+        "weights": {"fit": 40, "intent": 30, "reach": 20, "recency": 20},
+        "tier_thresholds": _DEFAULT_THRESHOLDS,
+        # no icp key → fit = 0
+    }
+    contact = _contact(
+        raw_data={"funding_event_last_180d": True, "recent_hiring": True},
+        # no email/linkedin/phone → reach = 0; no research_data → intent = 0
+    )
+    score = score_v1(contact, config)
+    # recency raw = 5 + 5 = 10; default_recency_max = 10; cap = 20 → scaled = 20
+    # fit = 0 (no icp); reach = 0 → total = 20
+    assert score == 20

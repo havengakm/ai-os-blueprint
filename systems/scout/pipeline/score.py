@@ -43,14 +43,14 @@ from typing import Any
 # Module-level defaults — match DB column defaults in 003_client_config_extensions.sql
 # ---------------------------------------------------------------------------
 
-_DEFAULT_WEIGHTS: dict[str, int] = {
+DEFAULT_WEIGHTS: dict[str, int] = {
     "fit": 40,
     "intent": 30,
     "reach": 20,
     "recency": 10,
 }
 
-_DEFAULT_TIER_THRESHOLDS: dict[str, int] = {
+DEFAULT_TIER_THRESHOLDS: dict[str, int] = {
     "A": 80,
     "B": 65,
     "C": 50,
@@ -88,11 +88,11 @@ _DEFAULT_INTENT_RAW_MAX = _RAW_INTENT_PAIN + _RAW_INTENT_ACTIVITY  # 30
 
 
 def _weights(client_config: dict[str, Any]) -> dict[str, int]:
-    return {**_DEFAULT_WEIGHTS, **client_config.get("weights", {})}
+    return {**DEFAULT_WEIGHTS, **client_config.get("weights", {})}
 
 
 def _thresholds(client_config: dict[str, Any]) -> dict[str, int]:
-    return {**_DEFAULT_TIER_THRESHOLDS, **client_config.get("tier_thresholds", {})}
+    return {**DEFAULT_TIER_THRESHOLDS, **client_config.get("tier_thresholds", {})}
 
 
 def _scale(raw: int, raw_max: int, cap: int) -> int:
@@ -148,7 +148,7 @@ def _score_reach(contact: dict[str, Any], cap: int) -> int:
     if contact.get("phone"):
         raw += _RAW_REACH_PHONE
 
-    return min(raw, cap)
+    return _scale(raw, _DEFAULT_REACH_RAW_MAX, cap)
 
 
 def _score_recency(contact: dict[str, Any], cap: int) -> int:
@@ -158,7 +158,7 @@ def _score_recency(contact: dict[str, Any], cap: int) -> int:
         raw += _RAW_RECENCY_FUNDING
     if raw_data.get("recent_hiring") is True:
         raw += _RAW_RECENCY_HIRING
-    return min(raw, cap)
+    return _scale(raw, _DEFAULT_RECENCY_RAW_MAX, cap)
 
 
 def _score_intent(contact: dict[str, Any], cap: int) -> int:
