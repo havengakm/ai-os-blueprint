@@ -16,6 +16,8 @@ import re
 import time
 from typing import Any, Callable
 
+from playwright.async_api import async_playwright
+
 from systems.scout.identity.base import IdentityResult, is_generic_email
 
 
@@ -240,26 +242,53 @@ class ClaudeIdentityScraper:
         clock: callable returning current time (defaults to time.monotonic) — used for throttle testing.
         """
         self._browser = browser
+        self._browser_provided = browser is not None
         self._anthropic_client = anthropic_client
+        self._anthropic_provided = anthropic_client is not None
         self._clock = clock or time.monotonic
-        self._playwright_ctx: Any = None  # holds async_playwright() manager
+        self._playwright_ctx: Any = None  # holds async_playwright() context, if we started one
 
     async def _ensure_browser(self) -> Any:
         """Lazily launch a Playwright browser if none was injected."""
-        if self._browser is not None:
-            return self._browser
-        from playwright.async_api import async_playwright
-        self._playwright_ctx = await async_playwright().start()
-        self._browser = await self._playwright_ctx.chromium.launch(headless=True)
+        if self._browser is None:
+            self._playwright_ctx = await async_playwright().start()
+            self._browser = await self._playwright_ctx.chromium.launch(headless=True)
         return self._browser
 
     async def _ensure_anthropic_client(self) -> Any:
         """Lazily create an Anthropic async client if none was injected."""
-        if self._anthropic_client is not None:
-            return self._anthropic_client
-        from anthropic import AsyncAnthropic
-        self._anthropic_client = AsyncAnthropic()
+        if self._anthropic_client is None:
+            from anthropic import AsyncAnthropic
+            self._anthropic_client = AsyncAnthropic()
         return self._anthropic_client
+
+    async def aclose(self) -> None:
+        """Close lazily-created browser + Anthropic client. Idempotent.
+
+        Does not close resources that were injected at construction time — the
+        caller that provided them owns their lifecycle.
+        """
+        if self._browser is not None and not self._browser_provided:
+            try:
+                await self._browser.close()
+            finally:
+                self._browser = None
+        if self._playwright_ctx is not None:
+            try:
+                await self._playwright_ctx.stop()
+            finally:
+                self._playwright_ctx = None
+        if self._anthropic_client is not None and not self._anthropic_provided:
+            try:
+                await self._anthropic_client.close()
+            finally:
+                self._anthropic_client = None
+
+    async def __aenter__(self) -> "ClaudeIdentityScraper":
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        await self.aclose()
 
     async def resolve(
         self,

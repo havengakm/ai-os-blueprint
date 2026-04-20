@@ -365,3 +365,104 @@ async def test_scraper_handles_malformed_claude_json(_env):
     assert result.first_name == "James"
     assert result.last_name == "Carter"
     assert result.source == "claude_scraper"
+
+
+# ---------------------------------------------------------------------------
+# Test 12: aclose() closes lazily-created browser + playwright context
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_scraper_aclose_closes_lazy_browser():
+    """Lazily-created browser and playwright ctx are closed on aclose()."""
+    fake_browser = AsyncMock()
+    fake_playwright_ctx = AsyncMock()
+
+    async def _fake_start():
+        return fake_playwright_ctx
+
+    fake_playwright_ctx.chromium = AsyncMock()
+    fake_playwright_ctx.chromium.launch = AsyncMock(return_value=fake_browser)
+
+    scraper = ClaudeIdentityScraper(browser=None, anthropic_client=None)
+
+    with patch(
+        "systems.scout.identity.claude_identity_scraper.async_playwright",
+        return_value=AsyncMock(start=_fake_start),
+    ):
+        await scraper._ensure_browser()
+
+    await scraper.aclose()
+
+    fake_browser.close.assert_called_once()
+    fake_playwright_ctx.stop.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Test 13: aclose() does NOT close an injected browser
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_scraper_aclose_does_not_close_injected_browser():
+    """Injected browser is not owned by the scraper; aclose() must not close it."""
+    injected_browser = AsyncMock()
+
+    scraper = ClaudeIdentityScraper(browser=injected_browser, anthropic_client=None)
+    await scraper.aclose()
+
+    injected_browser.close.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Test 14: aclose() is idempotent
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_scraper_aclose_idempotent():
+    """Calling aclose() twice must not raise and browser.close() called exactly once."""
+    fake_browser = AsyncMock()
+    fake_playwright_ctx = AsyncMock()
+
+    async def _fake_start():
+        return fake_playwright_ctx
+
+    fake_playwright_ctx.chromium = AsyncMock()
+    fake_playwright_ctx.chromium.launch = AsyncMock(return_value=fake_browser)
+
+    scraper = ClaudeIdentityScraper(browser=None, anthropic_client=None)
+
+    with patch(
+        "systems.scout.identity.claude_identity_scraper.async_playwright",
+        return_value=AsyncMock(start=_fake_start),
+    ):
+        await scraper._ensure_browser()
+
+    await scraper.aclose()
+    await scraper.aclose()  # second call must not raise
+
+    fake_browser.close.assert_called_once()
+    fake_playwright_ctx.stop.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Test 15: works as async context manager
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_scraper_works_as_async_context_manager():
+    """async with ClaudeIdentityScraper() should call aclose() on __aexit__."""
+    fake_browser = AsyncMock()
+    fake_playwright_ctx = AsyncMock()
+
+    async def _fake_start():
+        return fake_playwright_ctx
+
+    fake_playwright_ctx.chromium = AsyncMock()
+    fake_playwright_ctx.chromium.launch = AsyncMock(return_value=fake_browser)
+
+    with patch(
+        "systems.scout.identity.claude_identity_scraper.async_playwright",
+        return_value=AsyncMock(start=_fake_start),
+    ):
+        async with ClaudeIdentityScraper() as scraper:
+            await scraper._ensure_browser()
+            assert scraper._browser is fake_browser
+
+    # After exiting the context manager, the browser should be closed
+    fake_browser.close.assert_called_once()
+    fake_playwright_ctx.stop.assert_called_once()
