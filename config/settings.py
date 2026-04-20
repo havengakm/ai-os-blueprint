@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     anymail_finder_api_key: str = ""
     zerobounce_api_key: str = ""
 
+    # --- Lead stack (primary, per 2026-04-20 architecture decision) ---
+    manus_api_key: str = ""         # primary scraping + research executor
+    lusha_api_key: str = ""         # mobile phone lookup (score >= 50 only)
+
+    # --- Lead stack (escalation — enable only when triggers fire) ---
+    hunter_api_key: str = ""        # second-pass email finder (escalation)
+    cognism_api_key: str = ""       # compliance-grade mobile (escalation)
+
     # --- Communication (Plan 3) ---
     telegram_bot_token: str = ""
     telegram_admin_chat_id: str = ""
