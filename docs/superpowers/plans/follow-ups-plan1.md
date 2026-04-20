@@ -110,6 +110,30 @@ Storing the Clutch profile URL in `company_website` makes downstream code think 
 
 Plan prose references `pull(client_id, icp_spec: ICPSpec, max_contacts, ...)`. Adopted Protocol in `systems/scout/sources/base.py` uses `max_companies` with no `icp_spec` arg (adapters accept source-specific filters via `**kwargs`). Update plan prose to match reality so the next executing agent doesn't get confused.
 
+## Pull orchestrator cleanup — bundle with Task 17 wiring
+
+### 14. Add `source_selection` to `decision_log.decision_type` CHECK constraint
+
+**Raised by:** Task 9d code-quality review (2026-04-20)
+**Severity:** Important (vocabulary squat)
+**File:** `scripts/sql/001_foundation.sql` (CHECK constraint at line 141-146) + `systems/scout/pipeline/pull.py` (switch from `enrichment_choice` to `source_selection`)
+
+Pull-stage source routing currently logs as `enrichment_choice` which is reserved for Task 12's enrichment-vendor decisions. When the weekly report asks "success rate of enrichment_choice", pull-source health + enrich-vendor health get averaged together. Fix: schema migration adding `source_selection` to the allowed `decision_type` values; update pull orchestrator to emit it.
+
+### 15. Pull orchestrator suggestions (Task 9d CQ S1–S7)
+
+**Raised by:** Task 9d code-quality review (2026-04-20)
+**Severity:** Suggestions — roll into Task 17 integration pass
+**File:** `systems/scout/pipeline/pull.py`
+
+- S1: add `total_errored: int` computed property on `PullResult`
+- S2: decide + document empty `source_filter=[]` semantics (ValueError vs pass-through)
+- S3: add test for ghost-adapter + `source_filter` interaction
+- S4: already partially done in hardening (structured context) — verify richer counts are consumed by Plan 4 cost-report queries
+- S5: reject reserved kwarg keys (`client_id`, `max_companies`, `dry_run`) in `adapter_kwargs`
+- S6: raise `ValueError` on duplicate adapter names in `PullOrchestrator.__init__`
+- S7: add one-line comment near `normalize_domain(row.company_domain)` noting it's defensive idempotency against non-normalising adapters
+
 ## Refactor — trigger at ~6 lead-stack keys
 
 ### 8. Move vendor config to `data/reference/vendor_stack.yaml`
