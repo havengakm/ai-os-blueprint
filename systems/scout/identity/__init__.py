@@ -6,10 +6,12 @@ from systems.scout.identity.base import (
     IdentityResult,
     is_generic_email,
 )
+from systems.scout.identity.hunter_domain import HunterDomainAdapter
 
 __all__ = [
     "ApolloPeopleAdapter",
     "GENERIC_EMAIL_LOCAL_PARTS",
+    "HunterDomainAdapter",
     "IdentityAdapter",
     "IdentityResult",
     "is_generic_email",
