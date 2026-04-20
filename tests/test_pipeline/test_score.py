@@ -77,6 +77,32 @@ def test_score_v1_partial_fit():
     assert score == 30
 
 
+def test_score_v1_industry_match_is_case_insensitive():
+    """Industry data from vendors has inconsistent casing ("Fractional CFO" vs
+    "fractional cfo"). Match must be case-insensitive exact."""
+    config_lower = {
+        "weights": _BASE_CONFIG["weights"],
+        "tier_thresholds": _BASE_CONFIG["tier_thresholds"],
+        "icp": {**_BASE_CONFIG["icp"], "industries": ["fractional cfo"]},
+    }
+    # Contact has capital-C spelling; must still match
+    contact = _contact(industry="Fractional CFO")
+    score = score_v1(contact, config_lower)
+    assert score == 15  # industry fit only, nothing else set
+
+
+def test_score_v1_industry_mismatch_still_fails():
+    """Case-insensitive, but not substring — 'software' should not match 'SaaS'."""
+    config = {
+        "weights": _BASE_CONFIG["weights"],
+        "tier_thresholds": _BASE_CONFIG["tier_thresholds"],
+        "icp": {**_BASE_CONFIG["icp"], "industries": ["SaaS"]},
+    }
+    contact = _contact(industry="software services")
+    score = score_v1(contact, config)
+    assert score == 0
+
+
 # ---------------------------------------------------------------------------
 # score_v1 — reach signals
 # ---------------------------------------------------------------------------

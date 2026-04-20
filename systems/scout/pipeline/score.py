@@ -112,7 +112,8 @@ def _scale(raw: int, raw_max: int, cap: int) -> int:
 def _score_fit(contact: dict[str, Any], icp: dict[str, Any], cap: int) -> int:
     raw = 0
     industries: list[str] = icp.get("industries") or []
-    if contact.get("industry") in industries:
+    contact_industry: str = (contact.get("industry") or "").strip().lower()
+    if contact_industry and contact_industry in {i.strip().lower() for i in industries}:
         raw += _RAW_FIT_INDUSTRY
 
     titles: list[str] = icp.get("titles") or []
