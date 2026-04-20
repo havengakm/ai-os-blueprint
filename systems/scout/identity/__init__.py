@@ -8,6 +8,7 @@ from systems.scout.identity.base import (
 )
 from systems.scout.identity.claude_identity_scraper import ClaudeIdentityScraper
 from systems.scout.identity.hunter_domain import HunterDomainAdapter
+from systems.scout.identity.orchestrator import IdentityOrchestrator, OrchestratorResult
 
 __all__ = [
     "ApolloPeopleAdapter",
@@ -15,6 +16,8 @@ __all__ = [
     "GENERIC_EMAIL_LOCAL_PARTS",
     "HunterDomainAdapter",
     "IdentityAdapter",
+    "IdentityOrchestrator",
     "IdentityResult",
+    "OrchestratorResult",
     "is_generic_email",
 ]
