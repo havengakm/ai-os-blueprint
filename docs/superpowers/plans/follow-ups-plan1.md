@@ -54,6 +54,26 @@ Current stub returns `status: "accepted"` for ANY valid stage — parsed, not di
 
 Any future test that does `from api.main import app` at module top-level will trigger `create_app()` → `get_settings()` before any monkeypatch fires → `ValidationError`. Current conftest.py sets env inside fixture, so it works. Mitigation when tripped: split into `api/main.py` (factory only) + `api/asgi.py` (module-level `app = create_app()`) — Procfile + railway.toml need the startCommand path updated to `api.asgi:app`.
 
+## Test coverage — add when the dependency lands
+
+### 7. Case-insensitive env var resolution test
+
+**Raised by:** Task 3.7 code-quality review (2026-04-20)
+**Severity:** Suggestion
+**File:** `tests/test_config_settings.py`
+
+`Settings.model_config` sets `case_sensitive=False`. Add one test locking that in against regression — `monkeypatch.setenv("manus_api_key", "m-key")` (lowercase) should resolve same as uppercase. Add on the first task in Plan 1 that actually relies on case-insensitive resolution, not before.
+
+## Refactor — trigger at ~6 lead-stack keys
+
+### 8. Move vendor config to `data/reference/vendor_stack.yaml`
+
+**Raised by:** Task 3.7 code-quality review (2026-04-20)
+**Severity:** Suggestion (data-driven refactor)
+**Files:** new `data/reference/vendor_stack.yaml`; `config/settings.py` (simplify)
+
+Two-bucket "primary vs escalation" comment grouping scales fine up to ~6 total keys. Beyond that, keep only raw API key env-vars in `Settings` and move the metadata (trigger rules, tier gates, cost caps) to a YAML file in `data/reference/`. Aligns with CLAUDE.md's "customisation is data, not code" and `feedback_productised_not_custom`. Fire the refactor at the 6-key threshold (adding RocketReach, ContactOut, Surfe, etc. would cross it), not sooner.
+
 ## Schema cleanup — address in a future migration
 
 ### 6. Drop legacy `enrichment_budget_per_contact_cents` column from `client_config`
