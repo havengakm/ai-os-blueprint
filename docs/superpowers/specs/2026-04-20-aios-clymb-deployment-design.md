@@ -42,6 +42,8 @@ Every operational step is documented in a centralised SOP library (`data/referen
 | 15 | Monthly margin review: value-first efficiency, evidence before swaps | Never reduce value to cut cost |
 | 16 | Improvement backlog with 5 sources, 3 cadences, outcome measurement | Makes "gets smarter every week" a repeatable process |
 | 17 | **Productised service — same deployment for every client, customisation only in data** | Non-negotiable constraint from the business model; custom code per client destroys margin and SOP |
+| 18 | Every offer scored against the 27-constraint offer framework; target 5/5 per constraint | Ties tactical iteration to structural quality; makes "no-brainer" measurable |
+| 19 | Expert knowledge library expands across named authorities (Hormozi, Saraev, Brunson, Acosta, Walsh, Sapp) | Domain-specific RAG content is the moat over generic AI |
 
 ---
 
@@ -172,9 +174,32 @@ All architectural choices, table schemas, infrastructure setups, SOPs, web app r
 
 **Gap assessment for Clymb pilot:**
 - Layer 1 — mostly ready. Clymb context complete. Fractional + Consulting ICPs need adding.
-- Layer 2 — knowledge embeddings not yet loaded. Performance tables (`campaigns`, `outcomes`) not created.
+- Layer 2 — knowledge embeddings not yet loaded. Performance tables (`campaigns`, `outcomes`) not created. **Expert knowledge library expansion pending** (see below).
 - Layer 3 — code exists (`os/foundation/`) but outcomes writeback not yet wired. pattern_matcher untested on real data.
 - Layer 4 — Scout is a stub. Needs full migration from `base-camp-agents/`.
+
+### Expert knowledge library (Layer 2 expansion)
+
+CLYMB's AIOS is only as good as the frameworks it retrieves. The knowledge library is a living corpus of domain-specific expert content, embedded into Supabase via pgvector for RAG retrieval. Every new system loads the relevant expert's frameworks before acting.
+
+**Currently loaded (`data/knowledge/`):**
+- `nick-saraev-cold-email.md` — cold outbound templates + patterns
+- `nick-saraev-ai-positioning.md` — AI positioning + offer strategy
+- `copywriting-frameworks.md` — general copywriting patterns
+
+**Planned expansions (to be created in W2-3 alongside template work):**
+
+| Domain | Authority | File | Used by |
+|---|---|---|---|
+| Offers + value equation | **Alex Hormozi** | `hormozi-offers.md` | Offer design, template writing, margin review, tier structure |
+| LinkedIn content (authority frameworks) | **Lara Acosta** | `lara-acosta-linkedin.md` | Content OS (future), personal brand strategy |
+| LinkedIn content (volume + distribution) | **Matt Walsh** | `matt-walsh-linkedin.md` | Content OS, engagement tactics |
+| Funnel building | **Russell Brunson** | `brunson-funnels.md` | Value ladder, tripwire design, webinar structure (post-pilot) |
+| High-ticket sales | **Shelby Sapp** | `shelby-sapp-sales.md` | Discovery call scripts, objection handling, close sequences |
+
+Each file follows the format established by `nick-saraev-ai-positioning.md`: 5-10 named frameworks per authority, each with principle + how-to-apply + 1-2 examples. Embedded via `scripts/load_knowledge.py`.
+
+**Productisation note:** expert knowledge is blueprint-level, not client-specific. Every client benefits from every added expert. New experts are added to the blueprint and propagate to all forks on next sync.
 
 ---
 
@@ -191,6 +216,60 @@ All architectural choices, table schemas, infrastructure setups, SOPs, web app r
 Nine cells. Each is a `(campaign_id, niche, offer_variant)` tuple with its own contacts, own pre-approved template, own metrics.
 
 **Why these three niches:** all three have Pipeline as their research-validated #1 pain (per `research/customer/pain-buckets-and-offers.md`). All three have Scout as the natural entry offer. This keeps the test clean — we're testing offer angles within a shared Scout thesis, not cross-mismatched systems. DMCs deferred (their #1 pain is Proposals, wrong entry system). M&A deferred (needs DealOS, a separate system).
+
+### Offer score framework (every offer evaluated before launch)
+
+Every template written, every offer pitched, and every new system built is scored against the 27-constraint scorecard from `data/reference/offer-upgrade-playbook.docx`. Target: 5/5 on every constraint (135/135 total). Baseline at design time: 110/135 (81%). Playbook target: 132/135 (98%).
+
+**The 27 constraints (max 5 each):**
+
+| # | Constraint | Current | Target |
+|---|---|---|---|
+| 1 | Clear moat / differentiators | 3 | 5 |
+| 2 | Recession resilient | 4 | 5 |
+| 3 | AI replacement protection | 2 | 4 |
+| 4 | Strong brand potential | 4 | 5 |
+| 5 | Simple repeatable ops | 4 | 5 |
+| 6 | Untapped growth opportunities | 4 | 5 |
+| 7 | MRR / subscription potential | 5 | 5 |
+| 8 | Low customer concentration | 3 | 5 |
+| 9 | Not geographically limited | 5 | 5 |
+| 10 | Fun, freedom, fulfilment | 3 | 4 |
+| 11 | Small lean team | 5 | 5 |
+| 12 | Irreplaceably human element | 3 | 5 |
+| 13 | Productised ecosystem | 3 | 5 |
+| 14 | Fundamental need / real pain | 5 | 5 |
+| 15 | Not bespoke / productised | 4 | 5 |
+| 16 | Not hours for money | 4 | 5 |
+| 17 | Not oversaturated | 3 | 5 |
+| 18 | Profitable, scalable, realistic | 4 | 5 |
+| 19 | Low capital, fast to start | 5 | 5 |
+| 20 | Low barrier to entry | 4 | 5 |
+| 21 | Not overly complex | 4 | 5 |
+| 22 | Clone and iterate | 5 | 5 |
+| 23 | Predictable cashflow | 4 | 5 |
+| 24 | Asymmetric risk-reward | 5 | 5 |
+| 25 | Dhandho framework | 5 | 5 |
+| 26 | $30k+ monthly potential | 4 | 5 |
+| 27 | Seven figure vision | 4 | 5 |
+
+**The no-brainer test (secondary qualitative filter):**
+1. ROI is obvious enough that saying no is irrational
+2. Risk sits with Clymb, not the client
+3. Walking away costs the client more than accepting
+
+**Integration with the design:**
+
+- `templates` table adds `offer_score` column (JSONB of per-constraint scores + total + last_reviewed_at)
+- New templates scored by Kirsten before approval; templates scoring < 120/135 (89%) flagged for upgrade before launch
+- Monthly margin review (Section 10) adds an offer-score trajectory panel: which constraints have moved, which are stuck
+- Improvement backlog (Section 11) gains an `offer_quality` category — backlog items explicitly tagged with which constraints they move
+- The nine upgrade areas from the playbook become permanent roadmap threads: build unbreakable moat, eliminate AI replacement risk, make human element irreplaceable, build productised ecosystem, eliminate commodity trap, make ROI undeniable, make guarantee bulletproof, price for value, accelerate speed to value
+
+**Metric addition to Section 8:**
+- **Offer score per template** (total + per-constraint breakdown)
+- **Offer score trajectory** (monthly delta)
+- **Constraint improvement velocity** — which constraints are improving fastest across the portfolio
 
 ### ICP definitions
 
@@ -1361,7 +1440,8 @@ When to stop and ask for help.
 
 ### Open items (TODOs)
 
-- Finalise the 9 concrete copy templates (Kirsten writes during W1, W3, W4)
+- Finalise the 9 concrete copy templates (Kirsten writes during W1, W3, W4), each scored against the 27-constraint offer framework before approval
+- Create expert knowledge files in W2-3: `hormozi-offers.md`, `lara-acosta-linkedin.md`, `matt-walsh-linkedin.md`, `brunson-funnels.md`, `shelby-sapp-sales.md` — following the existing format in `data/knowledge/nick-saraev-ai-positioning.md`
 - Decide on web app tenant-routing strategy (subdomain per tenant vs path-based) — single codebase either way per Section 0
 - Confirm Railway cron vs APScheduler choice (recommended: Railway cron for simplicity)
 - Contracts (MSA, DPA, SLA, NDA) need lawyer review before external client signing
