@@ -244,6 +244,24 @@ Fix: add `identity_lookup` to the CHECK allow-list in the same migration that ad
 
 Fix: one-line docstring note explaining the boundary. No code change.
 
+### 26. Client-config validation pass (substring direction + tier ordering)
+
+**Raised by:** Task 10a code-quality review (2026-04-20)
+**Severity:** Suggestion (config-time lint, not runtime defence)
+**File:** new `systems/scout/pipeline/validate_config.py` + call in onboarding script
+
+Two known footguns in `client_config` are correctly deferred today per the simplicity mandate, but should be caught at client-onboarding time:
+
+1. Substring-direction matching in `_score_fit` does `config_value.lower() in contact_value.lower()` for titles and geographies. "US" matches "Russia" (substring bleed). "CEO" matches "Video-CEO-Assistant". Deliberate permissiveness, low risk while operators type full strings. Risk rises if any client uses ISO-2 country codes or truncated titles.
+2. Tier-threshold inversion in `assign_tier` walks top-down (A to B to C to D to archive). If an operator sets A=50, B=80 by mistake, every score at least 50 assigns to 'A' and 'B' is unreachable. Silent garbage-in-garbage-out.
+
+Fix: onboarding-time validator that lints:
+- `client_config.icp.titles` entries for length less than 4 characters
+- `client_config.icp.geographies` for known-ambiguous-substring members like "US", "UK", "AU"
+- `client_config.tier_thresholds` for A greater than B greater than C greater than archive_floor monotonicity
+
+Runs during `/build-context` client onboarding and during any update to `client_config`, not on every scoring call. Land before the first fully-autonomous promotion, or earlier if a live miss surfaces.
+
 ## Data-driven simplification (tune after first live run)
 
 ### 24. Collapse orchestrator per-adapter logging into one summary row per contact
