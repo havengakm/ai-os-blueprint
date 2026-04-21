@@ -166,7 +166,7 @@ class IdentityOrchestrator:
         try:
             await self._decision_logger.log_decision(
                 client_id=client_id,
-                decision_type="enrichment_choice",
+                decision_type="identity_lookup",
                 decision=f"identity_lookup:{adapter_name}:{outcome_label}",
                 reasoning=reasoning,
                 context={
@@ -195,7 +195,7 @@ class IdentityOrchestrator:
         try:
             await self._decision_logger.log_decision(
                 client_id=client_id,
-                decision_type="enrichment_choice",
+                decision_type="identity_lookup",
                 decision="identity_lookup:archive_no_decision_maker",
                 reasoning=(
                     "All identity adapters returned None; contact cannot be outreached "

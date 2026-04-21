@@ -975,7 +975,7 @@ async def test_summary_decision_type_and_context_shape():
     summaries = [d for d in storage.decisions if d["decision"] == "enrich_stage_summary"]
     assert len(summaries) == 1
     entry = summaries[0]
-    assert entry["decision_type"] == "enrichment_choice"
+    assert entry["decision_type"] == "enrich_contact"
     ctx = entry["context"]
     for key in (
         "client_id",

@@ -196,27 +196,30 @@ class IdentityStage:
 
                 result.total_archived += 1
 
-        await self._storage.log_decision(
-            client_id,
-            decision_type="enrichment_choice",
-            decision="identity_stage_summary",
-            reasoning=(
-                f"Processed {result.total_eligible} contacts: "
-                f"{result.total_resolved} resolved, "
-                f"{result.total_archived} archived, "
-                f"{result.total_errored} errored"
-            ),
-            context={
-                "client_id": client_id,
-                "dry_run": dry_run,
-                "total_eligible": result.total_eligible,
-                "total_resolved": result.total_resolved,
-                "total_archived": result.total_archived,
-                "total_errored": result.total_errored,
-                "by_source": result.by_source,
-            },
-            confidence=None,
-        )
+        try:
+            await self._storage.log_decision(
+                client_id,
+                decision_type="identity_lookup",
+                decision="identity_stage_summary",
+                reasoning=(
+                    f"Processed {result.total_eligible} contacts: "
+                    f"{result.total_resolved} resolved, "
+                    f"{result.total_archived} archived, "
+                    f"{result.total_errored} errored"
+                ),
+                context={
+                    "client_id": client_id,
+                    "dry_run": dry_run,
+                    "total_eligible": result.total_eligible,
+                    "total_resolved": result.total_resolved,
+                    "total_archived": result.total_archived,
+                    "total_errored": result.total_errored,
+                    "by_source": result.by_source,
+                },
+                confidence=None,
+            )
+        except Exception:
+            pass  # summary log failure must never break the stage's return
 
         return result
 
@@ -231,7 +234,7 @@ class IdentityStage:
         try:
             await self._storage.log_decision(
                 client_id,
-                decision_type="enrichment_choice",
+                decision_type="identity_lookup",
                 decision=f"identity_stage:persist_failed:{contact_id}",
                 reasoning=reasoning,
                 context={"contact_id": contact_id},

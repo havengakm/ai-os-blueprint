@@ -213,7 +213,7 @@ async def test_unknown_tier_skips_all_adapters_and_logs_once():
     # Exactly one decision_log entry — unknown_tier notice.
     assert len(log.entries) == 1
     assert log.entries[0]["decision"] == "enrich_contact:unknown_tier"
-    assert log.entries[0]["decision_type"] == "enrichment_choice"
+    assert log.entries[0]["decision_type"] == "enrich_contact"
 
 
 # --------------------------------------------------------------------------- #

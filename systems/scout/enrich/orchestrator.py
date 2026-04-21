@@ -41,10 +41,10 @@ TIER_ADAPTERS: dict[str, list[str]] = {
     "D": ["zerobounce", "claude_research"],
 }
 
-# Temp label until Task 12.5 schema migration adds `enrich_contact` to the
-# decision_type CHECK constraint. When 005_foundation_completion.sql ships,
-# change this single constant and update the migration plan accordingly.
-_DECISION_TYPE: Final[str] = "enrichment_choice"
+# Final decision-type label for the enrich stage. Added to the
+# decision_log.decision_type CHECK constraint by
+# scripts/sql/005_foundation_completion.sql (Task 12.5).
+_DECISION_TYPE: Final[str] = "enrich_contact"
 
 
 # --------------------------------------------------------------------------- #

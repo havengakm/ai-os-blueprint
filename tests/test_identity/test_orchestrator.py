@@ -142,7 +142,7 @@ async def test_orchestrator_archives_when_all_miss_and_logs_archive():
     assert len(log.entries) == 4
     archive_entry = log.entries[3]
     assert archive_entry["decision"] == "identity_lookup:archive_no_decision_maker"
-    assert archive_entry["decision_type"] == "enrichment_choice"
+    assert archive_entry["decision_type"] == "identity_lookup"
     assert "sources_attempted" in archive_entry["context"]
     assert "adapters_called" in archive_entry["context"]
 
@@ -170,7 +170,7 @@ async def test_orchestrator_logs_per_adapter_call():
     assert "identity_lookup:claude_scraper:miss" in decisions
 
     for entry in per_adapter:
-        assert entry["decision_type"] == "enrichment_choice"
+        assert entry["decision_type"] == "identity_lookup"
         assert entry["source"] == "system"
 
 

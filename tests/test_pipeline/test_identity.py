@@ -362,7 +362,7 @@ async def test_stage_logs_summary_decision():
     ]
     assert len(summary_decisions) == 1
     d = summary_decisions[0]
-    assert d["decision_type"] == "enrichment_choice"
+    assert d["decision_type"] == "identity_lookup"
     ctx = d["context"]
     assert ctx["client_id"] == CLIENT
     assert "dry_run" in ctx

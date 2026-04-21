@@ -187,7 +187,7 @@ class PullOrchestrator:
                 summary.error = f"{type(exc).__name__}: {exc}"
                 await self._storage.log_decision(
                     client_id,
-                    decision_type="enrichment_choice",
+                    decision_type="source_selection",
                     decision="source_adapter_failed",
                     reasoning=summary.error,
                     context={"adapter_name": adapter_name},
@@ -235,7 +235,7 @@ class PullOrchestrator:
             confidence = summary.inserted / max(summary.pulled, 1)
             await self._storage.log_decision(
                 client_id,
-                decision_type="enrichment_choice",
+                decision_type="source_selection",
                 decision="source_adapter_pulled",
                 reasoning=f"pulled={summary.pulled} inserted={summary.inserted} skipped={summary.skipped_duplicate}",
                 context={

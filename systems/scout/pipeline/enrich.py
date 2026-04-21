@@ -21,10 +21,11 @@ if TYPE_CHECKING:
     from systems.scout.enrich.orchestrator import EnrichOrchestrator
 
 
-# Temp label until Task 12.5 schema migration adds `enrich_contact` to the
-# decision_type CHECK constraint. Mirrors ``_DECISION_TYPE`` in
-# ``systems/scout/enrich/orchestrator.py``.
-_DECISION_TYPE = "enrichment_choice"
+# Final decision-type label for the enrich stage. Added to the
+# decision_log.decision_type CHECK constraint by
+# scripts/sql/005_foundation_completion.sql (Task 12.5). Mirrors
+# ``_DECISION_TYPE`` in ``systems/scout/enrich/orchestrator.py``.
+_DECISION_TYPE = "enrich_contact"
 
 # Default archive floor — contacts below this icp_score are already
 # archived by the screen/score stage and should never reach enrich.
