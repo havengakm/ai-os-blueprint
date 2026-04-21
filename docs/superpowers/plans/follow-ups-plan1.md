@@ -515,6 +515,32 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 52. EnrichStage — polish items from code review
+
+**Raised by:** Task 12d code-quality review (2026-04-21)
+**Severity:** Suggestion (stage shipped merge-ready; all items are polish)
+**File:** `systems/scout/pipeline/enrich.py` + `tests/test_pipeline/test_enrich.py`
+
+3 Important (but non-blocking) + 7 Minor. Bundle into one polish commit alongside Task 12.5 rename work (which will already touch this file for `_DECISION_TYPE` → `enrich_contact`).
+
+Important:
+- **I1:** Add a test + comment documenting cross-shape list dedupe behaviour in `_extend_dedupe`. Current logic keeps shape-differing items (`{"type":"x","detail":"y"}` vs `{"type":"x"}` both kept). Lock the intent so future edits don't silently drift.
+- **I2:** Add `mk_simple_zerobounce_orc(cid, tier="A")` helper to the test file's helper block. Replaces inline scaffolding across 3-4 tests (persistence-failure, summary-on-all-errors, budget-exhausted). Saves ~30-50 lines.
+- **I3:** Tighten `_merge_adapter_data(adapter_results: dict[str, Any])` → `dict[str, EnrichResult]`. Add runtime import. Type-checker help + self-documenting contract.
+
+Minor:
+- **M1:** Move `_UNHASHABLE = object()` sentinel above `_extend_dedupe` (currently between its two call sites).
+- **M2:** Hoist `from datetime import datetime, timezone` in `_utc_now_iso` to module top. No perf need for lazy import.
+- **M3:** Add one-line comment in the `by_tier` increment guard explaining why unknown tiers are silently dropped (orchestrator already logs them as `unknown_tier`).
+- **M4:** Drop the defensive `list()` wrappers in `_extend_dedupe`: `for item in left + right:` — type signature already says list, wrappers are dead code per simplicity rule.
+- **M5:** Cross-file consistency: `tests/test_pipeline/test_identity.py` imports pytest it doesn't use; `test_enrich.py` doesn't import pytest at all. Pick one convention across both files.
+- **M6:** Either delete `test_fake_storage_conforms_to_protocol` (it's a tautology — `assert storage is not None`) or promote it by adding `@runtime_checkable` to the Protocol + a real `isinstance` assert. Probably delete.
+- **M7 (cross-file):** Extract `_MAX_REASONING_LEN = 500` constant in both `identity.py` and `enrich.py` `_log_persist_failure` helpers (both hardcode the 500-char truncation). Task 12.5 rename work is the natural home.
+
+**Additional cross-file tech debt surfaced by this review** (not in this item, but worth noting):
+- `systems/scout/pipeline/identity.py` still inlines `"enrichment_choice"` at 2 call sites (lines 201, 234). Task 12.5 rename should include identity.py, not just enrich.py. Add to Task 12.5 scope or file as a separate follow-up.
+- `identity.py`'s summary log is NOT wrapped in try/except (enrich.py is — reviewer's judgment: enrich's pattern is the improvement). Consider backporting the try/except to identity.py in the same Task 12.5 pass.
+
 ### 51. Enrich orchestrator — residual minor cleanups
 
 **Raised by:** Task 12c code-quality review (2026-04-21); two Important items already amended at `8e8e233`, these are the leftover Minors
