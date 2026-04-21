@@ -520,3 +520,35 @@ async def test_trigify_null_published_at_gives_none_recency(_env):
     assert result.ok is True
     ev = result.data["trigger_events"][0]
     assert ev["recency_days"] is None
+
+
+@pytest.mark.asyncio
+async def test_trigify_naive_datetime_normalises_to_utc(_env):
+    """Regression: Trigify edge-case naive ISO-8601 timestamps (no Z, no offset)
+    would raise TypeError when subtracted from UTC-aware now(). Adapter must
+    normalise naive to UTC and compute recency rather than aborting the batch."""
+    contact = {
+        "contact_id": "c-naive",
+        "linkedin_url": "https://linkedin.com/in/jane",
+        "company_domain": None,
+        "company": "",
+        "trigify_search_ids": ["s1"],
+    }
+    # Naive timestamp — no Z, no offset. This is the edge case that was broken.
+    result_item = _trigify_result(
+        result_id="r-naive",
+        profile_url="https://linkedin.com/in/jane",
+        published_at="2026-04-11T12:00:00",
+    )
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _mock_response(_page_response([result_item]))
+
+    adapter = TrigifyAdapter(http_client=mock_client)
+    result = await adapter.enrich(contact)
+
+    # Must not crash. recency_days must be an int (not None), because the
+    # timestamp IS parseable once normalised to UTC.
+    assert result.ok is True
+    ev = result.data["trigger_events"][0]
+    assert isinstance(ev["recency_days"], int)
+    assert 8 <= ev["recency_days"] <= 11

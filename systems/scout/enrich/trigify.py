@@ -196,7 +196,7 @@ class TrigifyAdapter:
             },
             cost_cents=0,
             reason=reason,
-            raw_response={"monitors_queried": list(search_ids)},
+            raw_response={},  # Multi-monitor payloads would bloat memory; data.monitors_queried carries audit intent
         )
 
 
@@ -227,8 +227,8 @@ def _match_contact(
         if company_domain in text or company_domain in content_url:
             return "domain"
 
-    # Company name match (length-gated)
-    if company and len(company.strip()) >= MIN_COMPANY_NAME_LEN:
+    # Company name match (length-gated). `company` is already stripped by the caller.
+    if company and len(company) >= MIN_COMPANY_NAME_LEN:
         if company.lower() in text:
             return "name"
 
@@ -265,12 +265,21 @@ def _engagement_sum(event: dict[str, Any]) -> int:
 
 
 def _compute_recency(published_at: str | None) -> int | None:
-    """Return days since published_at (UTC), or None if unparseable/missing."""
+    """Return days since published_at (UTC), or None if unparseable/missing.
+
+    Normalises naive datetimes to UTC before subtraction — Trigify has been
+    observed to return ISO-8601 timestamps without a `Z` suffix or offset
+    in some edge cases, which would otherwise raise TypeError when subtracting
+    from an offset-aware `now`.
+    """
     if not published_at:
         return None
     try:
         dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        # Assume naive datetimes are UTC — safer than breaking the batch.
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         now = datetime.now(tz=timezone.utc)
         return max(0, (now - dt).days)
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, TypeError):
         return None
