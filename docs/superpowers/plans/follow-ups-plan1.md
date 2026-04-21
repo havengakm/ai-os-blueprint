@@ -363,7 +363,7 @@ Operator describes a custom signal in plain English ("anyone posting about 'pipe
 
 Makes custom-signal authoring accessible to non-technical operators — exactly the leverage point from the webinar.
 
-### 43. Plan 7 multi-cadence optimizer architecture (3 crons, not 1)
+### 43. Plan 7 multi-cadence optimizer architecture (3 cadences, not 1)
 
 **Raised by:** Hans + Max webinar 2026-04-21 + plan-mode refinement
 **Severity:** Plan 7 scope — architectural refinement
@@ -372,9 +372,18 @@ Makes custom-signal authoring accessible to non-technical operators — exactly 
 
 Plan 7's optimization engine is NOT a single weekly cron. It's three cadences:
 
-1. **Daily campaign-stats pull** (per channel) — ingestion leg, no action
-2. **Per-cohort micro-segment evaluation** (every ~500 leads completed in a niche × offer × round × sequence) — the self-improvement core; auto-mutates next cohort's bandit weights at `act_notify` autonomy tier
-3. **Weekly strategic report** (operator-facing) — surfaces structural changes for operator approval
+1. **Daily campaign-stats pull** (per channel, time-driven) — ingestion leg, no action
+2. **Per-cohort micro-segment evaluation (LEADS-TRIGGERED, not time-triggered)** — fires when ~500 completed leads accumulate in a given `(niche, offer, round, sequence_id)` cohort. The self-improvement core; auto-mutates next cohort's bandit weights at `act_notify` autonomy tier
+3. **Weekly strategic report** (time-driven, operator-facing) — surfaces structural changes for operator approval
+
+**Why cadence 2 is leads-triggered, not time-triggered (Kirsten 2026-04-21):** statistical relevance requires a minimum sample size. Time-based evaluators would fire on 50 leads for low-volume clients or 5000 leads for high-volume ones — noise-driven auto-promotions on small samples + stale insights on large ones. Fixed-leads threshold (500) guarantees every evaluation sits on a statistically defensible sample, consistent across clients + niches + sequences. Auto-promotion is a money + brand-risk action; it must not fire on noise.
+
+**Trigger mechanism for cadence 2:** database-change-driven via `contacts.status` transition to terminal states (`completed_sequence | replied | opted_out | meeting_booked`). Two implementation options to evaluate at Plan 7 kickoff:
+
+- **Option A (preferred for tightness):** Postgres trigger on `contacts.status` updates → increments `cohort_progress` counter row per `(niche, offer, round, sequence_id)` → when counter crosses a 500-multiple, enqueues evaluator job via pg_notify / change-stream → scheduler vendor (per item 44) picks up the job. Near-real-time, single source of truth.
+- **Option B (simpler, acceptable):** hourly sweep job reads `contacts` grouped by cohort key + counts status-terminal rows since last evaluator run → when delta ≥ 500, fires the evaluator. Stateful comparison via `cohort_evaluations.last_run_lead_count` column. Up to 1-hour delay; simpler infra.
+
+Default to Option B unless Plan 7 implementation surfaces a real need for sub-hourly responsiveness. Decide at Plan 7 kickoff.
 
 Target benchmarks (calibrate per channel × niche × offer):
 - **Floor:** 30% acceptance / 25% reply. Below → aggressively iterate.
