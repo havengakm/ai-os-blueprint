@@ -30,12 +30,20 @@ Agent-runnable markdown procedures. Each skill is a step-by-step set of instruct
 
 Each skill is a markdown file named in kebab-case: `skills/operations/run-nightly-pipeline.md`.
 
+**The `description` field is a matcher.** When an agent decides which skill to invoke, it reads the description FIRST to determine relevance. A vague description = missed invocations or wrong-skill dispatches. Rules:
+
+- Lead with the CONCRETE ACTION (not the abstract topic). Good: "Advance all contacts through ready pipeline stages...". Bad: "Skill for pipeline management."
+- Include **when NOT to use** if the skill has a narrow trigger. E.g., "Explicit trigger only — do not invoke opportunistically."
+- If the skill should only fire on a specific command, say so in `when-to-use`.
+
+Source: Max (Trigify) webinar 2026-04-21 — "optimise that very first section that AI scans always."
+
 Suggested structure inside each skill:
 
 ```markdown
 ---
 name: Run nightly pipeline
-description: Advance all contacts through ready pipeline stages, log decisions, report tier distribution.
+description: Advance all contacts through ready pipeline stages, log decisions, report tier distribution. Explicit daily trigger only — do not invoke opportunistically.
 when-to-use: Daily at 02:00 client timezone, or on-demand for a dry-run.
 trigger: Scheduler (Plan 1 Task 16.6) OR operator invocation via web app.
 ---

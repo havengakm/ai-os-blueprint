@@ -317,6 +317,116 @@ Trigify's docs mark `POST /v1/searches` (monitor creation) as deprecated in favo
 
 MVP fetches `?limit=100` per monitor per enrich call. If monitors accumulate more than 100 results between polls (likely at higher-activity client workspaces or after long gaps), signals will be silently dropped past the first page. Implement cursor pagination (`?cursor=<next_cursor>`) when signal volume crosses the threshold. Wrap the current single-page call in a `while has_more` loop.
 
+### 39. Evaluate Instantly as email-channel vendor (pre-Plan-2 decision record required)
+
+**Raised by:** Hans (Instantly CRO) + Max (Trigify CEO) webinar, shared by Kirsten 2026-04-21
+**Severity:** Important — blocks Plan 2 kickoff until resolved
+**File:** new `docs/superpowers/decisions/2026-XX-XX-email-channel-vendor.md`
+**Source:** `feedback_cold_email_stack_reference.md` memory
+
+Before Plan 2 starts, produce a decision record evaluating:
+- **Option A:** build email send engine from scratch (IMAP/SMTP/ESP integration, deliverability warming, inbox rotation, sequence execution, bounce management, unsubscribe handling). Estimated 4-6 sessions.
+- **Option B:** wrap Instantly's MCP + REST API as the email-channel adapter. Instantly handles deliverability + sequences + webhooks. We wrap the same way we already wrap ZeroBounce / Hunter / Apollo / Trigify. Estimated 1-2 sessions.
+
+Criteria: vendor lock-in risk vs time-to-market vs per-seat cost vs deliverability maturity. Recommendation in the memory is Option B. Confirm before Plan 2 kickoff.
+
+### 40. Extend `claude_web_triggers.py` for "new hire" silver-bullet signal
+
+**Raised by:** Hans + Max webinar 2026-04-21
+**Severity:** Suggestion (high-leverage copy change)
+**File:** `systems/scout/enrich/claude_web_triggers.py` (prompt + validation)
+
+Max and Ilia both cited "new hire within 180 days at a target company" as the highest-performing signal across every industry — outperforms funding, product launches, keyword mentions. Current adapter has `executive_hire` as one of 6 event types but only considers C-suite + VP-level. Changes:
+- Broaden `executive_hire` event-type prompt to include Director+ / senior-manager-level hires at companies matching ICP
+- Bump `has_active_buying_signal` recency window from 60d to 180d specifically for hire-type events (keep 60d for other event types)
+- Add a test for the Director-level-hire-180d case
+
+### 41. Plan 7 skill — operator-initiated batch variant exploration
+
+**Raised by:** Hans + Max webinar 2026-04-21 ("30 campaigns in 5 minutes")
+**Severity:** Plan 7 scope (new skill)
+**File:** future `skills/authoring/seed-n-variants.md`
+
+Operator invokes a single skill → system generates N (default 10-20) component variants across the specified component type (subject lines OR icebreakers OR pain_hooks), scores each against the 27-constraint offer-score rubric, surfaces them in the operator dashboard for approval, and auto-seeds the approved ones into the component registry with `ab_epsilon` set to explore-heavy. Follows the "exploration-heavy → winner survives → exploit" bandit pattern. Validates the "30 campaigns in 5 minutes" efficiency the webinar showcased.
+
+### 42. Plan 7 skill — plain-English custom-signal authoring
+
+**Raised by:** Hans + Max webinar 2026-04-21
+**Severity:** Plan 7 scope (new skill)
+**File:** future `skills/authoring/configure-custom-signal.md`
+
+Operator describes a custom signal in plain English ("anyone posting about 'pipeline broken' AND working at a company that raised Series A in the last 90 days AND is a SaaS founder"). Skill:
+- Parses the description into structured criteria (keywords, company-filters, firmographic-filters)
+- Creates matching Trigify monitor(s) via the MCP `create_search` endpoint
+- Writes an interpretation rule that converts raw signals into structured `trigger_events[]` entries with the correct `type` taxonomy
+- Registers the new signal type in the client's config so the composer knows how to reference it
+
+Makes custom-signal authoring accessible to non-technical operators — exactly the leverage point from the webinar.
+
+### 43. Plan 7 multi-cadence optimizer architecture (3 crons, not 1)
+
+**Raised by:** Hans + Max webinar 2026-04-21 + plan-mode refinement
+**Severity:** Plan 7 scope — architectural refinement
+**File:** plan-doc amendment + `systems/optimizer/*` module structure
+**Source:** `~/.claude/plans/please-ask-questions-one-refactored-bubble.md` Plan 7 section
+
+Plan 7's optimization engine is NOT a single weekly cron. It's three cadences:
+
+1. **Daily campaign-stats pull** (per channel) — ingestion leg, no action
+2. **Per-cohort micro-segment evaluation** (every ~500 leads completed in a niche × offer × round × sequence) — the self-improvement core; auto-mutates next cohort's bandit weights at `act_notify` autonomy tier
+3. **Weekly strategic report** (operator-facing) — surfaces structural changes for operator approval
+
+Target benchmarks (calibrate per channel × niche × offer):
+- **Floor:** 30% acceptance / 25% reply. Below → aggressively iterate.
+- **Ceiling:** 50-55% reply. Above → diminishing returns; ship as evergreen winner.
+- **Operating band:** 35-45% reply. Bandit exploits current winner + explores 10-15% against new variants.
+
+Module structure:
+- `os/foundation/optimization_engine.py` — shared math + Bayesian significance
+- `systems/optimizer/daily_stats_puller.py` — cadence 1
+- `systems/optimizer/cohort_evaluator.py` — cadence 2 (the self-improvement core)
+- `systems/optimizer/weekly_reporter.py` — cadence 3
+
+New data-model tables for Plan 7: `campaign_daily_stats`, `cohort_evaluations`.
+
+Fold into the canonical Plan 7 plan doc when written.
+
+### 44. Scheduler/orchestration vendor eval — Railway worker vs trigger.dev vs hybrid
+
+**Raised by:** Kirsten 2026-04-21 following Hans + Max webinar (Max uses trigger.dev for his cron orchestration)
+**Severity:** Important — blocks Task 16.6 daemon kickoff + Plan 7 optimizer crons until resolved
+**File:** new `docs/superpowers/decisions/2026-XX-XX-scheduler-vendor.md`
+
+Task 16.6 (Scout autonomous daemon) + Plan 7 (3 optimizer crons at daily / per-cohort / weekly cadences) both need a scheduling layer. Three candidates:
+
+**Option A — Railway background worker** (currently implicit in Task 16.6 scope):
+- `scripts/agent_daemon.py` as long-running asyncio process on Railway background dyno
+- Simple, no new vendor, $0 marginal cost (already on Railway)
+- We build: retry logic, concurrency control, observability dashboards, crash recovery, idempotency guarantees
+- Risk: rebuilding workflow-orchestration primitives poorly
+
+**Option B — trigger.dev** (Max's choice per webinar):
+- Dedicated workflow/cron orchestration service with TypeScript/Node SDK
+- Built-in retry policies, concurrency caps, observability dashboards, version-pinned job definitions, crash recovery, idempotency
+- External vendor dep + cost (~$10-50/mo at low volume, scales with job count)
+- Matches the "wrap mature vendors" pattern we've used for all other infrastructure
+- Integrates with Claude Code workflows per the webinar demo
+- Question: does it play well with our Python stack, or does it force Node boundary crossings?
+
+**Option C — Hybrid** (Scout daemon on Railway worker + Plan 7 optimizer crons on trigger.dev):
+- Scout daemon stays simple (tick every 15 min, advance contacts) — minimal orchestration needs
+- Optimizer crons (daily stats + per-cohort eval + weekly report) use trigger.dev where retry/observability/version-pinning matters most
+- Splits the orchestration concern across two layers — more mental overhead but targeted
+
+**Research scope (before writing the decision record):**
+- trigger.dev Python SDK availability (if any) OR the cost of a thin HTTP-trigger bridge from trigger.dev → our FastAPI app
+- Pricing model at ~30 crons × 7 days × 4 clients = ~840 executions/week
+- Observability + retry semantics compared to what Railway-worker DIY would require
+- Multi-tenant isolation — can one trigger.dev account fire crons scoped per-AIOS-client?
+- Alternatives worth a line: Upstash cron, Temporal, Apache Airflow, Inngest
+
+Produce a decision record before Task 16.6 kickoff. Default recommendation absent research: Option C (hybrid) — Scout daemon simple-Railway + optimizer crons on trigger.dev — but this is a placeholder pending the research pass.
+
 ### 38. Claude web-triggers adapter — M1/M2/M3/S3 cleanup
 
 **Raised by:** Task 12b.3a code-quality review (2026-04-21)
