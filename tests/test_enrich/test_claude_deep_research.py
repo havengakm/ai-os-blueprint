@@ -55,7 +55,10 @@ class _FakeContext:
 
 
 class _FakeBrowser:
-    """Returns pre-configured pages per URL, or a default page for unspecified URLs."""
+    """Returns pre-configured pages per URL, or a default page for unspecified URLs.
+
+    Tracks new_context call count so skip-path tests can assert no network happened.
+    """
 
     def __init__(
         self,
@@ -65,8 +68,10 @@ class _FakeBrowser:
         self._url_map = url_map or {}
         self._default_html = default_html
         self.close = AsyncMock()
+        self.new_context_calls = 0
 
     async def new_context(self) -> _FakeContext:
+        self.new_context_calls += 1
         return _FakeContext(_FakeUrlDispatchPage(self._url_map, self._default_html))
 
 
@@ -100,12 +105,16 @@ class _FakeUrlDispatchPage:
 # --------------------------------------------------------------------------- #
 
 class _FakeAnthropic:
+    """Mock Anthropic client. Tracks create() call count for skip-path assertions."""
+
     def __init__(self, response_json: str):
         self._response_json = response_json
         self.messages = self
         self.close = AsyncMock()
+        self.create_calls = 0
 
     async def create(self, **kwargs):
+        self.create_calls += 1
         resp = MagicMock()
         resp.content = [MagicMock(text=self._response_json)]
         return resp
@@ -181,6 +190,20 @@ def _fixture_browser() -> _FakeBrowser:
     return _FakeBrowser(url_map=url_map, default_html="")
 
 
+def _linkedin_only_browser() -> _FakeBrowser:
+    """Browser where company pages are all empty but LinkedIn pages return content.
+
+    Exercises the company-pages-exhaust-then-LinkedIn path — this path was broken
+    in the original commit (URL slicing cut LinkedIn at positions 15-16).
+    """
+    linkedin_html = _load_fixture("linkedin_company_page.html")
+    url_map = {
+        "https://www.linkedin.com/company/acme-consulting/": linkedin_html,
+        "https://www.linkedin.com/company/acme-consulting/posts/": linkedin_html,
+    }
+    return _FakeBrowser(url_map=url_map, default_html="")
+
+
 _CONTACT = {
     "contact_id": "c-deep-001",
     "company": "Acme Consulting",
@@ -238,49 +261,61 @@ async def test_deep_research_no_api_key(monkeypatch):
     assert result.ok is False
     assert result.cost_cents == 0
     assert result.reason == "no_api_key"
+    # Money defense: no network call, no Anthropic call when API key is missing
+    assert browser.new_context_calls == 0
+    assert fake_client.create_calls == 0
 
 
 @pytest.mark.asyncio
 async def test_deep_research_no_company(_env):
-    """Blank company → ok=False, cost=0."""
+    """Blank company → ok=False, cost=0, no network."""
+    browser = _FakeBrowser()
+    fake_client = _FakeAnthropic(_full_response())
     from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
-    adapter = ClaudeDeepResearchAdapter(
-        browser=_FakeBrowser(), anthropic_client=_FakeAnthropic(_full_response())
-    )
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
     result = await adapter.enrich({
         "contact_id": "c1", "company": "", "company_domain": "acme.com"
     })
     assert result.ok is False
     assert result.cost_cents == 0
     assert result.reason == "no_company"
+    # Money defense: no network call, no Anthropic call when company is blank
+    assert browser.new_context_calls == 0
+    assert fake_client.create_calls == 0
 
 
 @pytest.mark.asyncio
 async def test_deep_research_no_domain(_env):
-    """Blank domain → ok=False, cost=0."""
+    """Blank domain → ok=False, cost=0, no network."""
+    browser = _FakeBrowser()
+    fake_client = _FakeAnthropic(_full_response())
     from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
-    adapter = ClaudeDeepResearchAdapter(
-        browser=_FakeBrowser(), anthropic_client=_FakeAnthropic(_full_response())
-    )
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
     result = await adapter.enrich({
         "contact_id": "c2", "company": "Acme", "company_domain": ""
     })
     assert result.ok is False
     assert result.cost_cents == 0
     assert result.reason == "no_domain"
+    # Money defense: no network call, no Anthropic call when domain is blank
+    assert browser.new_context_calls == 0
+    assert fake_client.create_calls == 0
 
 
 @pytest.mark.asyncio
 async def test_deep_research_dry_run(_env):
-    """dry_run=True → ok=True, cost=0, no network."""
+    """dry_run=True → ok=True, cost=0, no network, no Anthropic call."""
+    browser = _FakeBrowser()
+    fake_client = _FakeAnthropic(_full_response())
     from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
-    adapter = ClaudeDeepResearchAdapter(
-        browser=_FakeBrowser(), anthropic_client=_FakeAnthropic(_full_response())
-    )
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
     result = await adapter.enrich(_CONTACT, dry_run=True)
     assert result.ok is True
     assert result.cost_cents == 0
     assert result.reason == "dry_run_skipped"
+    # Money defense: dry-run never touches network or billed API
+    assert browser.new_context_calls == 0
+    assert fake_client.create_calls == 0
 
 
 @pytest.mark.asyncio
@@ -515,3 +550,27 @@ async def test_deep_research_aclose_closes_lazy_resources(_env):
     await adapter2.aclose()
     lazy_browser.close.assert_awaited_once()
     lazy_client.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_deep_research_linkedin_reachable_when_company_pages_empty(_env, monkeypatch):
+    """Regression: LinkedIn URLs (positions 15-16 in the combined URL list) were previously
+    unreachable because of a bad slice before the fetch loop. This test locks in that
+    LinkedIn fills the slack when company pages return nothing."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _linkedin_only_browser()
+    fake_client = _FakeAnthropic(_full_response())
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    # The run must have reached Claude (some content was gathered from LinkedIn)
+    assert result.ok is True
+    assert result.cost_cents == 3
+    assert result.reason == "research_complete"
+    # At least one of the two LinkedIn URLs must appear in sources_fetched
+    sources = result.data["sources_fetched"]
+    assert any("linkedin.com/company/acme-consulting" in s for s in sources), (
+        f"LinkedIn URL never reached despite company pages being empty. sources={sources}"
+    )

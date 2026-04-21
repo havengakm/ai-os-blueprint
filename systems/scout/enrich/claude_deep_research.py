@@ -333,7 +333,15 @@ class ClaudeDeepResearchAdapter:
             )
 
         # --- fetch pages ---
-        all_urls = (_company_page_urls(domain) + _linkedin_urls(company))[:MAX_PAGES + 2]
+        # LinkedIn URLs FIRST (2 pages) so they always get a shot before MAX_PAGES is
+        # consumed by empty/404 company pages. Company paths follow. Earlier versions
+        # put company paths first + sliced the combined list, making LinkedIn URLs
+        # (then at positions 15-16) permanently unreachable. Now LinkedIn is at
+        # positions 0-1 and the natural loop termination at MAX_PAGES leaves ~6 slots
+        # for company pages after LinkedIn. If LinkedIn is blocked / empty in production
+        # it costs 2 slots of the 8-page budget — acceptable tradeoff because LinkedIn
+        # surfaces the freshest trigger events (recent posts, funding, exec changes).
+        all_urls = _linkedin_urls(company) + _company_page_urls(domain)
         browser = await self._ensure_browser()
 
         sources_fetched: list[str] = []
