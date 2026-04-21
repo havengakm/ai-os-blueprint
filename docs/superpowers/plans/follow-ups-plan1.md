@@ -268,6 +268,57 @@ Schema additions (Plan 2 migration):
 
 Sequence library structure: `data/reference/sequences/{niche}/round-{N}-{descriptor}.yaml`.
 
+### 32. Plan 1 Task 16.6 (NEW): autonomous daemon — block Plan 1 launch without it
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plan 1 expanded scope (BLOCKS email-live launch)
+**Decision record:** [`2026-04-21-aios-as-autonomous-sdr.md`](../decisions/2026-04-21-aios-as-autonomous-sdr.md)
+
+AIOS is an autonomous SDR system, not a toolkit. HTTP-trigger-only (`/api/pipeline/trigger`) is NOT autonomous operation. Plan 1 must ship a daemon/background-worker that runs continuously without human trigger.
+
+Scope:
+- `scripts/agent_daemon.py` — async loop, tick cadence 15 min, wakes up + scans `contacts` by status, advances contacts through next-eligible stages, logs heartbeat every tick, respects autonomy levels per `client_config.autonomy_rules`
+- Per-stage cron triggers inside the daemon (pull daily, identity daily, enrich daily, compose hourly — see `agents/scout.md` schedule block)
+- Railway background-worker deployment config (`railway.toml` + Procfile addition)
+- Graceful shutdown, no-quota-exceeded auto-pause, signal-based pause/resume
+- Task 17 e2e test exercises daemon running for N cycles, NOT just one-shot `/api/pipeline/trigger` call
+
+Replaces part of the approved plan's Task 17 + Task 16 scope. Authoritative task list update goes in `docs/superpowers/plans/2026-04-20-foundation-scout-migration.md` at next plan-doc amendment pass.
+
+### 33. Plan 2 scheduler service — scope clarification
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plan 2 scope addition
+**Decision record:** [`2026-04-21-aios-as-autonomous-sdr.md`](../decisions/2026-04-21-aios-as-autonomous-sdr.md)
+
+Plan 2 Beacon ships with a scheduler service equivalent to Scout's daemon (Task 16.6) but for send-window management:
+- Tick cadence appropriate to send-timing (every 1-5 min during business hours, paused outside send window per client timezone)
+- Reads `outreach_drafts status='ready_to_send'` rows
+- Checks contact global state (row-locked read), opts out if any terminal state
+- Fires next sequence step via the channel module for that step's channel
+- Respects per-client daily send cap
+- Emits `decision_log` entry per send with full component tuple
+
+Scope baked into Plan 2 authoritative plan doc when Plan 2 is written. Referenced here for continuity.
+
+### 34. Plan 7 operator dashboard + system personification
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plan 7 scope addition
+**Decision record:** [`2026-04-21-aios-as-autonomous-sdr.md`](../decisions/2026-04-21-aios-as-autonomous-sdr.md)
+
+Plan 7 ships operator-facing web dashboard slices:
+
+- **"What is AIOS doing right now?"** — live view of in-flight queues per agent (Scout, Beacon, Optimizer, channel modules). Uses agent manifests from `agents/*.md` for display names + persona.
+- **Pending approval queue** — surfaces `suggest` / `draft`-level decisions awaiting operator action. Approve / reject / defer.
+- **Variant promotion actions** — weekly optimization report surfaces winner/loser components per niche × offer. Operator one-click promotes / retires variants.
+- **Weekly report narrative** — auto-generated from `skills/analysis/weekly-report-narrative.md`. Top wins, top losses, proposed changes, client-level trend.
+- **Autonomy-level controls** — operator adjusts autonomy per action-type per client via UI (vs editing client_config JSON directly).
+
+System personification (non-functional UI polish): agents named in UI per `agents/*.md` manifests. Operator sees "Scout is scoring 47 contacts" not "pull.py is executing on 47 rows."
+
+Scope baked into Plan 7 authoritative plan doc when Plan 7 is written. Referenced here for continuity.
+
 ### 31. Task 12 enrich scope — LOCKED with buying signals required
 
 **Raised by:** Architecture session 2026-04-21 (corrected scope after quality/cost misread)
