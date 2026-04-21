@@ -18,13 +18,20 @@ from typing import Any, Protocol
 
 @dataclass
 class EnrichResult:
-    """What an enrich adapter returns per contact call."""
+    """What an enrich adapter returns per contact call.
+
+    IMPORTANT for callers: ``ok`` indicates the API call completed (or was
+    deliberately skipped), NOT that the business outcome was positive. Always
+    check ``reason`` before using ``data``. Example: a ZeroBounce call on an
+    invalid email returns ``ok=True`` (call succeeded) but ``reason="unsafe:invalid"``
+    — the email is NOT deliverable and ``data["email_verified"]`` is False.
+    """
 
     adapter_name: str
-    ok: bool                        # True if the API call completed successfully
+    ok: bool                        # True if API call completed or was skipped cleanly
     data: dict[str, Any]            # adapter-specific output fields
     cost_cents: int                 # ACTUAL cost of this call. Always >= 0.
-    reason: str                     # human-readable disposition
+    reason: str                     # business disposition — check before using data
     raw_response: dict[str, Any] = field(default_factory=dict)  # audit trail
 
 

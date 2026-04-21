@@ -132,15 +132,15 @@ class ZeroBounceAdapter:
         }
 
         logger.info(
-            "zerobounce contact_id=%s status=%s reason=%s cost_cents=1",
-            contact_id, status, reason,
+            "zerobounce contact_id=%s status=%s reason=%s cost_cents=%d",
+            contact_id, status, reason, self.cost_cents_per_call,
         )
 
         return EnrichResult(
             adapter_name=self.name,
             ok=True,
             data=data,
-            cost_cents=1,
+            cost_cents=self.cost_cents_per_call,
             reason=reason,
             raw_response=body,
         )
