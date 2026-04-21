@@ -301,6 +301,37 @@ Plan 2 Beacon ships with a scheduler service equivalent to Scout's daemon (Task 
 
 Scope baked into Plan 2 authoritative plan doc when Plan 2 is written. Referenced here for continuity.
 
+### 35. Trigify adapter — migrate off deprecated `POST /v1/searches`
+
+**Raised by:** Task 12b.3b code-quality review (2026-04-21)
+**Severity:** Suggestion (backlog — Trigify has not published replacement endpoints yet)
+**File:** `systems/scout/enrich/trigify.py` + future `scripts/setup_client.sh` at client onboarding
+
+Trigify's docs mark `POST /v1/searches` (monitor creation) as deprecated in favour of "dedicated per-source endpoints," but the replacements are NOT publicly documented at time of writing. We use the deprecated endpoint for MVP. Migrate when Trigify publishes the replacements. No functional impact today.
+
+### 36. Trigify adapter — implement pagination on `get_results`
+
+**Raised by:** Task 12b.3b code-quality review (2026-04-21)
+**Severity:** Suggestion (backlog — triggered when signal volume exceeds ~100 per poll)
+**File:** `systems/scout/enrich/trigify.py:141` (single-page fetch loop)
+
+MVP fetches `?limit=100` per monitor per enrich call. If monitors accumulate more than 100 results between polls (likely at higher-activity client workspaces or after long gaps), signals will be silently dropped past the first page. Implement cursor pagination (`?cursor=<next_cursor>`) when signal volume crosses the threshold. Wrap the current single-page call in a `while has_more` loop.
+
+### 37. Trigify adapter — client isolation at 10+ client scale
+
+**Raised by:** Task 12b.3b code-quality review (2026-04-21) + research agent audit
+**Severity:** Important (do before onboarding client #10)
+**File:** Trigify workspace config + `scripts/setup_client.sh`
+
+MVP uses a single Trigify workspace and namespaces searches by `[client_id]-` prefix in the `name` field. Search names are not load-bearing for permissions — all API keys in the workspace can read all searches. No multi-tenant isolation today.
+
+Before onboarding client #10 (or earlier if a client has stricter isolation requirements), contact Trigify support to confirm:
+- Whether workspace-level API-key scoping exists (per-workspace key that only sees its own searches)
+- Whether Enterprise tier unlocks sub-accounts or white-label isolation
+- Whether we need to provision per-client Trigify workspaces (+ manage N API keys)
+
+Until resolved: limit AIOS to clients who explicitly acknowledge the shared-workspace pattern in their onboarding SOP.
+
 ### 34. Plan 7 operator dashboard + system personification
 
 **Raised by:** Architecture session 2026-04-21
