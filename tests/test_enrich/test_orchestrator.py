@@ -462,6 +462,61 @@ async def test_zero_cost_successful_adapter_does_not_call_record_spend():
 
 
 # --------------------------------------------------------------------------- #
+# 11. Budget tracker raises — fail safe but surface diagnostic reason           #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.asyncio
+async def test_budget_tracker_exception_fails_safe_with_diagnostic_reason():
+    """When remaining_cents raises, we still auto-pause the tier (fail safe),
+    but skipped reasons and the single log entry must distinguish a
+    budget-tracker outage from legitimate budget exhaustion."""
+    adapters = _make_tier_a_adapters()
+    budget = FakeBudgetTracker(
+        initial_cents=100,
+        raise_on_remaining=RuntimeError("db down"),
+    )
+    log = FakeLogger()
+
+    orch = EnrichOrchestrator(adapters=adapters, budget_tracker=budget, decision_logger=log)
+    result = await orch.enrich_contact("client-1", _contact(), tier="A")
+
+    # Every adapter was skipped (zerobounce hits tracker failure first, then
+    # the early-exit branch buckets the rest with the same reason).
+    assert result.adapter_results == {}
+    assert result.budget_exhausted is True
+    assert result.total_cost_cents == 0
+    expected_reason = "budget_tracker_error:RuntimeError"
+    assert all(
+        reason == expected_reason for reason in result.skipped.values()
+    ), result.skipped
+    assert set(result.skipped.keys()) == {
+        "zerobounce", "trigify", "claude_web_triggers",
+        "apollo_enrich", "claude_deep_research",
+    }
+
+    # No adapter ever ran.
+    for a in adapters:
+        assert a.enrich_calls == []
+
+    # Exactly ONE decision_log entry for the tracker error (not one per
+    # skipped adapter), and it must carry the diagnostic marker.
+    tracker_error_entries = [
+        e for e in log.entries if e["decision"].endswith(":budget_tracker_error")
+    ]
+    assert len(tracker_error_entries) == 1
+    entry = tracker_error_entries[0]
+    assert entry["decision"] == "enrich_contact:zerobounce:budget_tracker_error"
+    # Distinct from legitimate budget_exhausted.
+    budget_exhausted_entries = [
+        e for e in log.entries if e["decision"].endswith(":budget_exhausted")
+    ]
+    assert budget_exhausted_entries == []
+    # Diagnostic reasoning mentions the exception type.
+    assert "RuntimeError" in entry["reasoning"]
+    assert entry["context"]["tracker_error_type"] == "RuntimeError"
+
+
+# --------------------------------------------------------------------------- #
 # Extra edge: adapter listed in tier but not supplied is marked not_supplied    #
 # --------------------------------------------------------------------------- #
 

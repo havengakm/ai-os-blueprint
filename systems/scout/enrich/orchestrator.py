@@ -16,7 +16,7 @@ tier-budget accounting.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Final, Protocol
 
 from systems.scout.enrich.base import EnrichAdapter, EnrichResult
 
@@ -40,6 +40,11 @@ TIER_ADAPTERS: dict[str, list[str]] = {
     "C": ["zerobounce", "trigify", "claude_research"],
     "D": ["zerobounce", "claude_research"],
 }
+
+# Temp label until Task 12.5 schema migration adds `enrich_contact` to the
+# decision_type CHECK constraint. When 005_foundation_completion.sql ships,
+# change this single constant and update the migration plan accordingly.
+_DECISION_TYPE: Final[str] = "enrichment_choice"
 
 
 # --------------------------------------------------------------------------- #
@@ -85,7 +90,8 @@ class EnrichOrchestratorResult:
     # Only adapters that actually ran and returned a result are in adapter_results.
     skipped: dict[str, str] = field(default_factory=dict)
     # adapter_name -> reason ("tier_gate" | "unknown_tier" | "not_supplied"
-    # | "budget_exhausted" | "adapter_error:{ExceptionType}")
+    # | "budget_exhausted" | "budget_tracker_error:{ExceptionType}"
+    # | "adapter_error:{ExceptionType}")
     total_cost_cents: int = 0
     budget_exhausted: bool = False
     # True if we auto-paused before completing the tier's adapter list.
@@ -180,7 +186,10 @@ class EnrichOrchestrator:
             if name not in self._adapters:
                 result.skipped[name] = "not_supplied"
 
-        budget_exhausted_logged = False
+        budget_stop_logged = False
+        # Set on first tracker error within this call; subsequent skipped
+        # adapters get the same bucketed reason for consistency.
+        tracker_error_type: str | None = None
 
         for name in tier_names:
             if name not in self._adapters:
@@ -202,29 +211,42 @@ class EnrichOrchestrator:
             #   exhausted — desirable behaviour for continuous signal
             #   capture.
             if result.budget_exhausted:
-                # Already auto-paused on a prior paid adapter; skip remainder.
-                result.skipped[name] = "budget_exhausted"
+                # Already auto-paused on a prior adapter; skip remainder.
+                # Bucket skip reason by whichever path tripped us.
+                if tracker_error_type is not None:
+                    result.skipped[name] = f"budget_tracker_error:{tracker_error_type}"
+                else:
+                    result.skipped[name] = "budget_exhausted"
                 continue
 
             try:
                 remaining = await self._budget_tracker.remaining_cents(client_id, tier)
-            except Exception:
+                tracker_failed = False
+            except Exception as exc:
                 # A budget-tracker failure should NOT silently pass adapters
-                # through. Treat the same as budget exhausted to fail safe.
+                # through. Treat as budget-exhausted (fail safe) but surface
+                # the tracker error separately in skip reason + log entry.
                 remaining = -1
+                tracker_failed = True
+                tracker_error_type = type(exc).__name__
 
             if remaining < adapter.cost_cents_per_call:
-                result.skipped[name] = "budget_exhausted"
+                if tracker_failed:
+                    skip_reason = f"budget_tracker_error:{tracker_error_type}"
+                else:
+                    skip_reason = "budget_exhausted"
+                result.skipped[name] = skip_reason
                 result.budget_exhausted = True
-                if not budget_exhausted_logged:
+                if not budget_stop_logged:
                     await self._log_budget_exhausted(
                         client_id=client_id,
                         contact_id=contact_id,
                         tier=tier,
                         adapter_name=name,
                         remaining=remaining,
+                        tracker_error_type=tracker_error_type if tracker_failed else None,
                     )
-                    budget_exhausted_logged = True
+                    budget_stop_logged = True
                 continue
 
             # --- adapter call ----------------------------------------
@@ -308,7 +330,7 @@ class EnrichOrchestrator:
         try:
             await self._decision_logger.log_decision(
                 client_id=client_id,
-                decision_type="enrichment_choice",
+                decision_type=_DECISION_TYPE,
                 decision=f"enrich_contact:{adapter_name}:{adapter_result.reason}",
                 reasoning=(
                     f"Adapter {adapter_name} ran for contact_id={contact_id} tier={tier}: "
@@ -344,7 +366,7 @@ class EnrichOrchestrator:
         try:
             await self._decision_logger.log_decision(
                 client_id=client_id,
-                decision_type="enrichment_choice",
+                decision_type=_DECISION_TYPE,
                 decision=f"enrich_contact:{adapter_name}:{reason}",
                 reasoning=(
                     f"Adapter {adapter_name} raised for contact_id={contact_id} tier={tier}: {reason}"
@@ -371,28 +393,52 @@ class EnrichOrchestrator:
         tier: str,
         adapter_name: str,
         remaining: int,
+        tracker_error_type: str | None = None,
     ) -> None:
-        """Log a single budget_exhausted entry per (contact, tier) — the
+        """Log a single budget-stop entry per (contact, tier) — the
         orchestrator emits this at most once per enrich_contact() call, on
         the FIRST adapter skipped for budget reasons. Remaining adapters
-        are marked skipped but not re-logged."""
+        are marked skipped but not re-logged.
+
+        When `tracker_error_type` is truthy, the entry records a
+        budget_tracker_error instead of a plain budget_exhausted, so that
+        operator dashboards can distinguish legitimate budget depletion
+        from an outage of the budget service."""
         if self._decision_logger is None:
             return
+        if tracker_error_type:
+            decision = f"enrich_contact:{adapter_name}:budget_tracker_error"
+            reasoning = (
+                f"Budget tracker raised {tracker_error_type} during "
+                f"remaining_cents check; failing safe as budget-exhausted. "
+                f"Tier {tier} adapter {adapter_name} and remainder auto-paused."
+            )
+            context = {
+                "contact_id": contact_id,
+                "tier": tier,
+                "first_skipped_adapter": adapter_name,
+                "remaining_cents": remaining,
+                "tracker_error_type": tracker_error_type,
+            }
+        else:
+            decision = f"enrich_contact:{tier}:budget_exhausted"
+            reasoning = (
+                f"Tier {tier} budget exhausted before adapter {adapter_name}; "
+                f"remaining={remaining}c. Remaining tier adapters auto-paused."
+            )
+            context = {
+                "contact_id": contact_id,
+                "tier": tier,
+                "first_skipped_adapter": adapter_name,
+                "remaining_cents": remaining,
+            }
         try:
             await self._decision_logger.log_decision(
                 client_id=client_id,
-                decision_type="enrichment_choice",
-                decision=f"enrich_contact:{tier}:budget_exhausted",
-                reasoning=(
-                    f"Tier {tier} budget exhausted before adapter {adapter_name}; "
-                    f"remaining={remaining}c. Remaining tier adapters auto-paused."
-                ),
-                context={
-                    "contact_id": contact_id,
-                    "tier": tier,
-                    "first_skipped_adapter": adapter_name,
-                    "remaining_cents": remaining,
-                },
+                decision_type=_DECISION_TYPE,
+                decision=decision,
+                reasoning=reasoning,
+                context=context,
                 source="system",
                 confidence=None,
             )
@@ -410,7 +456,7 @@ class EnrichOrchestrator:
         try:
             await self._decision_logger.log_decision(
                 client_id=client_id,
-                decision_type="enrichment_choice",
+                decision_type=_DECISION_TYPE,
                 decision="enrich_contact:unknown_tier",
                 reasoning=(
                     f"Tier {tier!r} is not in the orchestrator's tier_adapters map; "
