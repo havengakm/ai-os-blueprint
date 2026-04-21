@@ -436,26 +436,16 @@ Task 16.6 (Scout autonomous daemon) + Plan 7 (3 optimizer crons at daily / per-c
 
 Produce a decision record before Task 16.6 kickoff. Default recommendation absent research: Option C (hybrid) — Scout daemon simple-Railway + optimizer crons on trigger.dev — but this is a placeholder pending the research pass.
 
-### 46. Memory graph-link layer (Obsidian-brain pattern) — bake into Plan 1 Task 12.5 schema
+### 46. Memory graph-link layer (Obsidian-brain pattern) — CLOSED, folded into Task 12.5
 
 **Raised by:** Max (Trigify) webinar 2026-04-21 part 2 — context-layering methodology
-**Severity:** Important (schema decision — early bake is cheap, retrofit is painful)
-**Decision required:** Plan 1 Task 12.5 schema migration (`005_foundation_completion.sql`) — before Task 12.5 ships.
+**Status:** DECIDED 2026-04-21. Folded into Plan 1 Task 12.5 scope. Arrays chosen over join-table for MVP (flag join-table as a future migration if any client brain exceeds ~500 nodes).
 
-Current Plan 1 Task 12.5 designs `business_context` + `client_facts` tables with embeddings (pgvector). Embedding similarity surfaces *topically* similar items. It does NOT capture *explicit* relationships ("this post was by person X," "this competitor launched product Y," "this case study proves claim Z").
+**Decision:** `business_context` and `client_facts` tables will ship with `related_context_ids UUID[]` + `related_fact_ids UUID[]` columns in migration `005_foundation_completion.sql`. A `match_context_graph(client_id, start_id, start_table, max_depth=3, max_nodes=50)` RPC walks the graph breadth-first from a starting node, capped to prevent unbounded traversal. Operator-authored context markdown supports Obsidian-style `[[entity-name]]` syntax resolved at `load_context.py` time (two-pass: load all rows, then resolve links; unresolved links log to `load_context_unresolved_links.log` without creating stub entries).
 
-Karpathy's agent-memory philosophy (popularised by Max's webinar, implemented in his Hermes agent via Obsidian.md): agents perform best when memory is an **interlinked graph**, not a flat bag. Agent traverses the graph selectively, stops when it has enough context, never loads the whole brain.
+Full spec in plan-mode plan file at `/home/kirsten/.claude/plans/please-ask-questions-one-refactored-bubble.md` — Task 12.5 section.
 
-**Proposed additions to migration 005:**
-
-1. `related_context_ids UUID[]` column on `business_context` — explicit outbound links.
-2. `related_fact_ids UUID[]` column on `client_facts` — cross-table links allowed (context entry can link to a client fact).
-3. OR a separate `context_links (from_id, from_table, to_id, to_table, link_type)` join table if the arrays get unwieldy (>50 links per node).
-4. `match_context_graph(client_id, start_id, max_depth, max_nodes)` Postgres function that walks the graph N steps from a starting node. Complements `match_business_context` (embedding search).
-
-**Authoring UX:** operators writing context markdown use Obsidian-style `[[entity-name]]` backlink syntax. `load_context.py` parses these, resolves names to UUIDs, populates the links columns. Zero operator training needed — Obsidian syntax is widely understood.
-
-**Decision required before Task 12.5 ships:** arrays vs join-table. Arrays simpler, join-table scales. Default recommendation: arrays for MVP, flag join-table as follow-up if any client's brain exceeds ~500 nodes.
+**Follow-up (not blocking Task 12.5):** arrays-vs-join-table revisit once the first client brain exceeds 500 nodes. Keep as open data-driven question.
 
 ### 47. Raw → Wiki nightly cron (belief-threshold memory writes)
 
