@@ -61,3 +61,50 @@ Skills get authored as the corresponding plan tasks are completed. Don't backfil
 Every AIOS client inherits every skill. Customisation happens at the `context/` + `client_config` + niche-specific YAML-sequence level, not by forking skills per client. If a client legitimately needs a different procedure, the right move is usually a new autonomy gate or a niche-conditional step inside an existing skill, not a forked skill file.
 
 See `docs/superpowers/decisions/2026-04-21-aios-as-autonomous-sdr.md` for the shared-foundation principle.
+
+## Library scope — grows with AIOS systems
+
+AIOS spans multiple systems per `CLAUDE.md` (Scout / Beacon / Optimizer / Content OS / Ads / Landing Page OS / etc.). The skill library grows as each system ships. Skills are authored alongside the code that implements them, NEVER preemptively.
+
+Reference library for inspiration (inspired by the mature agency library Kirsten shared 2026-04-21):
+
+### Scout + Beacon + Optimizer (Plan 1 + 2 + 7 — in or near scope)
+
+- **Authoring:** compose-draft, write-component-variant, copywriting, copy-editing, brand-guidelines, email-sequence, score-offer-27-constraints, write-yaml-sequence
+- **Analysis:** handle-reply, classify-objection, explain-scoring-decision, explain-composition-decision, competitor-intel, memory-recall, revenue-analysis, weekly-report-narrative, ab-test-setup, analytics-tracking
+- **Operations:** run-nightly-pipeline, diagnose-stuck-contact, weekly-optimization-review, rerun-cool-off-contacts, pause-client, resume-client, inspect-daemon-state
+- **Onboarding:** onboard-client, onboarding-cro, seed-knowledge-base, configure-trigify-monitors, configure-client-offer, configure-channel-stack, verify-deployment
+
+### Content OS (future system — not yet planned)
+
+Blog writing + SEO + content marketing. Candidate skills: `blog-research`, `blog-outline`, `blog-write`, `blog-status`, `schema-markup`, `programmatic-seo`, `linear-blog` (for Linear content roadmap integration), `marketing-psychology`, `marketing-ideas`.
+
+### Ads system (future — per CLAUDE.md)
+
+Paid acquisition across Meta / Google / LinkedIn Ads. Candidate skills: `paid-ads`, `launch-strategy`, `audience-research`, `creative-iteration`, `ad-performance-analysis`.
+
+### Landing Page OS (future)
+
+Conversion-rate optimisation for landing pages, popups, paywalls, forms. Candidate skills: `page-cro`, `popup-cro`, `paywall-upgrade-cro`, `form-cro`, `saved-search-cro`, `free-tool-strategy`, `frontend-design`.
+
+### Distribution systems (future)
+
+Post-launch growth mechanics. Candidate skills: `referral-program`, `employee-advocacy`, `customer-success`, `ceo-proactive` (for operator-level strategic tasks).
+
+### Cross-system skills
+
+Skills invoked by multiple agents regardless of which system they belong to: `memory-recall`, `brand-guidelines`, `analytics-tracking`, `pricing-strategy`. These sit in their natural role-based folder but get referenced by multiple agents' manifests.
+
+## Skill ownership via agent manifests
+
+Each agent's manifest (`agents/{name}.md`) declares which skills it invokes. Scout's skills appear in `agents/scout.md`; Beacon's will appear in `agents/beacon.md` when Plan 2 ships; each channel module's skills in its own manifest. One skill CAN be invoked by multiple agents (e.g., `memory-recall` is Scout + Beacon + Optimizer). That's expected — skills are the reusable units, agents compose them.
+
+## When to add a new skill
+
+Three signals that it's time:
+
+1. A **concrete, repeatable task** that happens more than once (compose a draft, handle a reply, explain a scoring decision).
+2. Code or infrastructure exists that implements it (don't author skills for features we haven't built).
+3. An **agent manifest will reference it** (if no agent needs it, it probably doesn't belong as a skill — could be an SOP or just docs).
+
+When you add a skill, update the relevant agent manifest to list it, and update the subfolder's README to remove the "planned" tag and replace with a link to the actual file.
