@@ -176,21 +176,117 @@ With the AI voice agent rejected (decision 2026-04-20), LinkedIn becomes the nex
 
 **Sequencing:** write Plan 3 after Beacon's reply classifier is live in production (so LinkedIn replies have a working destination). Do not delay Plan 3 further than that — this is the primary channel for the high-ticket book, not a future nice-to-have.
 
-### 17. Voice callback system — REJECTED
+### 17. Voice-booking agent module — PLAN 5 SCOPE (narrow scope only)
 
-**Raised by:** User video input 2026-04-20
-**Severity:** REJECTED (2026-04-20)
-**Decision record:** [`docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md`](../decisions/2026-04-20-reject-ai-voice-agent.md)
+**Raised by:** User video input 2026-04-20; amended 2026-04-21 with correct narrow scope
+**Severity:** Scheduled for Plan 5 in the surround-sound architecture
+**Decision records:** [`2026-04-20-reject-ai-voice-agent.md`](../decisions/2026-04-20-reject-ai-voice-agent.md) (amended) + [`2026-04-21-outbound-architecture-surround-sound.md`](../decisions/2026-04-21-outbound-architecture-surround-sound.md)
 
-Dropped from the roadmap. Call volume too low to justify the build; high-ticket closing needs a human, not an AI voice agent; downside risk of a fumbled objection on a warm prospect exceeds the upside of faster booking. Replaced by Beacon sending the Calendly link directly on positive reply, human closer takes the call.
+AI voice agent RESTRICTED to appointment booking only — NOT for closing sales calls. Closing remains human-only (Shelby Sapp methodology). Booking agent scope:
+- Triggered by positive reply on any channel (email / LinkedIn / SMS / WhatsApp)
+- Calls within 60-120 seconds to confirm interest + book Calendly slot
+- Sends Calendly invite via SMS/email after booking
+- Post-booking nurture (T-24h + T-1h reminders) to reduce no-show rate
 
-### 18. Voice vendor decision — REJECTED
+Quality bar is low for booking (vs. closing). VAPI-level adequate.
 
-**Raised by:** Kirsten 2026-04-20 after reviewing video
-**Severity:** REJECTED (2026-04-20)
-**Decision record:** [`docs/superpowers/decisions/2026-04-20-reject-ai-voice-agent.md`](../decisions/2026-04-20-reject-ai-voice-agent.md)
+### 18. Voice-booking vendor decision — research before Plan 5
 
-Voice vendor research is not needed; the voice system itself is dropped. Item 17 explains why.
+**Raised by:** Kirsten 2026-04-20; scope re-narrowed 2026-04-21
+**Severity:** Research task before Plan 5 kicks off
+**Decision records:** see item 17
+
+Evaluate vendors on BOOKING-specific quality bar (not closing sophistication): VAPI, Bland, Retell, Synthflow, ElevenLabs Conversational AI. Score on:
+- Latency / turn-taking responsiveness (<500ms matters for natural feel)
+- Calendly / scheduling API integration
+- Phone number provisioning + call-out reliability
+- Call recording + transcript to decision_log
+- Per-minute cost against tier caps
+- TCPA / state consent handling + call-open recording disclosure
+- Fallback if call fails (drop to SMS Calendly link)
+
+### 27. Channel-module architecture — Plan 3+ framework
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plans 3-6 scope (surround-sound multi-channel rollout)
+**Decision record:** [`2026-04-21-outbound-architecture-surround-sound.md`](../decisions/2026-04-21-outbound-architecture-surround-sound.md)
+
+Build each outbound channel as a pluggable module implementing a shared `ChannelModule` Protocol. Per-client config enables which channels fire. Roadmap:
+
+- **Plan 3:** channels framework (`ChannelModule` Protocol, registry, per-client `enabled_channels` config) + LinkedIn module (first additional channel — connection requests, conditional message flow, reply polling)
+- **Plan 4:** SMS module (Twilio or Telnyx, opt-out keyword detection, per-client DND list)
+- **Plan 5:** voicemail / ringless voicemail module + voice-booking agent module (see items 17-18)
+- **Plan 6:** WhatsApp module (WhatsApp Business API, opt-in required) + handwritten letters module (Postalytics or Letter API)
+
+Per-channel compliance SOPs mandatory (`data/reference/sops/{channel}-compliance.md`) following the existing `phone-sms-compliance.md` pattern.
+
+### 28. Cross-channel state coordination + reply ingestion — Plan 2 foundation
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plan 2 (Beacon) expanded scope
+**Decision record:** [`2026-04-21-outbound-architecture-surround-sound.md`](../decisions/2026-04-21-outbound-architecture-surround-sound.md)
+
+Plan 2 expands from email-only autoresponder to include the multi-channel foundation:
+
+- **Reply ingestion:** pluggable receivers per channel (email IMAP/webhook, LinkedIn polling, SMS webhook, WhatsApp webhook, VAPI callback). All feed a single `replies` table + update `contacts.status = 'replied'` in one transaction.
+- **Reply classifier:** positive / negative / neutral / question / opt-out. Uses Claude for sentiment + keyword matcher for explicit opt-out keywords.
+- **Cross-channel state machine:** single `contacts.status` field read with row-level lock before every send. Terminal states (`replied`, `meeting_booked`, `opted_out`, `dead`) pause ALL sequences across ALL channels.
+- **Opt-out detection:** keyword matcher (STOP/UNSUBSCRIBE/REMOVE/OPT OUT/etc.) + Claude toxicity classifier (severity ≥ 8 → auto-opt-out). Any fire → global DND for that contact on that client.
+- **Fuzzy-match reply review queue:** exact match on channel ID auto-pauses; fuzzy match (different email, assistant replying) queued for human review.
+
+### 29. YAML conditional sequence engine — Plan 2 foundation
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plan 2 (Beacon) expanded scope
+**Decision record:** [`2026-04-21-outbound-architecture-surround-sound.md`](../decisions/2026-04-21-outbound-architecture-surround-sound.md)
+
+Sequences are NOT linear. They are DAGs with conditional edges (on_event, on_timeout, on_success, on_failure). YAML-defined in `data/reference/sequences/{niche}/round-{N}-*.yaml`. Engine is one piece of code; every client's sequences are data.
+
+Node types: `send` (channel + template) / `wait` (days OR event) / `branch` (conditional) / `STOP` / `END`. Events: `reply_any_channel`, `reply_positive`, `linkedin_connection_accepted`, `link_clicked`, etc.
+
+Per-contact channel availability: engine skips steps for channels the contact doesn't have an ID for (no phone → skip SMS step, advance to `next`). Per-client channel config: engine skips steps for channels the client has disabled.
+
+### 30. 90-day cool-off + round-based re-entry — Plan 2 foundation
+
+**Raised by:** Architecture session 2026-04-21
+**Severity:** Plan 2 (Beacon) expanded scope
+**Decision record:** [`2026-04-21-outbound-architecture-surround-sound.md`](../decisions/2026-04-21-outbound-architecture-surround-sound.md)
+
+Contacts who complete a full sequence without replying → `status=cooling_off`, `cool_off_until = now + 90d` (client-configurable via `client_config.cool_off_days`). Daily cron re-enters eligible contacts:
+- Re-runs enrich (fresh buying signals — critical since intent changes in 90d)
+- Re-scores v2 (intent bucket)
+- If still tier >= archive → `status=ready`, assigned next round's sequence
+- Else → `status=dead`
+
+Max 3-4 rounds per contact before default `dead` state. Operator can extend via UI (future Plan 7). Each round uses materially different angle / hook / offer (matches `feedback_offer_score_framework`).
+
+Schema additions (Plan 2 migration):
+- `contacts.sequence_round INT DEFAULT 0`
+- `contacts.cool_off_until TIMESTAMPTZ`
+- `contacts.active_sequence_id UUID`
+- `contacts.sequences_completed TEXT[]` — for rotation de-dup
+
+Sequence library structure: `data/reference/sequences/{niche}/round-{N}-{descriptor}.yaml`.
+
+### 31. Task 12 enrich scope — LOCKED with buying signals required
+
+**Raised by:** Architecture session 2026-04-21 (corrected scope after quality/cost misread)
+**Severity:** Plan 1 Task 12 current scope
+**Decision record:** [`2026-04-21-outbound-architecture-surround-sound.md`](../decisions/2026-04-21-outbound-architecture-surround-sound.md)
+
+Task 12 adapters (corrected scope, replacing earlier light-touch-only proposal):
+
+- **12a: ZeroBounce** (email verification) — shipped
+- **12b: Claude light-touch research** (pain inference fallback) — shipped
+- **12b.2 (NEW): Claude heavy research** — multi-page Playwright scrape (/about, /services, /approach, /case-studies, /testimonials, /team, blog recent, LinkedIn company page + 3-5 recent posts) + single Sonnet call to extract `citable_details[]` + `buying_signals[]` + `pain_match`. Tier A/B only. ~2-3¢ per contact with Sonnet.
+- **12b.3 (NEW): Trigify adapter** — LinkedIn-surfaced triggers (funding, exec change, product launch, expansion). Credit-based ($0.012/credit). Tier A/B/C (cheap enough to cover all three). Populates `research_data.trigger_events[]`.
+- **12c: Enrich orchestrator** — tier-gated dispatch with per-tier budget caps + auto-pause at 100% of tier budget. Runs Trigify before Claude heavy research so extraction prompt has the trigger context.
+- **12d: EnrichStage pipeline class** — unchanged shape
+
+Deferred to hardening (build when data justifies):
+- Apollo enrich (existing contacts already Apollo-enriched; adds value only for new-source pulls)
+- Lusha phone enrich (SMS/voicemail modules will need it; add in Plan 4 or 5)
+- Additional signal sources (news APIs, job-posting scrapers) — evaluate after Trigify produces measurable outcome data
 
 ## Identity scraper lifecycle hardening
 

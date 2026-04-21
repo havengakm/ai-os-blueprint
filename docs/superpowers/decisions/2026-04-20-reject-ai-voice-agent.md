@@ -1,50 +1,67 @@
-# Decision: Reject AI Voice Agent for High-Ticket Closing
+# Decision: AI Voice Agent — Narrow Rejection (Closer = NO, Booking Agent = YES)
 
-**Date:** 2026-04-20
+**Date:** 2026-04-20 (original) / 2026-04-21 (amended with narrower scope)
 **Decided by:** Kirsten
-**Status:** Accepted
+**Status:** Amended — narrow rejection only
 
-## Context
+> **AMENDMENT 2026-04-21:** The original 2026-04-20 decision rejected AI voice agents ENTIRELY. That was based on a misreading of the use case. The correct scope of the rejection is narrower: AI voice agents CLOSING high-ticket sales = rejected; AI voice agents BOOKING appointments into a human closer's calendar = accepted and on the roadmap. See "Amended scope" section below. The original reasoning is preserved for context.
 
-The Victoria + Vapi + Make.com video (captured as input at `data/reference/design_inputs/2026-04-20-multichannel-outbound-methodology.md`) proposed a Vapi voice agent calling prospects 60 to 120 seconds after a positive reply to confirm phone number and text a Calendly link.
+---
 
-This was provisionally added to the roadmap as Plan 3 "Voice" scope, with items 17 and 18 in `docs/superpowers/plans/follow-ups-plan1.md` capturing the build and the vendor research (Vapi vs Dan Martell's product vs Bland / Retell / Synthflow / ElevenLabs).
+## Amended scope (authoritative as of 2026-04-21)
 
-## Decision
+### REJECTED: AI voice agent as sales closer
 
-**Drop the AI voice agent from the roadmap entirely.** Do not build Plan 3 Voice. Do not research voice vendors. Do not budget for voice per-minute cost.
+An AI conducting the actual sales call — discovery, objection handling, pricing conversation, close — is rejected. High-ticket sales ($5k-$25k+) close on trust, tension management, and identity-led selling (Shelby Sapp framework). Human-only.
 
-## Reasoning
+### ACCEPTED: AI voice agent as appointment booker
 
-1. **Call volume is too low to justify the build.** AIOS is a productised service targeting a narrow tier of high-ticket buyers. Total annual call volume across all clients is measured in dozens to low hundreds, not thousands. The per-call cost of a voice agent (build + vendor + maintenance) does not amortise at that volume.
+A voice agent whose entire job is to book a prospect who has already replied positively into a human closer's Calendly slot. Scope:
 
-2. **High-ticket closing needs a human.** $5k to $25k+ sales close on trust, not efficiency. A prospect who just replied positively to a cold outbound message is warm but skeptical. An AI voice agent that fumbles an objection, mispronounces a name, or can't answer a pricing nuance burns the warm lead. Shelby Sapp's methodology (captured at `data/knowledge/shelby-sapp-sales.md`) is explicit: tension management, identity selling, and silence-after-the-drop are human skills. An AI agent optimised for booking speed undermines the tension that drives the close.
+1. **Trigger:** prospect replies positively on email / LinkedIn / SMS / WhatsApp.
+2. **Call:** voice agent (VAPI or similar) calls within ~60 seconds to 2 minutes.
+3. **Script:** confirm interest, confirm phone number, offer specific Calendly times, book the meeting.
+4. **Output:** Calendly invite sent via SMS or email after booking.
+5. **Post-booking nurture:** T-24h reminder, T-1h reminder to reduce no-show rate.
 
-3. **Downside risk exceeds upside.** Best case: an AI voice agent shaves 24 hours off time-to-book. Worst case: it turns a warm, positive-reply prospect into a lost deal by sounding robotic or mishandling an objection. For a low-volume high-ticket book, the downside is larger than the upside.
+Quality bar is fundamentally lower than closing: "confirm interest + drop a Calendly link" vs "navigate pricing objections on a $15k deal." VAPI-level voice quality is adequate for this job.
 
-## What replaces it
+## Where voice-booking agent fits in the roadmap
 
-**The Beacon reply handler (Plan 2) sends the Calendly link directly on a positive reply.** No voice step between reply and calendar. A human closer takes the Calendly meeting. Shelby Sapp's six-step close arc runs live on the call.
+Placed as a MODULE in the surround-sound architecture (decision `2026-04-21-outbound-architecture-surround-sound.md`). Each outbound channel is a module — email, LinkedIn, SMS, voicemail, WhatsApp, letters, voice-booking. Clients enable which channels they want per their compliance posture and audience preferences.
 
-This is the system Kirsten actually wants:
-1. Scout sends AI-personalised outbound (email, and later LinkedIn)
-2. Prospect replies positively
-3. Beacon's autoresponder sends the Calendly link, answers basic questions from the knowledge base
-4. Prospect books
-5. Human closer takes the call with the Shelby Sapp discovery and close script
+Voice-booking as a module:
+- Fires only in response to positive reply events (not as cold outbound)
+- Respects global DND / opt-out list
+- Post-booking nurture sequence is itself a small multi-step flow in the sequence engine
+
+## Historical reasoning (original 2026-04-20 rejection, preserved)
+
+The original rejection rested on three claims:
+
+1. **Call volume is too low to justify an AI closer build.** Still true for a closer. Not true for a booking agent — a booking agent is cheap to wire (VAPI credit model) and drops the time-to-book lag from hours to seconds.
+
+2. **High-ticket closing needs a human.** Still true. The human closer takes the Calendly call and runs the Shelby Sapp discovery + close arc. The AI booking agent does NOT replace that.
+
+3. **Downside risk exceeds upside (for an AI closer).** Still true for closers — a fumbled objection at the close burns a warm lead. Not true for a booking agent — the downside of a fumbled booking call is low (prospect gets the Calendly link via follow-up SMS/email anyway), the upside is measurably faster booking and higher show-up rate via automated reminders.
+
+## What still replaces the closer
+
+**Human closer, always.** Shelby Sapp methodology (Three Buckets discovery → Drop & Silence → Objection Playbook → 6-Step Close Arc) is the canonical spine. The booking agent exists to put prospects on the closer's calendar, not to do any part of the closer's job.
 
 ## Implications
 
-- Follow-up items 17 (Voice callback system) and 18 (Voice vendor decision) are REJECTED. Leave in the backlog but mark rejected with a pointer to this decision record.
-- The multichannel design-input note's "Voice callback" section is REJECTED scope, not future scope. Add an amendment at the top.
-- Shelby Sapp knowledge file must NOT reference voice agent integration. Update the "Integration notes for AIOS" and Principle 5 sections to describe human closers only.
-- Memory: add `feedback_voice_agent_rejected.md` so future subagent dispatches do not propose AI voice.
+- Follow-up item 17 (Voice callback system): reclassified from REJECTED to **Plan 5 scope** (voice-booking-agent module). Scope narrowed to booking + reminder use case only.
+- Follow-up item 18 (Voice vendor decision): reclassified from REJECTED to **research required before Plan 5**. Evaluate VAPI, Bland, Retell, Synthflow on booking-specific quality bar (low sophistication bar, high latency sensitivity, good Calendly integration) — NOT on closing sophistication.
+- `data/reference/design_inputs/2026-04-20-multichannel-outbound-methodology.md`: voice section is NOT rejected scope — update amendment.
+- `feedback_voice_agent_rejected` memory: rename / rewrite to reflect narrow rejection.
+- Shelby Sapp knowledge file (`data/knowledge/shelby-sapp-sales.md`): continues to describe human closers only. The voice-booking agent does not use Sapp methodology — it has a different job.
 
-## Reversal conditions
+## Reversal conditions (for the narrow rejection on closers)
 
-This decision is revisited only if:
-- Total annual call volume exceeds ~1000 qualified bookings across all clients (not expected within Plan 1-4 scope)
-- A voice vendor ships objection-handling capability at parity with a trained human closer on high-ticket sales (not expected at current model capabilities)
-- A specific client needs and pays for voice qualification as a bolt-on (handle as custom work, not product)
+The "AI can't close high-ticket" position is revisited only if:
 
-Absent these, do not revisit.
+- A voice vendor ships objection-handling capability at demonstrable parity with a trained human closer on high-ticket sales (not expected at current model capabilities).
+- A specific client pilot shows AI-closed deals at equal or better close-rate than human-closed deals on matched prospect cohorts (experiment required, not assumed).
+
+Absent these, human closers remain the rule.
