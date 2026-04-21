@@ -436,6 +436,95 @@ Task 16.6 (Scout autonomous daemon) + Plan 7 (3 optimizer crons at daily / per-c
 
 Produce a decision record before Task 16.6 kickoff. Default recommendation absent research: Option C (hybrid) — Scout daemon simple-Railway + optimizer crons on trigger.dev — but this is a placeholder pending the research pass.
 
+### 46. Memory graph-link layer (Obsidian-brain pattern) — bake into Plan 1 Task 12.5 schema
+
+**Raised by:** Max (Trigify) webinar 2026-04-21 part 2 — context-layering methodology
+**Severity:** Important (schema decision — early bake is cheap, retrofit is painful)
+**Decision required:** Plan 1 Task 12.5 schema migration (`005_foundation_completion.sql`) — before Task 12.5 ships.
+
+Current Plan 1 Task 12.5 designs `business_context` + `client_facts` tables with embeddings (pgvector). Embedding similarity surfaces *topically* similar items. It does NOT capture *explicit* relationships ("this post was by person X," "this competitor launched product Y," "this case study proves claim Z").
+
+Karpathy's agent-memory philosophy (popularised by Max's webinar, implemented in his Hermes agent via Obsidian.md): agents perform best when memory is an **interlinked graph**, not a flat bag. Agent traverses the graph selectively, stops when it has enough context, never loads the whole brain.
+
+**Proposed additions to migration 005:**
+
+1. `related_context_ids UUID[]` column on `business_context` — explicit outbound links.
+2. `related_fact_ids UUID[]` column on `client_facts` — cross-table links allowed (context entry can link to a client fact).
+3. OR a separate `context_links (from_id, from_table, to_id, to_table, link_type)` join table if the arrays get unwieldy (>50 links per node).
+4. `match_context_graph(client_id, start_id, max_depth, max_nodes)` Postgres function that walks the graph N steps from a starting node. Complements `match_business_context` (embedding search).
+
+**Authoring UX:** operators writing context markdown use Obsidian-style `[[entity-name]]` backlink syntax. `load_context.py` parses these, resolves names to UUIDs, populates the links columns. Zero operator training needed — Obsidian syntax is widely understood.
+
+**Decision required before Task 12.5 ships:** arrays vs join-table. Arrays simpler, join-table scales. Default recommendation: arrays for MVP, flag join-table as follow-up if any client's brain exceeds ~500 nodes.
+
+### 47. Raw → Wiki nightly cron (belief-threshold memory writes)
+
+**Raised by:** Max (Trigify) webinar 2026-04-21 part 2 — context-layering methodology
+**Severity:** Plan 2 scope addition (depends on Plan 1 foundation)
+**File:** new `os/memory/context_processor.py` + daemon schedule
+
+Two-tier memory: raw captures (transcripts, Slack exports, signal feeds) flow into `raw/{client}/` folder. A nightly cron processes raw → wiki (`business_context` / `client_facts` tables) — BUT only promotes patterns that meet a belief threshold.
+
+**Belief-threshold rules:**
+- Pattern observed ≥3 times within a 7-day window, OR
+- Single observation with explicit operator confirmation (via operator-review UI), OR
+- Statistically significant experiment result (reuses Plan 7 cadence 2 machinery)
+
+Below threshold: stays in raw, eligible for promotion on future observation. Above threshold: wiki entry created or updated; `decision_log` records the promotion with source raw IDs.
+
+**Critical invariant:** `decision_log` stores EVERYTHING (single observations included). Wiki storage requires threshold. This preserves full audit trail while preventing wiki bloat. Same invariant applies to `pattern_matcher` entries — similarity search is across promoted wiki content, not raw.
+
+### 48. Internal-context ingestion adapters (Fireflies / Granola / help-docs / Linear / dashboard)
+
+**Raised by:** Max (Trigify) webinar 2026-04-21 part 2 — context-layering methodology
+**Severity:** Plan 1 Task 16 scope extension + Plan 2 scope
+**File:** new `systems/intelligence/ingest/` folder
+
+Max's claim: internal context is the highest-ROI source. Wire the five sources in priority order:
+
+1. **Fireflies adapter** (external sales calls) — poll Fireflies API for new recordings; write transcript → `raw/{client}/sales_calls/`. Plan 1 Task 16 can include ONE worked adapter as proof-of-concept.
+2. **Granola adapter** (internal team Slack huddles) — same pattern, different source.
+3. **Help-docs adapter** — subscribe to Linear tickets closed with `status=shipped`; when one fires, headless-browse the live app to audit whether help docs need updating; write audit → `raw/{client}/help_doc_audits/`. (Pier's exact pattern at Trigify.)
+4. **Slack export adapter** — daily export of relevant channels → processed summaries.
+5. **Dashboard metrics adapter** — Stripe + Supabase + internal SaaS dashboard → daily metric snapshot → `raw/{client}/metrics/`.
+
+Plan 1 lands ONE of these (probably Fireflies) as a worked example + folder structure. Remaining four land in Plan 2 / Plan 7 as demand surfaces.
+
+### 49. Understanding-tier external-context adapters (long-form research feed)
+
+**Raised by:** Max (Trigify) webinar 2026-04-21 part 2 — signal vs understanding tiering
+**Severity:** Plan 7 or future Intelligence system scope
+**File:** new `systems/intelligence/understanding/` folder (or separate `systems/intelligence_os/` system)
+
+We have the **signal tier** (Trigify monitors + Claude web-search triggers). We do NOT have the **understanding tier** — long-form content that explains the WHY behind a signal spike.
+
+Candidate adapters:
+- `youtube_transcripts.py` — given a topic/channel, pull transcripts of recent videos via YouTube Data API + captions endpoint
+- `substack_scraper.py` — follow named Substacks, pull new essays, extract frameworks/arguments
+- `podcast_transcripts.py` — same as YouTube but audio-first (via Fireflies / Whisper API)
+- `hn_trending.py` — Hacker News front-page + show/ask threads for agentic/SaaS/GTM topics
+- `daily_dev.py` — Daily Dev feed
+
+**Signal → understanding workflow:** signal-tier detects a breakout (e.g., a concept trending on X). Triggers an understanding-tier investigation: the adapter searches long-form platforms for coverage of that concept, extracts the frameworks/methods, promotes findings to wiki (subject to belief threshold).
+
+Scope: too large for Plan 1 or Plan 2. Candidate for a dedicated Intelligence system (could slot under Plan 7 or as a new plan). Flag here for continuity.
+
+### 50. Local-model eval for cron-stage budget workloads (GLM 5.1 / Mimi Pro vs Haiku)
+
+**Raised by:** Max (Trigify) webinar 2026-04-21 part 2 — model-routing recommendations
+**Severity:** Suggestion (data-driven — do only on cost-pressure signal)
+**File:** evaluation, not code
+
+Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chron-stage cheap work, frontier models for orchestrator/complex. He claims open-weights are close-enough to Haiku quality for batch tasks at materially lower cost.
+
+**Do NOT switch speculatively** per `feedback_value_first_efficiency.md` (evidence required before model swaps). But build the eval harness so that when cost pressure arrives we can act quickly:
+
+- `tests/evals/test_cron_model_quality.py` — harness that runs N real pipeline contacts through candidate models (Haiku 4.5 baseline, GLM 5.1, Mimi Pro, Qwen 2.5, etc.), scores against ground-truth, reports quality-parity-or-better with cost delta
+- Run before any model swap decision
+- Track the cost-pressure trigger: monthly model spend exceeds 40% of a client's AIOS monthly bill AND quality delta is ≤5%
+
+Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
+
 ### 45. Apollo enrich adapter — 6 minor code-quality items
 
 **Raised by:** Task 12b.4 code-quality review (2026-04-21)
