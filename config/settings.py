@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # --- Lead stack (mobile phone, per 2026-04-20 architecture) ---
     lusha_api_key: str = ""         # mobile phone lookup (score >= 50 only)
 
+    # --- Lead stack (behavioral signals — monitors pre-configured at client onboarding) ---
+    trigify_api_key: str = ""       # behavioral signal pulls; monitor-creation is one-time PAYG
+
     # --- Lead stack (escalation — enable only when triggers fire) ---
     hunter_api_key: str = ""        # second-pass email finder (escalation)
     cognism_api_key: str = ""       # compliance-grade mobile (escalation)

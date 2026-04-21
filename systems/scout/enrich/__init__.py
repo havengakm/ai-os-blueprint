@@ -7,6 +7,7 @@ orchestrator that wires them into the pipeline.
 from systems.scout.enrich.base import EnrichAdapter, EnrichResult
 from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
 from systems.scout.enrich.claude_research import ClaudeResearchAdapter
+from systems.scout.enrich.trigify import TrigifyAdapter
 from systems.scout.enrich.zerobounce import ZeroBounceAdapter
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "ClaudeResearchAdapter",
     "EnrichAdapter",
     "EnrichResult",
+    "TrigifyAdapter",
     "ZeroBounceAdapter",
 ]
