@@ -157,10 +157,16 @@ $$;
 --
 -- Implemented as a recursive CTE: for each frontier node, look up its outgoing
 -- edges from whichever table it lives in, emit the neighbours at depth+1, and
--- let the CTE recursion stop at `max_depth`. A final DISTINCT pass collapses
--- duplicates that arise when a node is reached by multiple paths, and LIMIT
--- caps the result at `max_nodes`. Cycles are safe because the recursion
--- terminates on depth and DISTINCT de-duplicates visited nodes.
+-- let the CTE recursion stop at `max_depth`. A `visited_ids` accumulator on
+-- each recursion row tracks the ids already seen on that branch; neighbours
+-- already in `visited_ids` are filtered out so cycles cannot re-enter. A
+-- final DISTINCT pass collapses duplicates that arise when a node is reached
+-- by multiple paths, and LIMIT caps the result at `max_nodes`.
+--
+-- The seed anchor is guarded with EXISTS on (start_id, client_id_filter) in
+-- the appropriate source table: if `start_id` does not belong to
+-- `client_id_filter`, the seed is empty and the function returns no rows
+-- (prevents a one-UUID cross-tenant leak at depth 0).
 --
 -- Defaults: max_depth=3, max_nodes=50 (plan traversal caps).
 
@@ -177,19 +183,31 @@ RETURNS TABLE (
     depth INT
 )
 LANGUAGE sql AS $$
-    WITH RECURSIVE graph_walk(id, source_table, depth) AS (
-        -- Seed: the start node itself at depth 0. Only emit if start_table is
-        -- valid; otherwise the CTE yields no rows.
-        SELECT start_id, start_table, 0
-        WHERE start_table IN ('business_context', 'client_facts')
+    WITH RECURSIVE graph_walk(id, source_table, depth, visited_ids) AS (
+        -- Seed: the start node itself at depth 0. Emitted only when
+        -- (start_id, start_table) exists under client_id_filter. Invalid
+        -- start_table or cross-tenant start_id → both branches miss → seed
+        -- is empty → function returns no rows.
+        SELECT start_id, start_table, 0, ARRAY[start_id]::UUID[]
+        WHERE (start_table = 'business_context'
+               AND EXISTS (SELECT 1 FROM business_context
+                           WHERE id = start_id
+                             AND client_id = client_id_filter))
+           OR (start_table = 'client_facts'
+               AND EXISTS (SELECT 1 FROM client_facts
+                           WHERE id = start_id
+                             AND client_id = client_id_filter))
 
-        UNION
+        UNION ALL
 
         -- Recurse: for each node on the frontier, expand its outgoing edges
         -- from whichever table it lives in. Both edge arrays
         -- (related_context_ids / related_fact_ids) are unnested and emitted
-        -- with the correct target-table label.
-        SELECT neighbour_id, neighbour_table, gw.depth + 1
+        -- with the correct target-table label. Neighbours already in
+        -- gw.visited_ids are skipped (cycle guard); surviving neighbours
+        -- append their id to the visited accumulator for descendant rows.
+        SELECT edges.neighbour_id, edges.neighbour_table, gw.depth + 1,
+               gw.visited_ids || edges.neighbour_id
         FROM graph_walk gw
         CROSS JOIN LATERAL (
             -- Edges out of a business_context node
@@ -223,7 +241,8 @@ LANGUAGE sql AS $$
               AND cf.client_id = client_id_filter
         ) edges
         WHERE gw.depth < max_depth
-          AND neighbour_id IS NOT NULL
+          AND edges.neighbour_id IS NOT NULL
+          AND edges.neighbour_id <> ALL(gw.visited_ids)
     )
     SELECT DISTINCT ON (graph_walk.id, graph_walk.source_table)
            graph_walk.id, graph_walk.source_table, graph_walk.depth
