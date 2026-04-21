@@ -436,6 +436,23 @@ Task 16.6 (Scout autonomous daemon) + Plan 7 (3 optimizer crons at daily / per-c
 
 Produce a decision record before Task 16.6 kickoff. Default recommendation absent research: Option C (hybrid) — Scout daemon simple-Railway + optimizer crons on trigger.dev — but this is a placeholder pending the research pass.
 
+### 45. Apollo enrich adapter — 6 minor code-quality items
+
+**Raised by:** Task 12b.4 code-quality review (2026-04-21)
+**Severity:** Minor (all defer-worthy; adapter approved merge-ready)
+**File:** `systems/scout/enrich/apollo_enrich.py` + `tests/test_enrich/test_apollo_enrich.py`
+
+Six minor items bundled for a single hardening-pass touch of this adapter. All judgement-calls — no blockers surfaced. Commit `769b416`.
+
+- **M1:** Skip-path debug/warning logs omit `reason=` and `cost_cents=` key=value tags. Matches `zerobounce.py` precedent but `trigify.py` includes them. Unify when doing a cross-adapter logging cleanup (not alone — touch all three adapters in one pass).
+- **M2:** Lines 154–185 (Apollo-org → contact-field mapper) are ~32 lines of repetitive `if org.get(...): data[...] = ...`. Extract a private `_map_org_to_data(org) -> dict` helper following Trigify's `_match_contact` / `_build_event` pattern. Independently testable; shrinks `enrich` method.
+- **M3:** `revenue` accepts `(int, float)` and coerces to `int`; `employees` and `founded_year` require exact `int`. If Apollo returns employees as float (e.g. `120.0`) the field silently drops. Either accept `(int, float)` and coerce for all numeric fields, OR add a comment explaining why revenue is more permissive.
+- **M4:** `_env` fixture is copy-pasted across `test_zerobounce.py` + `test_trigify.py` + `test_apollo_enrich.py`. The `no_api_key` test copy-pastes it again sans the adapter-specific key. Move to a shared `conftest.py` fixture factory that takes an exclusion list. Cross-file refactor — bundle with M1.
+- **M5:** Stale comment in `test_apollo_enrich.py:140-143` references `.raise_for_status()` being untyped, but the code sets `side_effect` on `.get` directly. Trim to "fail loudly if Apollo is called" or delete (the `assert_not_called()` on the next line documents intent).
+- **M6:** `domain = normalize_domain(raw_domain) or raw_domain` falls back to raw garbage if `normalize_domain` returns None. Wastes a credit sending malformed input to Apollo. Add a fifth skip path: `reason='invalid_company_domain'`, `cost_cents=0` when `normalize_domain(raw_domain) is None`.
+
+Bundle M1, M2, M3, M5, M6 into one Apollo-focused PR when next touching this file. M4 is cross-adapter; wait until two or more adapters need the shared fixture.
+
 ### 38. Claude web-triggers adapter — M1/M2/M3/S3 cleanup
 
 **Raised by:** Task 12b.3a code-quality review (2026-04-21)
@@ -495,14 +512,15 @@ Task 12 adapters (corrected scope, replacing earlier light-touch-only proposal):
 - **12a: ZeroBounce** (email verification) — shipped
 - **12b: Claude light-touch research** (pain inference fallback) — shipped
 - **12b.2 (NEW): Claude heavy research** — multi-page Playwright scrape (/about, /services, /approach, /case-studies, /testimonials, /team, blog recent, LinkedIn company page + 3-5 recent posts) + single Sonnet call to extract `citable_details[]` + `buying_signals[]` + `pain_match`. Tier A/B only. ~2-3¢ per contact with Sonnet.
-- **12b.3 (NEW): Trigify adapter** — LinkedIn-surfaced triggers (funding, exec change, product launch, expansion). Credit-based ($0.012/credit). Tier A/B/C (cheap enough to cover all three). Populates `research_data.trigger_events[]`.
-- **12c: Enrich orchestrator** — tier-gated dispatch with per-tier budget caps + auto-pause at 100% of tier budget. Runs Trigify before Claude heavy research so extraction prompt has the trigger context.
+- **12b.3a (NEW): Claude web-search triggers adapter** — firmographic triggers (funding_round, executive_hire, product_launch, expansion, layoffs, press_coverage) via `web_search_20260209` tool. 5¢/call. Tier A/B. Shipped `e27c026`.
+- **12b.3b (NEW): Trigify adapter** — LinkedIn-surfaced behavioral triggers (competitor engagement, keyword watchers, profile watchers, influencer mentions, role changes). FREE per monitor-pull (credit cost is at monitor-creation time, one-off during onboarding). Tier A/B/C. Shipped `5e264c0` + `f92f9a3`.
+- **12b.4 (NEW): Apollo enrich adapter** — `/v1/organizations/enrich` company-level fill (revenue, employees, industry, founded_year, tech stack) for non-Apollo-sourced contacts. 1¢/call. Tier A/B only. `already_complete` guard short-circuits Apollo-sourced contacts to avoid burning credits. Shipped `769b416`.
+- **12c: Enrich orchestrator** — tier-gated dispatch with per-tier budget caps + auto-pause at 100% of tier budget. Runs signal adapters (Trigify + web-search triggers) BEFORE Claude heavy research so extraction prompt has trigger context.
 - **12d: EnrichStage pipeline class** — unchanged shape
 
-Deferred to hardening (build when data justifies):
-- Apollo enrich (existing contacts already Apollo-enriched; adds value only for new-source pulls)
+Deferred to hardening or later plans (build when data justifies):
 - Lusha phone enrich (SMS/voicemail modules will need it; add in Plan 4 or 5)
-- Additional signal sources (news APIs, job-posting scrapers) — evaluate after Trigify produces measurable outcome data
+- Additional signal sources (news APIs, job-posting scrapers) — evaluate after Trigify + web-search produce measurable outcome data
 
 ## Identity scraper lifecycle hardening
 
