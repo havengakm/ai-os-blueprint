@@ -515,6 +515,18 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 51. Enrich orchestrator — residual minor cleanups
+
+**Raised by:** Task 12c code-quality review (2026-04-21); two Important items already amended at `8e8e233`, these are the leftover Minors
+**Severity:** Suggestion (defer-worthy; orchestrator shipped merge-ready)
+**File:** `systems/scout/enrich/orchestrator.py` + `tests/test_enrich/test_orchestrator.py`
+
+- **M4 (primary):** `_log_adapter_call` and `_log_adapter_error` share ~80% of their body (same context dict shape, same `enrich_contact:{name}:{reason}` decision pattern). Extract `_log_adapter_outcome(adapter_name, reason, ok, cost_cents, dry_run, contact_id, tier, client_id)` helper; halves surface area, ~30-line win. Simplicity mandate favors this.
+- **M6:** `"<unknown>"` fallback for missing `contact_id` (orchestrator.py line 146 area). Deferred because the stage layer (Task 12d) is the right place to enforce the contract. Revisit once Task 12d wraps — if the stage validates contact_id on entry, the fallback becomes dead code and should be deleted.
+- **M9 (tests):** `test_adapter_exception_does_not_abort_fan_out`, ExplodingLogger test, and the new `test_budget_tracker_exception_fails_safe_with_diagnostic_reason` all build a tier-A adapter set with varying `raises=` on one adapter. Shared helper `_make_tier_a_adapters(raising_adapter=None, raises=None)` would DRY ~30 lines across three tests. Minor.
+
+Bundle all three into a single quality PR when next touching the orchestrator (likely during Task 12d wrap or the Task 12.5 `_DECISION_TYPE` rename).
+
 ### 45. Apollo enrich adapter — 6 minor code-quality items
 
 **Raised by:** Task 12b.4 code-quality review (2026-04-21)
