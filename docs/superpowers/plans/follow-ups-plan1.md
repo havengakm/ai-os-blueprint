@@ -317,6 +317,21 @@ Trigify's docs mark `POST /v1/searches` (monitor creation) as deprecated in favo
 
 MVP fetches `?limit=100` per monitor per enrich call. If monitors accumulate more than 100 results between polls (likely at higher-activity client workspaces or after long gaps), signals will be silently dropped past the first page. Implement cursor pagination (`?cursor=<next_cursor>`) when signal volume crosses the threshold. Wrap the current single-page call in a `while has_more` loop.
 
+### 38. Claude web-triggers adapter — M1/M2/M3/S3 cleanup
+
+**Raised by:** Task 12b.3a code-quality review (2026-04-21)
+**Severity:** Suggestion (all minor, defer-worthy)
+**File:** `systems/scout/enrich/claude_web_triggers.py` + `tests/test_enrich/test_claude_web_triggers.py`
+
+Four minor items bundled for a single hardening-pass touch of this adapter:
+
+- **M1:** Add `test_web_triggers_extract_text_block_skips_tool_use` — inject a fake content list with a plain non-MagicMock tool-use block (no `.text` attribute) followed by a real text block; assert `_extract_text_block` returns the text block's content. Covers the `except AttributeError: continue` path that's the stated purpose of the helper but currently untested.
+- **M2:** Harden `_extract_text_block` to skip empty text blocks (`if text is not None and text.strip()`) so a trailing empty text block doesn't starve the function of a non-empty earlier block. Add regression test.
+- **M3:** Remove duplicate type annotation on `data` at `claude_web_triggers.py:341`. Trivial — declare once.
+- **S3:** Extend `_compute_recency` to fall back to `datetime.fromisoformat(...).date()` if `strptime("%Y-%m-%d")` fails, so Claude-returned ISO timestamps with time/tz components still produce a recency value rather than silently degrading to None.
+
+All four are pure quality nits; adapter is Approved without blockers. Bundle into one PR when next touching this file.
+
 ### 37. Trigify adapter — client isolation at 10+ client scale
 
 **Raised by:** Task 12b.3b code-quality review (2026-04-21) + research agent audit
