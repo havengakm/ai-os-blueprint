@@ -1,6 +1,8 @@
 """Tests for SupabaseComposerBackend."""
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from systems.scout.supabase_backends.composer import SupabaseComposerBackend
@@ -145,3 +147,159 @@ async def test_log_decision_writes_entry_with_source() -> None:
     assert len(rows) == 1
     assert rows[0]["source"] == "system"
     assert rows[0]["decision_type"] == "render_draft"
+
+
+# ---------------------------------------------------------------------------
+# fetch_eligible_contacts                                                       #
+# ---------------------------------------------------------------------------
+
+
+def _enriched_contact(
+    *,
+    contact_id: str,
+    client_id: str = "c1",
+    tier: str = "A",
+    score: int = 80,
+    status: str = "enriched",
+    niche: str = "n",
+    **extra: Any,
+) -> dict[str, Any]:
+    row = {
+        "id": contact_id,
+        "client_id": client_id,
+        "icp_tier": tier,
+        "icp_score": score,
+        "status": status,
+        "niche": niche,
+        "first_name": "Jane",
+        "company": "Acme",
+        "email": f"{contact_id}@example.com",
+        "research_data": {},
+    }
+    row.update(extra)
+    return row
+
+
+async def test_fetch_eligible_contacts_returns_enriched_tier_abc() -> None:
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                _enriched_contact(contact_id="u1", tier="A", score=90),
+                _enriched_contact(contact_id="u2", tier="B", score=70),
+                _enriched_contact(contact_id="u3", tier="C", score=50),
+            ]
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1")
+
+    assert [c["contact_id"] for c in result] == ["u1", "u2", "u3"]
+    # Each row has composer-friendly keys.
+    first = result[0]
+    assert first["niche"] == "n"
+    assert first["first_name"] == "Jane"
+    assert first["icp_tier"] == "A"
+    assert first["icp_score"] == 90
+    assert first["research_data"] == {}
+
+
+async def test_fetch_eligible_contacts_excludes_tier_d_and_archive() -> None:
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                _enriched_contact(contact_id="u1", tier="A"),
+                # Tier D — must NOT appear.
+                _enriched_contact(contact_id="u2", tier="D"),
+                # Archived status — must NOT appear.
+                _enriched_contact(contact_id="u3", tier="A", status="archived"),
+                # Not yet enriched — must NOT appear.
+                _enriched_contact(contact_id="u4", tier="A", status="screened"),
+            ]
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1")
+    assert [c["contact_id"] for c in result] == ["u1"]
+
+
+async def test_fetch_eligible_contacts_excludes_contacts_with_existing_draft() -> None:
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                _enriched_contact(contact_id="u1", tier="A", score=90),
+                _enriched_contact(contact_id="u2", tier="B", score=80),
+                _enriched_contact(contact_id="u3", tier="C", score=70),
+            ],
+            "outreach_drafts": [
+                # u2 already drafted — must be skipped.
+                {"id": "d-1", "client_id": "c1", "contact_id": "u2",
+                 "status": "rendered"},
+            ],
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1")
+    assert [c["contact_id"] for c in result] == ["u1", "u3"]
+
+
+async def test_fetch_eligible_contacts_orders_by_tier_then_score_desc() -> None:
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                _enriched_contact(contact_id="c-low", tier="C", score=95),
+                _enriched_contact(contact_id="a-low", tier="A", score=40),
+                _enriched_contact(contact_id="a-high", tier="A", score=99),
+                _enriched_contact(contact_id="b-mid", tier="B", score=60),
+            ]
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1")
+    # A ranks above B ranks above C; within a tier, higher score first.
+    assert [c["contact_id"] for c in result] == [
+        "a-high", "a-low", "b-mid", "c-low",
+    ]
+
+
+async def test_fetch_eligible_contacts_respects_limit() -> None:
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                _enriched_contact(contact_id=f"u{i}", tier="A", score=100 - i)
+                for i in range(5)
+            ]
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1", limit=2)
+    assert len(result) == 2
+    # Top-ranked pair (u0 score 100, u1 score 99).
+    assert [c["contact_id"] for c in result] == ["u0", "u1"]
+
+
+async def test_fetch_eligible_contacts_empty_returns_empty_list() -> None:
+    fake = FakeSupabaseClient()
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1")
+    assert result == []
+
+
+async def test_fetch_eligible_contacts_filters_by_client_id() -> None:
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                _enriched_contact(contact_id="u1", client_id="c1"),
+                _enriched_contact(contact_id="u-other", client_id="c2"),
+            ]
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    result = await backend.fetch_eligible_contacts("c1")
+    assert [c["contact_id"] for c in result] == ["u1"]

@@ -98,7 +98,24 @@ class ComposerSkip:
 # --- Storage contract ------------------------------------------------------ #
 
 class ComposerStorageBackend(Protocol):
-    """Storage contract — tests inject an in-memory fake; Task 16 wires Supabase."""
+    """Storage contract — tests inject an in-memory fake; Task 16 wires Supabase.
+
+    Five methods: ``fetch_eligible_contacts`` (daemon batch-entry), the
+    per-contact trio (``fetch_approved_variants`` + ``fetch_active_directories``
+    + ``persist_draft``), and ``log_decision``.
+    """
+
+    async def fetch_eligible_contacts(
+        self,
+        client_id: str,
+        *,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return contacts eligible for compose — status ``'enriched'``,
+        ``icp_tier`` in A/B/C, no existing ``outreach_drafts`` row yet.
+        Caller iterates and passes each to ``Composer.compose()``. If
+        ``limit`` is ``None``, no cap."""
+        ...
 
     async def fetch_approved_variants(
         self,

@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from systems.scout.outreach.composer import ComposerStorageBackend
     from systems.scout.skill import ScoutSystem
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ async def _run_one_stage(
     client_id: str,
     *,
     dry_run: bool,
+    composer_backend: "ComposerStorageBackend | None",
 ) -> StageRun:
     """Run one stage, capture outcome + timing. Never raises."""
     started = _now_iso()
@@ -93,16 +95,18 @@ async def _run_one_stage(
         elif stage == "score_v2":
             await scout.run_score(client_id, dry_run=dry_run, phase="v2")
         elif stage == "compose":
-            # Compose is per-contact and requires a list of enriched contacts.
-            # No composer_backend.fetch_eligible_contacts yet (Plan 1 scope
-            # stops at the API-triggered /render endpoint). The daemon
-            # surfaces this as a clean NotImplementedError so operators see
-            # what's missing rather than silently skipping.
-            raise NotImplementedError(
-                "daemon compose stage needs composer_backend.fetch_eligible_contacts "
-                "to batch-load enriched contacts; not implemented in Plan 1. See "
-                "systems/scout/supabase_backends/composer.py for the method to add."
-            )
+            if composer_backend is None:
+                raise RuntimeError(
+                    "compose stage requires composer_backend; "
+                    "pass it to run_client_cycle"
+                )
+            contacts = await composer_backend.fetch_eligible_contacts(client_id)
+            if not contacts:
+                logger.info(
+                    "compose stage: no eligible contacts client=%s", client_id,
+                )
+            else:
+                await scout.run_compose(client_id, contacts, dry_run=dry_run)
         else:
             raise ValueError(f"unknown stage: {stage}")
     except Exception as exc:
@@ -131,6 +135,7 @@ async def run_client_cycle(
     *,
     dry_run: bool = False,
     stages: tuple[str, ...] | None = None,
+    composer_backend: "ComposerStorageBackend | None" = None,
 ) -> ClientCycleResult:
     """Run the nightly pipeline for one client.
 
@@ -141,6 +146,10 @@ async def run_client_cycle(
 
     ``stages`` lets callers restrict to a subset — used by
     ``scripts/run_daemon_once.py`` for targeted debugging.
+
+    ``composer_backend`` is required iff the ``compose`` stage is selected.
+    Threaded through explicitly (rather than fished out of the ScoutSystem)
+    so stage handlers stay independent of Scout's construction details.
     """
     selected = stages if stages is not None else STAGE_ORDER
     # Validate up-front so a typo surfaces before any work happens.
@@ -160,7 +169,10 @@ async def run_client_cycle(
         completed_at=started,  # overwritten at end
     )
     for stage in selected:
-        run = await _run_one_stage(scout, stage, client_id, dry_run=dry_run)
+        run = await _run_one_stage(
+            scout, stage, client_id,
+            dry_run=dry_run, composer_backend=composer_backend,
+        )
         result.stages_run.append(run)
         if not run.ok:
             result.errors.append({

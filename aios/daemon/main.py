@@ -125,7 +125,11 @@ async def run_nightly_cycle(
                 continue
 
             scout = _build_scout_for_client(registry, factory, client_config)
-            await run_client_cycle(scout, client_id, dry_run=dry_run)
+            await run_client_cycle(
+                scout, client_id,
+                dry_run=dry_run,
+                composer_backend=registry.composer_backend,
+            )
             completed += 1
         except Exception:
             # Defence in depth. run_client_cycle catches stage-level

@@ -120,7 +120,9 @@ async def _run(
     factory = AdapterFactory(settings, registry)
     scout = _build_scout_for_client(registry, factory, client_config)
     return await run_client_cycle(
-        scout, client_id, dry_run=dry_run, stages=stages,
+        scout, client_id,
+        dry_run=dry_run, stages=stages,
+        composer_backend=registry.composer_backend,
     )
 
 
