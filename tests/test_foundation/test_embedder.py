@@ -1,34 +1,16 @@
-"""Tests for os.foundation.embedder.VoyageEmbedder.
+"""Tests for aios.foundation.embedder.VoyageEmbedder.
 
 Uses a FakeVoyageClient for deterministic vectors + token counts.
 No real API calls.
-
-Note on imports: the project's `os/` package shadows Python's stdlib `os` when
-imported by name, so we load embedder.py directly via importlib. Task 16b is
-expected to renamespace the foundation package to make this cleaner; until
-then this is the known pattern.
 """
 from __future__ import annotations
 
-import importlib.util
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import pytest
 
-
-def _load_embedder_module():
-    path = Path(__file__).resolve().parents[2] / "os" / "foundation" / "embedder.py"
-    spec = importlib.util.spec_from_file_location("aios_foundation_embedder", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_embedder_mod = _load_embedder_module()
-VoyageEmbedder = _embedder_mod.VoyageEmbedder
-EmbedderCostExceeded = _embedder_mod.EmbedderCostExceeded
+from aios.foundation.embedder import EmbedderCostExceeded, VoyageEmbedder
 
 
 @dataclass

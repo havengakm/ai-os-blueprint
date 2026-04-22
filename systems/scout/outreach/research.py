@@ -82,7 +82,7 @@ class ResearchFills:
 
 
 class DecisionLoggerProtocol(Protocol):
-    """Minimal subset of ``os.foundation.decision_logger.DecisionLogger``."""
+    """Minimal subset of ``aios.foundation.decision_logger.DecisionLogger``."""
 
     async def log_decision(
         self,

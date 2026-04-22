@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 from systems.scout.enrich.base import EnrichAdapter, EnrichResult
 
 if TYPE_CHECKING:
-    from os.foundation.decision_logger import DecisionLogger
+    from aios.foundation.decision_logger import DecisionLogger
 
 
 # --------------------------------------------------------------------------- #

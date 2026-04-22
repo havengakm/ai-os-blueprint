@@ -26,31 +26,19 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib.util
 import logging
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
-# Path-based import of the embedder: the project's `os/` package shadows
-# Python's stdlib `os` when imported by name, so we load by file path.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-def _load_embedder_cls() -> type:
-    path = _REPO_ROOT / "os" / "foundation" / "embedder.py"
-    spec = importlib.util.spec_from_file_location("aios_foundation_embedder", path)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod.VoyageEmbedder
-
 
 # Ensure scripts._lib imports resolve when the script is invoked from anywhere.
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from aios.foundation.embedder import VoyageEmbedder  # noqa: E402
 from scripts._lib.markdown_loader import MarkdownDoc, parse_markdown, walk_markdown  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -168,8 +156,7 @@ def _build_supabase(url: str, key: str) -> Any:
 
 
 def _build_embedder(api_key: str) -> Any:
-    cls = _load_embedder_cls()
-    return cls(api_key=api_key)
+    return VoyageEmbedder(api_key=api_key)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:

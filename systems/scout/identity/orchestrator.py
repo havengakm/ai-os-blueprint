@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from os.foundation.decision_logger import DecisionLogger
+    from aios.foundation.decision_logger import DecisionLogger
     from systems.scout.identity.base import IdentityAdapter, IdentityResult
 
 
