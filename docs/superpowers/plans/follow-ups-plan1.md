@@ -515,6 +515,34 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 65. Task 16b Step 1 approved — Step 2 prep notes
+
+**Raised by:** Task 16b Step 1 background review (2026-04-22)
+**Severity:** Action items for Step 2 (api/deps.py + SystemRegistry wiring)
+**File:** forthcoming `api/deps.py`, `aios/foundation/registry.py`, plus minor Protocol docstring cleanup
+
+Task 16b Step 1 (Supabase backends + item-62 gate) shipped merge-ready at worktree commit `7bd760d`. Reviewer verified: item-62 gate correct (class-level frozenset + explicit 4-key dict construction + runtime assert + hostile-payload regression test), all 8 Protocols conform, 5 design calls all approved. Full suite 457/457.
+
+**Reviewer's Step 2 action items (folded in as guidance):**
+
+- **S1:** Wire a single `get_supabase_client()` DI provider (service-role key from env); all 8 backends consume it. Avoid per-backend client instances.
+- **S2:** `SystemRegistry` should expose the 8 backends as named singletons, not factory-per-call. Backends are stateless aside from the shared client.
+- **S3 (recommended):** Add a smoke test that instantiates every backend against a live Supabase dev project (guarded by `SUPABASE_SMOKE=1` env). Unit tests use fakes, so they won't catch a column rename. Optional hardening.
+- **S4:** Document `SupabaseBudgetTracker.record_spend`'s single-writer assumption prominently in `api/deps.py`. If Step 2 ever wires it into a background/concurrent context, read-modify-write becomes race-prone — Plan 2's version column becomes mandatory.
+- **S5 (docstring drift):** `EnrichStorageBackend.get_eligible_contacts_for_enrich` Protocol docstring at `systems/scout/pipeline/enrich.py` says `last_enriched_at IS NULL` but the actual DB column per `002_scout.sql:121` is `enriched_at`. The backend correctly writes to `enriched_at`; only the Protocol docstring is stale. One-line fix during Step 2 or a natural future touch.
+
+**Flagged inaccuracy (worth noting but no code fix needed):** the implementer's Step 1 report claimed `trigify_search_ids` is NOT in the migration set. Wrong — migration 005 line 282 DOES add it, and the backend at `supabase_backends/enrich.py:85` correctly reads from `client_config.trigify_search_ids`. Behaviour is correct; only the narrative was inaccurate.
+
+### 66. Task 1.5.9a polish items
+
+**Raised by:** Task 1.5.9a self-review (2026-04-22)
+**Severity:** Suggestion (monitor-creator shipped approved; these are design clarifications)
+**File:** `systems/scout/sources/trigify_monitors.py` + `skills/README.md` + ongoing
+
+- **P1:** `skills/README.md` does not yet exist in the repo. The skill ships following Max 2026-04-21 webinar description-as-matcher convention (from memory), but operators / future task implementers should author the canonical README. Worth including with the Task 18 SOP pass, or sooner if `.claude/skills/` wrappers (Task 1.5.9c) need a shared convention document.
+- **P2:** `TrigifyMonitorCreator.provision_from_yaml` partial-commits on failure — if 4 of 5 POSTs succeed and 1 fails, storage IS called with the 4 successful IDs. Rationale: idempotency makes re-invocation clean, and failed-all alternative would leave the client with zero monitors after a flaky call. Skill SOP documents the expected re-invoke pattern. Flag only if operator experience surfaces the partial-state as confusing.
+- **P3:** `GET /v1/searches` response envelope accepts both `{"searches": [...]}` and bare `[...]` — implementer couldn't pin the exact Trigify API shape from available docs. Verify against real Trigify response once the first real monitor provisioning runs; tighten the parser if the bare-list path is dead.
+
 ### 63. Rename `os/` → `aios/` before Task 16b wires api/deps.py
 
 **Raised by:** Task 16a review (2026-04-22)
