@@ -515,6 +515,29 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 70. Task 16b Step 3 approved — load_components + setup_client + enrich.py cleanup
+
+**Raised by:** Task 16b Step 3 review (2026-04-22)
+**Severity:** Approved (no follow-ups)
+**File:** `scripts/load_components.py`, `scripts/setup_client.sh`, `systems/scout/pipeline/enrich.py`
+
+Task 16b Step 3 shipped at worktree commit `b4c9237`. Item-62 invariant preserved (DryRunComponentStoreBackend forwards reads + captures writes locally; live path uses real `SupabaseComponentStoreBackend` with shipped allow-list gate). 2 residual `last_enriched_at` docstrings fixed (closes item 69 cleanup). 9 new tests, full suite 532/532 + 1 skipped.
+
+**setup_client.sh orchestrates 5 steps** in order: seed autonomy → load knowledge → load context → load components → configure Trigify monitors. Fail-fast via `set -euo pipefail`. Executable bit set (755).
+
+**Operator onboarding now one command:**
+```
+bash scripts/setup_client.sh <client-id>
+```
+Then:
+```
+/discover-trigify-leads <client-id>   # Claude Code
+```
+
+**4 design calls all approved:** sibling-consistency `_build_supabase()` wrapper (vs Step 2's `api/deps.py::get_supabase_client()`), exit-1-on-dry-run-errors stricter than spec, 9 tests vs 7 target (bundled setup_client.sh subprocess checks), no `.env` loading (sibling pattern).
+
+Task 16b Step 3 unblocks Task 16c (railway.toml + deployment SOP) and Task 17 (e2e dry-run).
+
 ### 69. Task 16b Step 2 approved — DI + SystemRegistry + pipeline router shipped
 
 **Raised by:** Task 16b Step 2 review (2026-04-22)
