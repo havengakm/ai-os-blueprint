@@ -15,9 +15,14 @@ The ``trigger`` endpoint from Task 8 (stage-name dispatch stub) is kept
 as a legacy compatibility shim — it returns ``accepted`` and delegates
 nothing. Real work happens through the per-stage endpoints below.
 
-Stage construction is factored through module-level ``_build_*_stage``
-hooks. Tests monkeypatch these to return stub stages, so the TestClient
-never calls real Supabase / Apollo / Trigify / Anthropic.
+Task 16.5 refactor
+------------------
+Endpoints now dispatch through ``ScoutSystem`` (via
+``api.deps.get_scout_system``) rather than constructing stages per
+request. ``ScoutSystem.run_<stage>`` wraps each inner orchestrator with
+the mandatory foundation loop (load_foundation → check_autonomy →
+find_similar_decisions → retrieve_knowledge[render only]) before
+dispatching. Stage construction lives in ``ScoutSystem.from_registry``.
 """
 from __future__ import annotations
 
@@ -27,16 +32,9 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from api.deps import (
-    get_budget_tracker,
-    get_composer_backend,
-    get_enrich_backend,
-    get_identity_backend,
-    get_pull_backend,
-    get_score_backend,
-    get_screen_backend,
-)
+from api.deps import get_scout_system
 from api.middleware.verify_signatures import require_cron_secret
+from systems.scout.skill import ScoutSystem
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
@@ -60,9 +58,8 @@ class PipelineInvocation(BaseModel):
 
 
 class RenderInvocation(PipelineInvocation):
-    """Render-stage body. Adds ``contacts`` — per-contact render has no
-    batch orchestrator yet (Task 16.5 will wire one). Caller supplies the
-    enriched contact dicts to compose drafts for."""
+    """Render-stage body. Adds ``contacts`` — the composer is per-contact and
+    has no batch fetcher yet. Caller supplies enriched contact dicts."""
     contacts: list[dict[str, Any]] = []
 
 
@@ -71,72 +68,6 @@ class TriggerRequest(BaseModel):
     stage: Literal["pull", "score", "screen", "enrich", "research", "render", "full"]
     dry_run: bool = False
     limit: int | None = None
-
-
-# ---------------------------------------------------------------------------
-# Stage-factory hooks
-# ---------------------------------------------------------------------------
-# Real production factories. Each returns a stage object with a
-# ``.run(client_id, *, dry_run, limit)`` coroutine. Tests monkeypatch
-# these to return stubs so the router can be exercised without any real
-# Supabase / Apollo / Claude / Voyage / Trigify calls.
-
-
-async def _build_pull_stage(backend: Any) -> Any:
-    """Build a ``PullOrchestrator`` with an empty adapter list.
-
-    Adapter wiring (Apollo / Clutch / CSV / Trigify-discovery) is
-    deliberately NOT done here — each adapter needs per-client API keys
-    that live outside this router's contract. The real deployment path
-    runs pull via ``scripts/run_trigify_discovery.py`` (or equivalent)
-    until Task 16.5 lifts pull into a BaseSystem that pulls its own
-    adapters from client config.
-
-    Calling ``.run()`` on this bare orchestrator is a valid no-op: it
-    will report zero active directories and log a summary — the exact
-    behaviour the HTTP route should surface when no source adapters
-    are wired in this process.
-    """
-    from systems.scout.pipeline.pull import PullOrchestrator
-    return PullOrchestrator(adapters=[], storage=backend)
-
-
-async def _build_score_stage(backend: Any) -> Any:
-    from systems.scout.pipeline.score_stage import ScoreStage
-    return ScoreStage(storage=backend)
-
-
-async def _build_screen_stage(backend: Any) -> Any:
-    from systems.scout.pipeline.screen import ScreenStage
-    return ScreenStage(storage=backend)
-
-
-async def _build_identity_stage(backend: Any) -> Any:
-    """Identity stage needs an IdentityOrchestrator, which needs adapters
-    keyed by live API credentials. We construct a zero-adapter
-    orchestrator so the route can at least surface eligible-contact
-    counts and log decisions — every contact will fail to resolve and
-    be archived as ``no_decision_maker``. Real adapter wiring is the
-    Scout daemon's job (Task 16.5)."""
-    from systems.scout.identity.orchestrator import IdentityOrchestrator
-    from systems.scout.pipeline.identity import IdentityStage
-    orchestrator = IdentityOrchestrator(adapters=[])
-    return IdentityStage(orchestrator=orchestrator, storage=backend)
-
-
-async def _build_enrich_stage(enrich_backend: Any, budget_tracker: Any) -> Any:
-    """Enrich stage mirrors identity: zero-adapter fan-out is a valid
-    no-op that reports eligible counts + emits a summary."""
-    from systems.scout.enrich.orchestrator import EnrichOrchestrator
-    from systems.scout.pipeline.enrich import EnrichStage
-    orchestrator = EnrichOrchestrator(adapters=[], budget_tracker=budget_tracker)
-    return EnrichStage(orchestrator=orchestrator, storage=enrich_backend)
-
-
-async def _build_composer(backend: Any) -> Any:
-    from systems.scout.outreach.composer import Composer
-    from systems.scout.outreach.research import ResearchSelector
-    return Composer(storage=backend, research_selector=ResearchSelector())
 
 
 def _to_json(result: Any) -> Any:
@@ -154,91 +85,65 @@ def _to_json(result: Any) -> Any:
 @router.post("/pull")
 async def run_pull(
     body: PipelineInvocation,
-    backend: Any = Depends(get_pull_backend),
+    scout: ScoutSystem = Depends(get_scout_system),
 ):
-    """Dispatch the pull stage. See ``_build_pull_stage`` for the
-    zero-adapter caveat — real adapter wiring lives in Scout daemon /
-    scripts until Task 16.5."""
-    stage = await _build_pull_stage(backend)
-    result = await stage.run(body.client_id, dry_run=body.dry_run)
+    """Dispatch the pull stage through ScoutSystem's foundation loop."""
+    result = await scout.run_pull(body.client_id, dry_run=body.dry_run, limit=body.limit)
     return _to_json(result)
 
 
 @router.post("/score")
 async def run_score(
     body: PipelineInvocation,
-    backend: Any = Depends(get_score_backend),
+    scout: ScoutSystem = Depends(get_scout_system),
 ):
-    """Dispatch the score stage."""
-    stage = await _build_score_stage(backend)
-    result = await stage.run(body.client_id, dry_run=body.dry_run, limit=body.limit)
+    """Dispatch the score stage (phase defaults to v1 — pre-screen pass)."""
+    result = await scout.run_score(body.client_id, dry_run=body.dry_run, limit=body.limit)
     return _to_json(result)
 
 
 @router.post("/screen")
 async def run_screen(
     body: PipelineInvocation,
-    backend: Any = Depends(get_screen_backend),
+    scout: ScoutSystem = Depends(get_scout_system),
 ):
     """Dispatch the screen stage."""
-    stage = await _build_screen_stage(backend)
-    result = await stage.run(body.client_id, dry_run=body.dry_run, limit=body.limit)
+    result = await scout.run_screen(body.client_id, dry_run=body.dry_run, limit=body.limit)
     return _to_json(result)
 
 
 @router.post("/identity")
 async def run_identity(
     body: PipelineInvocation,
-    backend: Any = Depends(get_identity_backend),
+    scout: ScoutSystem = Depends(get_scout_system),
 ):
-    """Dispatch the identity stage. See ``_build_identity_stage`` for
-    the zero-adapter caveat."""
-    stage = await _build_identity_stage(backend)
-    result = await stage.run(body.client_id, dry_run=body.dry_run, limit=body.limit)
+    """Dispatch the identity stage."""
+    result = await scout.run_identity(body.client_id, dry_run=body.dry_run, limit=body.limit)
     return _to_json(result)
 
 
 @router.post("/enrich")
 async def run_enrich(
     body: PipelineInvocation,
-    enrich_backend: Any = Depends(get_enrich_backend),
-    budget_tracker: Any = Depends(get_budget_tracker),
+    scout: ScoutSystem = Depends(get_scout_system),
 ):
-    """Dispatch the enrich stage. The budget tracker is resolved via the
-    registry (same Supabase client as enrich_backend)."""
-    stage = await _build_enrich_stage(enrich_backend, budget_tracker)
-    result = await stage.run(body.client_id, dry_run=body.dry_run, limit=body.limit)
+    """Dispatch the enrich stage."""
+    result = await scout.run_enrich(body.client_id, dry_run=body.dry_run, limit=body.limit)
     return _to_json(result)
 
 
 @router.post("/render")
 async def run_render(
     body: RenderInvocation,
-    backend: Any = Depends(get_composer_backend),
+    scout: ScoutSystem = Depends(get_scout_system),
 ):
     """Dispatch the render stage — compose drafts for the supplied contacts.
 
-    The Composer operates per-contact. Task 16.5 will add a batch
-    orchestrator that fetches enriched contacts itself; until then, the
-    caller provides them in the request body.
+    Batching belongs to the caller: the Composer operates per-contact.
+    Pass at most ``limit`` contacts (if supplied) through to compose.
     """
-    composer = await _build_composer(backend)
-    composed: list[dict[str, Any]] = []
-    skipped: list[dict[str, Any]] = []
-    for contact in body.contacts[: body.limit] if body.limit else body.contacts:
-        outcome = await composer.compose(body.client_id, contact, dry_run=body.dry_run)
-        payload = _to_json(outcome)
-        bucket = skipped if type(outcome).__name__ == "ComposerSkip" else composed
-        bucket.append(payload)
-    return {
-        "client_id": body.client_id,
-        "dry_run": body.dry_run,
-        "total_eligible": len(body.contacts),
-        "total_composed": len(composed),
-        "total_skipped": len(skipped),
-        "composed": composed,
-        "skipped": skipped,
-    }
+    contacts = body.contacts[: body.limit] if body.limit else body.contacts
+    return await scout.run_compose(body.client_id, contacts, dry_run=body.dry_run)
 
 
 # ---------------------------------------------------------------------------

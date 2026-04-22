@@ -25,6 +25,7 @@ from typing import Any
 from supabase import create_client
 
 from aios.foundation.registry import SystemRegistry, build_registry
+from systems.scout.skill import ScoutSystem
 
 logger = logging.getLogger(__name__)
 
@@ -148,3 +149,27 @@ def get_trigify_monitor_storage() -> Any:
 
 def get_trigify_discovery_storage() -> Any:
     return get_registry().trigify_discovery_storage
+
+
+# ---------------------------------------------------------------------------
+# System accessors
+# ---------------------------------------------------------------------------
+# Systems (Scout, future Beacon / Ad / Content) are BaseSystem subclasses
+# that wrap the inner pipeline orchestrators with the mandatory foundation
+# loop. Routers and the daemon depend on these rather than building stages
+# directly — every dispatch is context-aware, autonomy-gated, and logged.
+
+
+def get_scout_system() -> ScoutSystem:
+    """ScoutSystem wired to production backends via the registry.
+
+    Memoised per-registry-instance (the registry itself is ``lru_cache``d,
+    so ``from_registry`` is called at most once per process). Tests
+    override this via ``app.dependency_overrides`` to inject mocks.
+    """
+    return _get_scout_system_cached(get_registry())
+
+
+@lru_cache(maxsize=1)
+def _get_scout_system_cached(registry: SystemRegistry) -> ScoutSystem:
+    return ScoutSystem.from_registry(registry)

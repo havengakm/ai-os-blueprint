@@ -1,12 +1,14 @@
 """Tests for ``api/routers/pipeline.py`` — per-stage endpoint dispatch.
 
-Every endpoint is exercised via FastAPI TestClient. Stage construction
-is monkeypatched to return stub stages, so no real Supabase / Apollo /
-Claude / Voyage / Trigify calls happen.
+Task 16.5 refactor: endpoints dispatch through ``ScoutSystem`` instead of
+constructing stages directly. Tests override the
+``get_scout_system`` dependency with a stub ScoutSystem and assert the
+right ``run_<stage>`` method was called with the body params.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any
 
 import pytest
 
@@ -35,127 +37,84 @@ def test_pipeline_trigger_accepts_valid_secret(client):
 
 
 # ---------------------------------------------------------------------------
-# Stub stages
+# Stub ScoutSystem — records per-method calls, returns a dataclass result
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class _StubResult:
-    """Minimal dataclass result — stands in for every stage's result type."""
-
     client_id: str
     dry_run: bool = False
     limit_seen: int | None = None
-    calls: list[str] = field(default_factory=list)
+    method: str = ""
 
 
-class _StubStage:
-    """Stub stage with a ``.run(client_id, *, dry_run, limit)`` coroutine
-    that records the args + returns a ``_StubResult`` dataclass."""
+class _StubScoutSystem:
+    """Stub ScoutSystem with the 6 ``run_<stage>`` methods the router uses."""
 
-    def __init__(self, name: str):
-        self.name = name
-        self.last_call: dict | None = None
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
 
-    async def run(self, client_id: str, *, dry_run: bool = False, limit: int | None = None):
-        self.last_call = {"client_id": client_id, "dry_run": dry_run, "limit": limit}
-        return _StubResult(
-            client_id=client_id,
-            dry_run=dry_run,
-            limit_seen=limit,
-            calls=[self.name],
-        )
+    async def run_pull(self, client_id, *, dry_run=False, limit=None):
+        self.calls.append({"method": "run_pull", "client_id": client_id,
+                           "dry_run": dry_run, "limit": limit})
+        return _StubResult(client_id=client_id, dry_run=dry_run, limit_seen=limit, method="run_pull")
 
+    async def run_score(self, client_id, *, dry_run=False, limit=None, phase="v1"):
+        self.calls.append({"method": "run_score", "client_id": client_id,
+                           "dry_run": dry_run, "limit": limit, "phase": phase})
+        return _StubResult(client_id=client_id, dry_run=dry_run, limit_seen=limit, method="run_score")
 
-class _StubPullStage(_StubStage):
-    """Pull stage signature has no ``limit`` kwarg — the orchestrator uses
-    ``max_companies_per_source`` instead. Override run accordingly."""
-    async def run(self, client_id: str, *, dry_run: bool = False, **_):
-        self.last_call = {"client_id": client_id, "dry_run": dry_run}
-        return _StubResult(client_id=client_id, dry_run=dry_run, calls=[self.name])
+    async def run_screen(self, client_id, *, dry_run=False, limit=None):
+        self.calls.append({"method": "run_screen", "client_id": client_id,
+                           "dry_run": dry_run, "limit": limit})
+        return _StubResult(client_id=client_id, dry_run=dry_run, limit_seen=limit, method="run_screen")
+
+    async def run_identity(self, client_id, *, dry_run=False, limit=None):
+        self.calls.append({"method": "run_identity", "client_id": client_id,
+                           "dry_run": dry_run, "limit": limit})
+        return _StubResult(client_id=client_id, dry_run=dry_run, limit_seen=limit, method="run_identity")
+
+    async def run_enrich(self, client_id, *, dry_run=False, limit=None):
+        self.calls.append({"method": "run_enrich", "client_id": client_id,
+                           "dry_run": dry_run, "limit": limit})
+        return _StubResult(client_id=client_id, dry_run=dry_run, limit_seen=limit, method="run_enrich")
+
+    async def run_compose(self, client_id, contacts, *, dry_run=False):
+        self.calls.append({"method": "run_compose", "client_id": client_id,
+                           "contacts": list(contacts), "dry_run": dry_run})
+        return {
+            "client_id": client_id,
+            "dry_run": dry_run,
+            "total_eligible": len(contacts),
+            "total_composed": len(contacts),
+            "total_skipped": 0,
+            "composed": [{"contact_id": c.get("contact_id", "")} for c in contacts],
+            "skipped": [],
+        }
 
 
 # ---------------------------------------------------------------------------
-# Fixtures — patch stage factories + deps accessors
+# Fixtures — override the get_scout_system dependency with a stub
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def patched_pipeline(monkeypatch, app):
-    """Build the FastAPI app, then monkeypatch every stage factory to
-    return a stub stage. Returns a dict of the stubs so tests can assert
-    on what was called."""
-    import api.routers.pipeline as router_mod
-
-    stubs = {
-        "pull": _StubPullStage("pull"),
-        "score": _StubStage("score"),
-        "screen": _StubStage("screen"),
-        "identity": _StubStage("identity"),
-        "enrich": _StubStage("enrich"),
-    }
-
-    async def fake_pull(backend):
-        return stubs["pull"]
-
-    async def fake_score(backend):
-        return stubs["score"]
-
-    async def fake_screen(backend):
-        return stubs["screen"]
-
-    async def fake_identity(backend):
-        return stubs["identity"]
-
-    async def fake_enrich(enrich_backend, budget_tracker):
-        return stubs["enrich"]
-
-    monkeypatch.setattr(router_mod, "_build_pull_stage", fake_pull)
-    monkeypatch.setattr(router_mod, "_build_score_stage", fake_score)
-    monkeypatch.setattr(router_mod, "_build_screen_stage", fake_screen)
-    monkeypatch.setattr(router_mod, "_build_identity_stage", fake_identity)
-    monkeypatch.setattr(router_mod, "_build_enrich_stage", fake_enrich)
-
-    # Composer: the factory itself we stub, and swap the backend via deps override.
-    class _FakeComposer:
-        def __init__(self):
-            self.calls = []
-
-        async def compose(self, client_id, contact, *, dry_run=False):
-            self.calls.append({"client_id": client_id, "contact": contact, "dry_run": dry_run})
-            return _StubResult(client_id=client_id, dry_run=dry_run, calls=["compose"])
-
-    fake_composer = _FakeComposer()
-
-    async def fake_build_composer(backend):
-        return fake_composer
-
-    monkeypatch.setattr(router_mod, "_build_composer", fake_build_composer)
-    stubs["composer"] = fake_composer
-
-    # Override the per-backend DI deps so get_registry() (which reads real
-    # env) is never called during router handling.
+def patched_pipeline(app):
+    """Override ``get_scout_system`` with a stub. Returns (stub, app)."""
     from api import deps as deps_mod
-    for accessor_name in (
-        "get_pull_backend",
-        "get_score_backend",
-        "get_screen_backend",
-        "get_identity_backend",
-        "get_enrich_backend",
-        "get_budget_tracker",
-        "get_composer_backend",
-    ):
-        app.dependency_overrides[getattr(deps_mod, accessor_name)] = lambda: object()
 
-    yield stubs, app
+    stub = _StubScoutSystem()
+    app.dependency_overrides[deps_mod.get_scout_system] = lambda: stub
+    yield stub, app
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def patched_client(patched_pipeline):
-    stubs, app = patched_pipeline
+    stub, app = patched_pipeline
     from fastapi.testclient import TestClient
-    return stubs, TestClient(app)
+    return stub, TestClient(app)
 
 
 # ---------------------------------------------------------------------------
@@ -163,44 +122,57 @@ def patched_client(patched_pipeline):
 # ---------------------------------------------------------------------------
 
 
-def test_post_pull_dispatches_to_pull_stage(patched_client):
-    stubs, client = patched_client
+def test_post_pull_dispatches_to_scout_run_pull(patched_client):
+    stub, client = patched_client
     r = client.post("/api/pipeline/pull", json={"client_id": "c1", "dry_run": False})
     assert r.status_code == 200, r.text
-    assert stubs["pull"].last_call == {"client_id": "c1", "dry_run": False}
-    assert r.json()["calls"] == ["pull"]
+    assert len(stub.calls) == 1
+    assert stub.calls[0] == {
+        "method": "run_pull", "client_id": "c1", "dry_run": False, "limit": None,
+    }
+    assert r.json()["method"] == "run_pull"
 
 
-def test_post_score_dispatches_to_score_stage(patched_client):
-    stubs, client = patched_client
+def test_post_score_dispatches_to_scout_run_score(patched_client):
+    stub, client = patched_client
     r = client.post("/api/pipeline/score", json={"client_id": "c1", "limit": 7})
     assert r.status_code == 200, r.text
-    assert stubs["score"].last_call == {"client_id": "c1", "dry_run": False, "limit": 7}
+    call = stub.calls[0]
+    assert call["method"] == "run_score"
+    assert call["client_id"] == "c1"
+    assert call["limit"] == 7
+    assert call["dry_run"] is False
 
 
-def test_post_screen_dispatches_to_screen_stage(patched_client):
-    stubs, client = patched_client
+def test_post_screen_dispatches_to_scout_run_screen(patched_client):
+    stub, client = patched_client
     r = client.post("/api/pipeline/screen", json={"client_id": "c1"})
     assert r.status_code == 200, r.text
-    assert stubs["screen"].last_call == {"client_id": "c1", "dry_run": False, "limit": None}
+    assert stub.calls[0] == {
+        "method": "run_screen", "client_id": "c1", "dry_run": False, "limit": None,
+    }
 
 
-def test_post_identity_dispatches_to_identity_stage(patched_client):
-    stubs, client = patched_client
+def test_post_identity_dispatches_to_scout_run_identity(patched_client):
+    stub, client = patched_client
     r = client.post("/api/pipeline/identity", json={"client_id": "c1", "limit": 3})
     assert r.status_code == 200, r.text
-    assert stubs["identity"].last_call == {"client_id": "c1", "dry_run": False, "limit": 3}
+    assert stub.calls[0] == {
+        "method": "run_identity", "client_id": "c1", "dry_run": False, "limit": 3,
+    }
 
 
-def test_post_enrich_dispatches_to_enrich_stage(patched_client):
-    stubs, client = patched_client
+def test_post_enrich_dispatches_to_scout_run_enrich(patched_client):
+    stub, client = patched_client
     r = client.post("/api/pipeline/enrich", json={"client_id": "c1"})
     assert r.status_code == 200, r.text
-    assert stubs["enrich"].last_call == {"client_id": "c1", "dry_run": False, "limit": None}
+    assert stub.calls[0] == {
+        "method": "run_enrich", "client_id": "c1", "dry_run": False, "limit": None,
+    }
 
 
-def test_post_render_dispatches_to_composer(patched_client):
-    stubs, client = patched_client
+def test_post_render_dispatches_to_scout_run_compose(patched_client):
+    stub, client = patched_client
     r = client.post(
         "/api/pipeline/render",
         json={
@@ -213,9 +185,27 @@ def test_post_render_dispatches_to_composer(patched_client):
     body = r.json()
     assert body["total_eligible"] == 2
     assert body["total_composed"] + body["total_skipped"] == 2
-    # composer.compose() was called once per contact with dry_run=True
-    assert len(stubs["composer"].calls) == 2
-    assert all(c["dry_run"] is True for c in stubs["composer"].calls)
+    # Compose called once with the full contacts list
+    assert len(stub.calls) == 1
+    call = stub.calls[0]
+    assert call["method"] == "run_compose"
+    assert call["dry_run"] is True
+    assert len(call["contacts"]) == 2
+
+
+def test_post_render_respects_limit_truncation(patched_client):
+    stub, client = patched_client
+    r = client.post(
+        "/api/pipeline/render",
+        json={
+            "client_id": "c1",
+            "limit": 1,
+            "contacts": [{"contact_id": "X"}, {"contact_id": "Y"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+    # The router truncates to limit before handing to scout.run_compose
+    assert len(stub.calls[0]["contacts"]) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -224,14 +214,14 @@ def test_post_render_dispatches_to_composer(patched_client):
 
 
 def test_missing_client_id_returns_422(patched_client):
-    _stubs, client = patched_client
+    _stub, client = patched_client
     r = client.post("/api/pipeline/score", json={"dry_run": True})
     assert r.status_code == 422
     assert "client_id" in r.text
 
 
-def test_dry_run_forwarded_to_stage(patched_client):
-    stubs, client = patched_client
+def test_dry_run_forwarded_to_scout(patched_client):
+    stub, client = patched_client
     r = client.post("/api/pipeline/score", json={"client_id": "c1", "dry_run": True})
     assert r.status_code == 200, r.text
-    assert stubs["score"].last_call["dry_run"] is True
+    assert stub.calls[0]["dry_run"] is True
