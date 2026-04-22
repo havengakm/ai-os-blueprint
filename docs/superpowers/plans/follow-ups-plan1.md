@@ -515,6 +515,24 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 68. Task 1.5.9c approved — Trigify discovery pipeline complete end-to-end
+
+**Raised by:** Task 1.5.9c review (2026-04-22)
+**Severity:** Approved (minor observations only)
+**File:** `systems/scout/supabase_backends/trigify.py` + 2 CLIs + 2 SKILL.md + 3 test files
+
+Task 1.5.9c shipped at worktree commit `cdda97a` (9 files, 20 new tests, full suite 504/504). Reviewer verdict: "Spec compliant + approved." `_CachedAdapter` wrapper design, 315-line CLI size, `--no-confirm` flag, and monkeypatch test pattern all judged clean.
+
+**End-to-end operator flow now live:**
+1. Author `context/{client}/sourcing/trigify_monitors.yaml`
+2. `/configure-trigify-monitors <client-id>` (Claude Code) or `uv run python scripts/configure_trigify_monitors.py`
+3. `/discover-trigify-leads <client-id>` (Claude Code) or `uv run python scripts/run_trigify_discovery.py`
+4. Qualified engagers land in `contacts` table via PullOrchestrator with full audit trail
+
+**Minor observations (non-blocking):**
+- `run_trigify_discovery.py:276` requires `TRIGIFY_API_KEY` on `--dry-run`, asymmetric with configure CLI (which waives). Intentional — `TrigifyDiscoverySource.pull()` always needs the key. Worth a one-line comment.
+- `_CachedAdapter` has no dedicated unit test; behaviour is exercised transitively via `test_live_run_calls_orchestrator_with_source_filter` (pull_calls==1 proves the cache, source.name forwarded proves the Protocol attr).
+
 ### 67. Task 1.5.9b — minor nits from review
 
 **Raised by:** Task 1.5.9b review (2026-04-22)
