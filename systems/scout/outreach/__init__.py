@@ -9,6 +9,7 @@ from systems.scout.outreach.component_store import (
 )
 from systems.scout.outreach.composer import (
     AD_ACTIVITY_DIRECTORIES,
+    COMPONENT_TYPES_ORDERED,
     Composer,
     ComposedDraft,
     ComposerSkip,
@@ -23,6 +24,7 @@ from systems.scout.outreach.research import (
 
 __all__ = [
     "AD_ACTIVITY_DIRECTORIES",
+    "COMPONENT_TYPES_ORDERED",
     "ComponentStore",
     "ComponentStoreBackend",
     "ComponentVariant",

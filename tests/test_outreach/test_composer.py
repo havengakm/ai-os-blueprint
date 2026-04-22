@@ -612,6 +612,25 @@ async def test_dry_run_does_not_persist_but_still_logs() -> None:
     assert entry["context"]["persisted_draft_id"] is None
 
 
+async def test_dry_run_forwarded_to_research_selector() -> None:
+    # Regression guard: composer must forward dry_run=True into
+    # ResearchSelector.select_fills, which surfaces it in the
+    # research_contact decision_log entry context. A silent flip to
+    # dry_run=False in composer.py would otherwise go undetected.
+    research_logger = FakeLogger()
+    storage = FakeStorage(variants_by_type=mk_variants_by_type())
+    composer = mk_composer(storage, research_logger=research_logger)
+
+    await composer.compose("client-1", mk_contact(), dry_run=True)
+
+    research_entries = [
+        e for e in research_logger.entries
+        if e["decision_type"] == "research_contact"
+    ]
+    assert len(research_entries) == 1
+    assert research_entries[0]["context"]["dry_run"] is True
+
+
 # --------------------------------------------------------------------------- #
 # 15. Persist failure does not abort                                            #
 # --------------------------------------------------------------------------- #
