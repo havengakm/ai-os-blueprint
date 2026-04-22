@@ -1,5 +1,24 @@
+# railway.toml — AIOS deployment config for Railway.
+# Reference: https://docs.railway.com/guides/config-as-code
+#
+# Required env vars (set via Railway dashboard or CLI `railway variables`):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VOYAGE_API_KEY, ANTHROPIC_API_KEY,
+#   TRIGIFY_API_KEY, APOLLO_API_KEY, HUNTER_API_KEY, ZEROBOUNCE_API_KEY,
+#   CRON_SECRET, CLIENT_ID
+#
+# Without all of these set, `api.main:create_app()` raises at import time
+# (config/settings.py hard-requires them). Railway will surface the error in
+# deploy logs.
+
 [build]
 builder = "nixpacks"
+
+# Playwright needs its browser binaries installed separately from the Python
+# package. claude_identity_scraper, claude_deep_research, and the planned
+# ad-library scrapers all require Chromium. Without this step, any Playwright
+# call raises "Executable doesn't exist at .../chromium" at runtime.
+# Closes backlog item 19.
+buildCommand = "uv sync --frozen && uv run playwright install --with-deps chromium"
 
 [deploy]
 startCommand = "uvicorn api.main:app --host 0.0.0.0 --port $PORT"
@@ -7,3 +26,11 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
+# Scout daemon service placeholder (Task 16.6, pending). When the daemon
+# ships, enable via a second [[services]] section:
+#
+# [[services]]
+# name = "scout-daemon"
+# startCommand = "uv run python -m aios.daemon"
+# restartPolicyType = "always"
