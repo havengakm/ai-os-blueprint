@@ -515,6 +515,40 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 63. Rename `os/` → `aios/` before Task 16b wires api/deps.py
+
+**Raised by:** Task 16a review (2026-04-22)
+**Severity:** Important (blocks clean Task 16b api/deps.py wiring)
+**File:** `os/foundation/**` + `os/memory/**` + all TYPE_CHECKING imports that reference them
+
+Empirically confirmed during Task 16a review: `from os.foundation import ...` fails at runtime with `ModuleNotFoundError: No module named 'os.foundation'; 'os' is not a package`. Python's stdlib `os` shadows the project's foundation package. Every existing reference in systems/ is inside `TYPE_CHECKING` blocks — runtime code can't import the foundation normally.
+
+Task 16a's three scripts (`load_knowledge.py`, `load_context.py`, `tests/test_foundation/test_embedder.py`) worked around this with `importlib.util.spec_from_file_location` — three commented sites, acceptable for 16a's script surface.
+
+Task 16b needs `api/deps.py` to instantiate + inject `MemoryStore`, `DecisionLogger`, `PatternMatcher`, `KnowledgeStore`, `AutonomyGate`, `VoyageEmbedder` — six modules. FastAPI dependency-injection factories cannot realistically be six parallel `spec_from_file_location` calls. Rename is the right fix.
+
+**Proposed sequence for Task 16b kickoff:**
+1. `git mv os/ aios/` on the worktree
+2. Update all `TYPE_CHECKING` imports: `from os.foundation.X` → `from aios.foundation.X`
+3. Update `pyproject.toml` if there's an explicit package listing
+4. Update the three importlib sites in Task 16a scripts to normal imports
+5. Verify full test suite still green
+6. Commit the rename before adding any new Task 16b files
+
+Ship this as Task 16b Step 0 (prerequisite); don't bundle with the Supabase backend implementations.
+
+### 64. Task 16a — residual minor polish
+
+**Raised by:** Task 16a review (2026-04-22)
+**Severity:** Suggestion
+**File:** `os/foundation/embedder.py`, `scripts/load_context.py`, `scripts/seed_autonomy_rules.py`
+
+- **M1:** `embedder.py:35` comment "over-estimate slightly" overstates the chars/4 heuristic. Rephrase to "approximate; designed for runaway-prompt detection, not fine-grained throttling." The real cost accounting uses `result.total_tokens` post-call.
+- **M2:** `load_context.py:159` stores bracket-stripped body text. Original raw body with `[[backlinks]]` is lost (only `.md` source file has it). If future tooling wants to re-run resolution on stored rows, raw tokens are gone. Worth noting if re-resolution becomes a requirement — not a current bug.
+- **M3:** `seed_autonomy_rules.py:78-92` pre-fetches `existing_action_types` then logs a warning (not error) on fetch failure — fallback treats every action_type as new, but upsert's `on_conflict` still handles dupes safely. Document this in the docstring.
+
+All three are cosmetic; bundle with Task 16b or any natural touch of these files.
+
 ### 62. Composer — minor polish from Task 15 code review + ComponentVariant invariant enforcement
 
 **Raised by:** Task 15 spec + code review (2026-04-22)
