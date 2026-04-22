@@ -515,6 +515,48 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 75. AutonomyGate cache invalidation edge case
+
+**Raised by:** Task 17A+B review (2026-04-22)
+**Severity:** Latent bug (low probability in current flow; would surface if promotion ever happens outside `promote()` method)
+**File:** `aios/foundation/autonomy.py:152-160, 255-257`
+
+`AutonomyGate` caches autonomy decisions per `{client_id}:{action_type}` key. `promote()` is the only method that clears the cache. `check_promotion_eligibility` reads `autonomy_rules` directly from Supabase but does NOT touch `self._cache`. If an operator ever updates `autonomy_rules` via Supabase dashboard or a side-channel script (i.e., not through `promote()`), stale cache entries persist until process restart.
+
+**Current flow:** all promotions go through `promote()` → no incoherence. **Failure mode:** Plan 7's operator UI or a bulk-update migration could bypass `promote()`. At that point, decisions made in the first hour post-update use stale autonomy levels.
+
+Fix options:
+- Short TTL on cache entries (e.g., 60s) — acceptable latency for a rarely-queried value.
+- Subscribe to `autonomy_rules` Supabase realtime changefeed and invalidate on notify.
+- Force cache-bust on every `check_promotion_eligibility` call.
+
+Not a Task 17 blocker. Land before Plan 7's operator dashboard ships, since that's the most likely bypass vector.
+
+### 74. Task 17 A+B approved — foundation tests + e2e loop
+
+**Raised by:** Task 17 A+B delivery + combined review (2026-04-22)
+**Severity:** Approved (+1 new backlog — item 75)
+**File:** `tests/test_foundation/`, `tests/test_memory/`, `tests/test_e2e/`
+
+Task 17 parts A+B shipped at worktree commit `7f66b0b`. 58 new tests covering every foundation module + e2e integration test proving the foundation loop fires in order across all 7 pipeline stages. Test suite 584 → 642 passing + 1 skipped. Ruff clean.
+
+**Module coverage added:**
+- `test_decision_logger.py` (8 tests): log_decision + embedder wiring + fail-soft + success-rate math + pending-outcomes
+- `test_pattern_matcher.py` (8 tests): find_similar + pgvector RPC args + fail-soft + format_for_prompt
+- `test_knowledge.py` (9 tests): RPC similarity + keyword fallback + error paths + format_for_prompt
+- `test_autonomy.py` (10 tests): 4 levels + no-rule default + cache + fail-safe + promotion-eligibility
+- `test_memory/test_store.py` (18 tests): per-source retrievals + aggregation + failure isolation + prompt formatting + RPC-falls-back-to-table
+- `test_e2e/test_foundation_loop.py` (5 tests): 7-stage order + load-before-run invariant + compose task_query targets copywriting + stage-failure isolation + client_id propagation
+
+**Confirmed behavioral invariants:**
+- `MemoryStore.retrieve_business_context` silent fallback to plain-table query when pgvector RPC raises — deliberate resilience choice, codified by dedicated test. Keep.
+- Foundation modules use async Supabase (`await self.db.table(...).execute()`); scout backends use sync. Dual-pattern is intentional and tests model both.
+- `knowledge_store.retrieve` NOT called during compose — Task 16.5 fix verified: compose pulls knowledge via `load_foundation`'s `task_query="cold outbound copywriting frameworks"`.
+
+New backlog item 75 filed for AutonomyGate cache invalidation edge case (not a Task 17 blocker; land before Plan 7 operator dashboard).
+
+Task 17 remaining: Part C (composer_backend.fetch_eligible_contacts — closes daemon compose stage gap from item 73) + Part D (operator-run live dry-run on real Supabase).
+
 ### 73. Task 16.6 approved — autonomous daemon + deferred post-deploy polish
 
 **Raised by:** Task 16.6 delivery + two-stage review (2026-04-22)
