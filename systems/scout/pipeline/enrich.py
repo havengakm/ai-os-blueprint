@@ -93,7 +93,7 @@ class EnrichStorageBackend(Protocol):
         - ``icp_score >= archive_floor``
         - ``first_name IS NOT NULL`` (identity resolved)
         - ``status NOT IN ('archived', 'archived_no_decision_maker', 'killed')``
-        - ``last_enriched_at IS NULL`` (not previously enriched this round)
+        - ``enriched_at IS NULL`` (not previously enriched this round)
 
         Caller-supplied limit caps batch size; ``None`` means no cap.
         """
