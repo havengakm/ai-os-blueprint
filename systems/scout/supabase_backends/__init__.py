@@ -25,14 +25,20 @@ from systems.scout.supabase_backends.identity import SupabaseIdentityBackend
 from systems.scout.supabase_backends.pull import SupabasePullBackend
 from systems.scout.supabase_backends.score import SupabaseScoreBackend
 from systems.scout.supabase_backends.screen import SupabaseScreenBackend
+from systems.scout.supabase_backends.trigify import (
+    SupabaseDiscoveryStorage,
+    SupabaseTrigifyMonitorStorage,
+)
 
 __all__ = [
     "SupabaseBudgetTracker",
     "SupabaseComponentStoreBackend",
     "SupabaseComposerBackend",
+    "SupabaseDiscoveryStorage",
     "SupabaseEnrichBackend",
     "SupabaseIdentityBackend",
     "SupabasePullBackend",
     "SupabaseScoreBackend",
     "SupabaseScreenBackend",
+    "SupabaseTrigifyMonitorStorage",
 ]
