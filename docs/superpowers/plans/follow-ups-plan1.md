@@ -515,6 +515,50 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 73. Task 16.6 approved — autonomous daemon + deferred post-deploy polish
+
+**Raised by:** Task 16.6 delivery + two-stage review (2026-04-22)
+**Severity:** Approved (3 important post-deploy + 5 minor polish items deferred)
+**File:** `aios/daemon/`, `scripts/run_daemon_once.py`, `Procfile`, `railway.toml`, `data/reference/sops/deployment.md`
+
+Task 16.6 shipped at worktree commits `74170f6` (initial) + `8fc37cb` (pre-deploy fixes). AIOS now has a long-running worker process (`python -m aios.daemon`) that runs the nightly pipeline per client via APScheduler. 39 new daemon tests (545 → 584 passed + 1 skipped).
+
+**Modules shipped:**
+- `aios/daemon/main.py` — `run_daemon()` top-level coroutine with SIGTERM/SIGINT handling
+- `aios/daemon/scheduler.py` — `NightlyScheduler` wraps `AsyncIOScheduler`, default cron `"0 2 * * *"` UTC (override via `AIOS_DAEMON_CRON`), job-exception isolation
+- `aios/daemon/client_worker.py` — `run_client_cycle` runs 7 stages in order (pull → score_v1 → screen → identity → enrich → score_v2 → compose) with per-stage try/except degraded-mode
+- `aios/daemon/adapter_factory.py` — builds per-client pull/identity/enrich orchestrators from `active_directories` + env API keys; unknown or missing-key adapters warned + skipped
+- `aios/daemon/client_registry.py` — `list_active_clients` queries `clients.status='active'`
+- `scripts/run_daemon_once.py` — CLI for one-shot local testing, exit codes 0/1/2
+
+**Pre-deploy fixes applied in 8fc37cb:**
+- Replaced deprecated `asyncio.get_event_loop()` with `get_running_loop()` (3.13-safe)
+- Consolidated Railway config — Procfile is canonical source of truth; `railway.toml [[services]]` block commented with forward-migration note
+
+**Compose stage intentionally stubbed.** `composer_backend.fetch_eligible_contacts` does not exist yet; daemon raises `NotImplementedError` caught by per-stage try/except, surfaces in logs + CLI exit code 1. Fixes in Task 17 or Plan 2 depending on scope decision.
+
+**Deferred important items (land in pre-Plan-2 hardening pass):**
+
+1. **`aios/daemon/client_registry.py:49-53` silent error swallow.** `list_active_clients` catches `Exception` and returns `[]` on Supabase failure. Result: "no clients active" and "DB on fire" look identical in logs. Fix: raise or emit distinct `extra={"alert": "db_unreachable"}` log; let scheduler-level catch handle it.
+
+2. **`aios/daemon/client_registry.py:98-108` private-attr reach-in.** `_get_shared_supabase(registry)` reads `pull_backend._client` directly. Fragile to backend refactoring. Fix: add public `registry.supabase_client` attribute in `aios/foundation/registry.py`; all backends read from single source.
+
+3. **`aios/daemon/main.py:181-186` unbounded shutdown wait.** `sched.shutdown(wait=True)` can block indefinitely if a job is mid-cycle; Railway's SIGKILL (default 30s) will cut in and leave in-flight writes mid-transaction. Fix: wrap in `asyncio.wait_for(..., timeout=60)` with a hard-kill fallback.
+
+**Deferred minor polish items:**
+
+4. **Compose stage `NotImplementedError` TODO comment.** Add inline comment linking to the backlog item for `composer_backend.fetch_eligible_contacts` (which becomes Task 17 or Plan 2 scope).
+
+5. **`tests/test_daemon/test_scheduler.py:66-70` APScheduler-internal coupling.** Tests call `job.func` directly. Would break on APScheduler 4.x if `func` renames. Acceptable for now; flag as fragile.
+
+6. **`aios/daemon/adapter_factory.py:57` hardcoded Clutch category.** `_DEFAULT_CLUTCH_CATEGORY = "agencies/digital-marketing"`. TODO present in code. Per-client override becomes Plan 7 scope when second client with different category lands.
+
+7. **`scripts/run_daemon_once.py:27-29` redundant sys.path manipulation.** `sys.path.insert(0, _REPO_ROOT)` unnecessary when invoked via `uv run`. Gate on `"aios" not in sys.modules` or remove.
+
+8. **Missing edge-case test: empty `stages=()` tuple.** `run_client_cycle` should return empty `ClientCycleResult`. One-line regression test.
+
+All deferred items are pre-Plan-2 hardening-pass targets. None blocks Task 17 e2e dry-run.
+
 ### 72. Task 16.5 approved — Scout as BaseSystem + deferred minor polish
 
 **Raised by:** Task 16.5 delivery + two-stage review (2026-04-22)
