@@ -1,12 +1,23 @@
 # Operations skills
 
-Skills agents (and operators) invoke to run the system day-to-day.
+Atomic skills for business operations: documentation, playbooks, sprint planning, task tracking. Every skill: one input → one output.
 
-## Planned skills (authored as the underlying code ships)
+## Planned atomic skills
 
-- `run-nightly-pipeline.md` — Scout daemon's main tick: advance all contacts through ready pipeline stages, log decisions, report tier distribution. (Plan 1 Task 16.6)
-- `diagnose-stuck-contact.md` — investigate why a single contact is stalled in its current status, explain inputs that failed, propose resolution. (Plan 1 Task 17)
-- `weekly-optimization-review.md` — Optimizer agent's weekly pass: analyse decision_log + outcomes, surface winners/losers per component + niche × offer, propose promotions for operator approval. (Plan 7)
-- `rerun-cool-off-contacts.md` — scheduler task: identify contacts whose 90d cool-off has elapsed, re-run enrich + score_v2, assign to next round's sequence. (Plan 2)
-- `pause-client.md` / `resume-client.md` — operator-invocable kill-switch + restore. (Plan 2)
-- `inspect-daemon-state.md` — "what is AIOS doing right now?" — operator query that walks the in-flight queues per agent. (Plan 2)
+- `write-sop.md`
+- `structure-documentation.md`
+- `build-playbook.md`
+- `plan-sprint.md`
+- `track-tasks.md`
+- `allocate-resources.md`
+- `run-quality-check.md`
+
+## Populated
+None yet.
+
+## Referenced by departments
+- `departments/operations.md` (primary home)
+
+## Note on scope (previously this folder)
+
+This folder previously scaffolded system-level RUNBOOKS for operating the AIOS itself (run-nightly-pipeline, diagnose-stuck-contact, weekly-optimization-review, rerun-cool-off-contacts, pause-client, resume-client, inspect-daemon-state). Those are multi-step procedures, not atomic skills. Their new home is `data/reference/sops/`: they get written as their owning plan tasks ship (Plan 1 Task 16.6, Plan 1 Task 17, Plan 2, Plan 7). Until then, the Scout agent manifest (`agents/scout.md`) continues to reference those planned paths; relocation happens when they are authored, not preemptively.

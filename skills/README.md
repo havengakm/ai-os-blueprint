@@ -1,118 +1,139 @@
-# AIOS Skills
+# AIOS Skills: Three-Tier Library
 
-Agent-runnable markdown procedures. Each skill is a step-by-step set of instructions an agent (or human operator) follows to accomplish a specific operational task.
+Everything the agent or an operator can invoke. Three tiers, one tree.
 
-## What goes here vs elsewhere
+## The three tiers
 
-| Location | Audience | Format | Purpose |
-|---|---|---|---|
-| `skills/` (here) | Agents + operators | Markdown with step-by-step imperative instructions | Unit of agent-executable work |
-| `data/reference/sops/` | Humans (operators, developers, new hires) | Prose-heavy markdown with context + rationale | Understanding the system |
-| `systems/*` | Python runtime | Code | The actual implementation an agent calls |
-| `agents/*` | Operators | YAML manifest with inline comments | Who does what (persona + responsibilities) |
-| `.claude/commands/` | Claude Code users | Slash command definitions | Interactive shortcuts |
-| `.claude/skills/` | Claude Code agents | Claude-Code-native skill format | Skills the Skill tool can invoke |
+| Tier | Scope | Steps | Decisions | Human gates | Example |
+|---|---|---|---|---|---|
+| **Capability** | One input, one output, one job | 1 atomic step | None | No | `generate-cold-email` |
+| **Composite** | One batch orchestration | 3 to 8 capabilities chained | Linear | Rarely | `run-cold-outreach-campaign` |
+| **Playbook** | End-to-end workflow | Many, often branching | Branches on signals | Named checkpoints | `launch-new-niche` |
 
-**Rule of thumb:**
-- Skill = one unit of work an agent runs (compose a draft, classify a reply, run the weekly optimization pass).
-- SOP = the human-facing explanation of why the system works this way.
-- System = the code that executes the skill.
-- Agent = the named persona + schedule that invokes skills.
+Rule of thumb:
+- Fits on one page with zero branches: capability.
+- A sequence diagram with one path: composite.
+- A flowchart with branches and human gates: playbook.
+
+If a composite has more than 8 steps, branches on more than one condition, or pauses for human approval, it is a playbook.
 
 ## Folder structure
 
-- `operations/` — running the system day-to-day (run-nightly-pipeline, diagnose-stuck-contact, weekly-optimization-review)
-- `onboarding/` — setting up a new client (onboard-client, seed-knowledge-base, configure-trigify-monitors)
-- `authoring/` — creating or updating content (compose-draft, write-component-variant, score-offer-against-27-constraints)
-- `analysis/` — interpreting outputs (handle-reply, classify-objection, explain-scoring-decision)
+```
+skills/
+  meta/                      cross-cutting quality gates (atomic)
+  <15 capability categories>/  one folder per category (atomic, flat per-category)
+  composites/                multi-skill chains
+  playbooks/                 end-to-end workflows
+```
+
+The 15 atomic capability categories: `market-intelligence/`, `offer-positioning/`, `gtm/`, `outbound/`, `inbound/`, `copywriting/`, `sales/`, `customer-success/`, `data-analytics/`, `revops-automation/`, `finance/`, `legal/`, `operations/`, `admin/`, `brand/`.
+
+## What goes here vs elsewhere
+
+| Location | Format | Purpose |
+|---|---|---|
+| `skills/` (here) | Atomic capabilities, composites, playbooks | Everything invokable |
+| `rules/` | Global rule files | Guardrails every skill enforces |
+| `departments/` | Department manifests | Which skills each team activates |
+| `agents/` | Agent persona manifests | Named workers that run on a schedule |
+| `systems/` | Python code | The runtime that executes skills |
+| `data/reference/` | Human-facing system documentation | Specs, guides, deep explanations (not invokable) |
+| `data/knowledge/` | Knowledge base | Personal, company, expert facts skills read |
+
+`data/reference/sops/` is the home for **human-facing** system docs. `skills/playbooks/` is the home for **agent-invokable** workflows. A deep reference guide can link to a playbook and vice versa, but each file has one primary audience.
 
 ## Skill file convention
 
-Each skill is a markdown file named in kebab-case: `skills/operations/run-nightly-pipeline.md`.
-
-**The `description` field is a matcher.** When an agent decides which skill to invoke, it reads the description FIRST to determine relevance. A vague description = missed invocations or wrong-skill dispatches. Rules:
-
-- Lead with the CONCRETE ACTION (not the abstract topic). Good: "Advance all contacts through ready pipeline stages...". Bad: "Skill for pipeline management."
-- Include **when NOT to use** if the skill has a narrow trigger. E.g., "Explicit trigger only — do not invoke opportunistically."
-- If the skill should only fire on a specific command, say so in `when-to-use`.
-
-Source: Max (Trigify) webinar 2026-04-21 — "optimise that very first section that AI scans always."
-
-Suggested structure inside each skill:
+Every skill file (regardless of tier) uses this frontmatter:
 
 ```markdown
 ---
-name: Run nightly pipeline
-description: Advance all contacts through ready pipeline stages, log decisions, report tier distribution. Explicit daily trigger only — do not invoke opportunistically.
-when-to-use: Daily at 02:00 client timezone, or on-demand for a dry-run.
-trigger: Scheduler (Plan 1 Task 16.6) OR operator invocation via web app.
+name: generate-cold-email
+description: <concrete action; first sentence matters most for agent routing>
+tier: capability | composite | playbook
+category: <one of 15 categories; composites/playbooks may use a category or omit>
+tags: [outreach, sales, cold-email, writing]    # controlled vocabulary, see below
+input: <named inputs with types>
+output: <named outputs with shapes>
+requires_skills:                                 # other skills invoked at runtime
+  - skills/meta/validate-writing.md
+requires_tools: []                               # external APIs, MCPs, vendor CLIs
+references:                                      # docs and KB read but not invoked
+  - rules/global-writing-guardrails.md
+  - data/knowledge/experts/saraev/cold-email.md
+when-to-use: <explicit trigger or precondition>
+human_checkpoints: []                            # playbooks only: named pause points
 ---
 
-## Preconditions
-- ...
+# <skill-name>
 
-## Steps
-1. ...
-2. ...
+Follow rules/global-writing-guardrails.md.
 
-## Verification
-- ...
-
+## Purpose
+## Inputs
+## Steps  (capabilities)  |  Orchestration  (composites)  |  Phases  (playbooks)
+## Output
+## Quality gate
 ## Escalation
-- ...
 ```
 
-Skills get authored as the corresponding plan tasks are completed. Don't backfill empty skills; write them when the underlying code works.
+**Distinction that matters:**
+- `requires_skills` = skills invoked AT RUNTIME by this skill's procedure
+- `references` = docs, rules, KB files the skill READS for context
+- `requires_tools` = external tools (Instantly API, Trigify CLI, Supabase) the skill touches
 
-## Portability across client deployments
+Moving `skills/meta/validate-writing.md` from `references` to `requires_skills` makes the skill-to-skill dependency graph explicit; tooling (future) can traverse it.
 
-Every AIOS client inherits every skill. Customisation happens at the `context/` + `client_config` + niche-specific YAML-sequence level, not by forking skills per client. If a client legitimately needs a different procedure, the right move is usually a new autonomy gate or a niche-conditional step inside an existing skill, not a forked skill file.
+## Tag vocabulary
 
-See `docs/superpowers/decisions/2026-04-21-aios-as-autonomous-sdr.md` for the shared-foundation principle.
+Tags are orthogonal to category folders. One skill has one category (its folder) but can have 2 to 5 tags spanning multiple domains. Controlled list:
 
-## Library scope — grows with AIOS systems
+**Domain tags** (pick at least one):
+`outreach, sales, marketing, content, brand, research, ops, finance, legal, admin, analytics, revops, positioning, gtm, meta`
 
-AIOS spans multiple systems per `CLAUDE.md` (Scout / Beacon / Optimizer / Content OS / Ads / Landing Page OS / etc.). The skill library grows as each system ships. Skills are authored alongside the code that implements them, NEVER preemptively.
+**Function tags** (pick 1 to 3 if useful):
+`cold-email, linkedin, email, writing, sequencing, classification, reply-handling, personalisation, quality-gate, integration, scraping, enrichment, scoring, segmentation, reporting, forecasting`
 
-Reference library for inspiration (inspired by the mature agency library Kirsten shared 2026-04-21):
+Add a new tag to this list only when a second skill would use it. Don't invent one-off tags.
 
-### Scout + Beacon + Optimizer (Plan 1 + 2 + 7 — in or near scope)
+## The description field is a matcher
 
-- **Authoring:** compose-draft, write-component-variant, copywriting, copy-editing, brand-guidelines, email-sequence, score-offer-27-constraints, write-yaml-sequence
-- **Analysis:** handle-reply, classify-objection, explain-scoring-decision, explain-composition-decision, competitor-intel, memory-recall, revenue-analysis, weekly-report-narrative, ab-test-setup, analytics-tracking
-- **Operations:** run-nightly-pipeline, diagnose-stuck-contact, weekly-optimization-review, rerun-cool-off-contacts, pause-client, resume-client, inspect-daemon-state
-- **Onboarding:** onboard-client, onboarding-cro, seed-knowledge-base, configure-trigify-monitors, configure-client-offer, configure-channel-stack, verify-deployment
+When an agent picks a skill, it reads the `description` first. Lead with the concrete action. Include when NOT to use if the trigger is narrow. Source: Max (Trigify) webinar 2026-04-21: "optimise that very first section that AI scans always."
 
-### Content OS (future system — not yet planned)
+## Content-producing skills must
 
-Blog writing + SEO + content marketing. Candidate skills: `blog-research`, `blog-outline`, `blog-write`, `blog-status`, `schema-markup`, `programmatic-seo`, `linear-blog` (for Linear content roadmap integration), `marketing-psychology`, `marketing-ideas`.
+1. Include `rules/global-writing-guardrails.md` in `references`.
+2. Include the line `Follow rules/global-writing-guardrails.md.` near the top of the body.
+3. Include `skills/meta/validate-writing.md` in `requires_skills`.
+4. Invoke `validate-writing` on output before returning.
 
-### Ads system (future — per CLAUDE.md)
+Grep check: `grep -L "rules/global-writing-guardrails.md" skills/outbound/*.md skills/inbound/*.md skills/copywriting/*.md` must return nothing.
 
-Paid acquisition across Meta / Google / LinkedIn Ads. Candidate skills: `paid-ads`, `launch-strategy`, `audience-research`, `creative-iteration`, `ad-performance-analysis`.
+## When to author a new skill
 
-### Landing Page OS (future)
+Three signals:
+1. A concrete, repeatable unit of work happens more than once.
+2. Code or infrastructure exists that the skill relies on.
+3. A department manifest, composite, playbook, or agent will reference it.
 
-Conversion-rate optimisation for landing pages, popups, paywalls, forms. Candidate skills: `page-cro`, `popup-cro`, `paywall-upgrade-cro`, `form-cro`, `saved-search-cro`, `free-tool-strategy`, `frontend-design`.
+Don't backfill empty skills. Mark the category README "populated" when authored.
 
-### Distribution systems (future)
+## Productised library, per-deployment activation
 
-Post-launch growth mechanics. Candidate skills: `referral-program`, `employee-advocacy`, `customer-success`, `ceo-proactive` (for operator-level strategic tasks).
+Every AIOS deployment inherits the full `skills/` library and `rules/`. Client deployments activate a subset via their own `departments/` manifests. Customisation stays in `context/` and `data/knowledge/`. Never fork a skill per client.
 
-### Cross-system skills
+## Gooseworks alignment
 
-Skills invoked by multiple agents regardless of which system they belong to: `memory-recall`, `brand-guidelines`, `analytics-tracking`, `pricing-strategy`. These sit in their natural role-based folder but get referenced by multiple agents' manifests.
+The three-tier model (capability / composite / playbook) is adapted from the public Gooseworks skills catalog, which ships 108 skills in these tiers. Folder-per-skill (their SKILL.md + skill.meta.json convention) and CLI installer tooling are deliberately NOT adopted yet; revisit at ~50 skills or when the first client-deployment provisioning script is needed.
 
-## Skill ownership via agent manifests
+## Legacy folders
 
-Each agent's manifest (`agents/{name}.md`) declares which skills it invokes. Scout's skills appear in `agents/scout.md`; Beacon's will appear in `agents/beacon.md` when Plan 2 ships; each channel module's skills in its own manifest. One skill CAN be invoked by multiple agents (e.g., `memory-recall` is Scout + Beacon + Optimizer). That's expected — skills are the reusable units, agents compose them.
+`skills/onboarding/`, `skills/authoring/`, `skills/analysis/` remain from earlier scaffolding. They describe planned system-level runbooks that are actually playbooks by the new taxonomy. Relocation to `skills/playbooks/` happens when each is authored; `agents/scout.md` still references their old paths until then.
 
-## When to add a new skill
+## Source
 
-Three signals that it's time:
-
-1. A **concrete, repeatable task** that happens more than once (compose a draft, handle a reply, explain a scoring decision).
-2. Code or infrastructure exists that implements it (don't author skills for features we haven't built).
-3. An **agent manifest will reference it** (if no agent needs it, it probably doesn't belong as a skill — could be an SOP or just docs).
-
-When you add a skill, update the relevant agent manifest to list it, and update the subfolder's README to remove the "planned" tag and replace with a link to the actual file.
+- Atomic taxonomy (15 categories): Kirsten's direction 2026-04-22.
+- Writing guardrails: Kirsten's direction 2026-04-22.
+- Three-tier model: adapted from Gooseworks skills catalog, analysed 2026-04-22.
+- Portability principle: `docs/superpowers/decisions/2026-04-21-aios-as-autonomous-sdr.md`.
