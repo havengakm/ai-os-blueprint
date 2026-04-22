@@ -515,6 +515,23 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 69. Task 16b Step 2 approved — DI + SystemRegistry + pipeline router shipped
+
+**Raised by:** Task 16b Step 2 review (2026-04-22)
+**Severity:** Approved (minor cosmetic items only)
+**File:** `aios/foundation/registry.py`, `api/deps.py`, `api/routers/pipeline.py`, `systems/scout/pipeline/enrich.py`
+
+Task 16b Step 2 shipped at worktree commit `c9c0c62`. All 5 Item 65 action items landed (S1 single DI provider, S2 SystemRegistry singletons, S3 opt-in smoke test, S4 single-writer docstrings in 5 places, S5 Protocol docstring fix). 4 design calls all approved. Full suite 523/523 + 1 skipped smoke test.
+
+**Residual cosmetic cleanup (pre-existing, not introduced in Step 2):**
+
+- `systems/scout/pipeline/enrich.py:124` — `update_contact_enrich_data` Protocol docstring says "stamp `last_enriched_at`" (pre-existing drift; Supabase backend correctly writes to `enriched_at`)
+- `systems/scout/pipeline/enrich.py:435` — `_utc_now_iso` helper docstring: "ISO-8601 UTC timestamp for `last_enriched_at`"
+
+Not a regression; S5 fix only addressed the eligibility-filter docstring at line 96. Bundle these two with Task 16b Step 3 cleanup OR any natural future touch of `enrich.py`.
+
+**Implementer inaccuracy (worth noting, no code fix):** claimed 19 new tests in test_api/; reviewer found actual pass count is 26 (pre-existing health/middleware tests already present). More coverage, not less.
+
 ### 68. Task 1.5.9c approved — Trigify discovery pipeline complete end-to-end
 
 **Raised by:** Task 1.5.9c review (2026-04-22)
