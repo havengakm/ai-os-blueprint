@@ -1,4 +1,4 @@
-"""Scout outreach package — component registry + research selector + (future) composer/render stack."""
+"""Scout outreach package — component registry + research selector + composer."""
 from systems.scout.outreach.component_store import (
     ComponentStore,
     ComponentStoreBackend,
@@ -7,6 +7,14 @@ from systems.scout.outreach.component_store import (
     VALID_COMPONENT_TYPES,
     VALID_STATUSES,
 )
+from systems.scout.outreach.composer import (
+    AD_ACTIVITY_DIRECTORIES,
+    Composer,
+    ComposedDraft,
+    ComposerSkip,
+    ComposerStorageBackend,
+    DEFAULT_EPSILON,
+)
 from systems.scout.outreach.research import (
     DecisionLoggerProtocol,
     ResearchFills,
@@ -14,9 +22,15 @@ from systems.scout.outreach.research import (
 )
 
 __all__ = [
+    "AD_ACTIVITY_DIRECTORIES",
     "ComponentStore",
     "ComponentStoreBackend",
     "ComponentVariant",
+    "ComposedDraft",
+    "Composer",
+    "ComposerSkip",
+    "ComposerStorageBackend",
+    "DEFAULT_EPSILON",
     "DecisionLoggerProtocol",
     "ResearchFills",
     "ResearchSelector",

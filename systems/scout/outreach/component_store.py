@@ -70,6 +70,12 @@ class ComponentVariant:
 
     ``source_path`` is kept for operator error-reporting and is NOT
     persisted to the DB.
+
+    ``win_rate`` and ``sample_size`` are populated only when variants are
+    loaded FROM the DB (by the composer backend in Task 15). They stay at
+    their defaults (``None``, ``0``) on the sync path — ``_has_changed``
+    deliberately ignores them so operator YAML re-syncs never clobber
+    Plan 7 attribution data.
     """
 
     variant_key: str
@@ -81,6 +87,8 @@ class ComponentVariant:
     metadata: dict[str, Any] = field(default_factory=dict)
     ab_epsilon: float = 0.1
     source_path: str = ""
+    win_rate: float | None = None
+    sample_size: int = 0
 
 
 @dataclass

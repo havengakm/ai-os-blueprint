@@ -513,13 +513,15 @@ async def test_sync_preserves_learned_stats_on_update(tmp_path: Path) -> None:
     summary = await store.sync(client_id="c1")
 
     assert summary.updated == 1
-    # The update payload ComponentVariant does not carry win_rate /
-    # sample_size fields — assert they're not even attributes on it,
-    # so the backend physically cannot forward them.
+    # The sync path constructs ComponentVariant from YAML and never populates
+    # learned stats — the fields keep their defaults (None, 0). The backend
+    # mirrors production Supabase behaviour: update_variants only writes
+    # content/status/metadata/ab_epsilon and leaves the DB's win_rate /
+    # sample_size untouched (verified by the DB row assertion below).
     _, updates = backend.update_calls[0]
     _, payload = updates[0]
-    assert not hasattr(payload, "win_rate")
-    assert not hasattr(payload, "sample_size")
+    assert payload.win_rate is None
+    assert payload.sample_size == 0
 
     # And the DB row still holds the original learned stats.
     row = backend.get_row(
