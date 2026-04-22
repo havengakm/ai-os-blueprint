@@ -515,6 +515,19 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 60. Component registry — minor polish from Task 13 code review
+
+**Raised by:** Task 13 code-quality review (2026-04-22)
+**Severity:** Minor (all defer-worthy; loader shipped approved)
+**File:** `systems/scout/outreach/component_store.py` + `tests/test_outreach/test_component_store.py`
+
+- **M2 (highest-leverage):** `ComponentVariant.source_path` is documented as "not persisted" but the Task 16 Supabase wire-up could accidentally serialize it via `dataclasses.asdict(v)`. Defence options: prefix `_source_path`, use `dataclasses.field(metadata={"persist": False})`, or add explicit docstring warning on `insert_variants`/`update_variants`. Pick one when writing the real SupabaseComponentBackend in Task 16.
+- **M4:** `_has_changed` doesn't normalize `existing.get("metadata")` if the backend returns `None`. Add one-liner `existing_meta = existing.get("metadata") or {}` as defence-in-depth. Won't fire today (schema has `NOT NULL DEFAULT '{}'`) but belts-and-braces for Task 16 wire-up.
+- **M3:** `test_sync_skips_invalid_component_type` couples the VALID_* enum check with the folder-mismatch check. Cleaner: put the invalid YAML in a VALID folder so the enum check fires first in isolation. Rename to clarify intent.
+- **M6:** `test_sync_skips_missing_required_field` uses `str.replace` on `_BASELINE_YAML` which silently no-ops if the baseline is edited. Build the dict-then-dump or drop a different required field for a second data point.
+
+Bundle with Task 16 Supabase backend work (natural touchpoint for M2 + M4). M3 + M6 are test-only cosmetics — do during the next broader test cleanup.
+
 ### 52. EnrichStage — polish items from code review
 
 **Raised by:** Task 12d code-quality review (2026-04-21)
