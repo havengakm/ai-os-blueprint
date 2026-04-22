@@ -31,8 +31,16 @@ restartPolicyMaxRetries = 3
 # active clients and runs the nightly pipeline. Uses the same build +
 # env as the web service. Daemon-level dry-run: set AIOS_DAEMON_DRY_RUN=true
 # in env. Override cron via AIOS_DAEMON_CRON (default "0 2 * * *" UTC).
-
-[[services]]
-name = "scout-daemon"
-startCommand = "uv run python -m aios.daemon"
-restartPolicyType = "always"
+#
+# Canonical source of truth for the daemon is the `worker:` line in the
+# repo-root `Procfile` (Nixpacks picks this up reliably). The `[[services]]`
+# array below is the Railway v2 multi-service schema and is NOT universally
+# picked up today — leaving it active alongside the Procfile caused the
+# daemon service to silently not materialise on first deploy during Task
+# 16.6 code review. Kept commented out as a forward-migration reference for
+# when Railway's v2 schema is GA.
+#
+# [[services]]
+# name = "scout-daemon"
+# startCommand = "uv run python -m aios.daemon"
+# restartPolicyType = "always"

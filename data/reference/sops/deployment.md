@@ -144,11 +144,44 @@ Companion SOPs:
 - **Repeated healthcheck failures:** stop the service, inspect logs, fix
   locally before redeploying. Do not loop Railway restart policy.
 
+## Multi-service config (web + scout-daemon)
+
+AIOS deploys as two Railway services from a single repo: the `web` FastAPI
+app (public pipeline endpoints) and the `worker` Scout daemon (nightly
+pipeline). Source-of-truth rules:
+
+- **`Procfile` at repo root is canonical.** Railway's Nixpacks builder reads
+  every line (`web:`, `worker:`) and spawns one service per line. Edit the
+  Procfile when adjusting start commands or adding a new long-running
+  process.
+- **`railway.toml [[services]]` is commented out.** During Task 16.6 review
+  we confirmed that running both sources at once caused the worker to
+  silently not materialise on first deploy while the web service reported
+  success. The `[[services]]` array is the Railway v2 multi-service schema,
+  not uniformly GA, and is kept in the file only as a forward-migration
+  reference. Do not uncomment without re-testing end-to-end.
+- **`railway.toml [build]` + `[deploy]` still apply** — they govern the
+  builder, build command (Playwright install), healthcheck path, and the
+  default/primary service's deploy policy.
+
+**Verify both services materialise after first deploy:**
+
+1. Railway CLI: `railway service list` → expect entries for both `web` and
+   `worker` (names come from the Procfile keys).
+2. Railway dashboard: project → Services pane → confirm two tiles, each
+   with a green "Deployed" status.
+3. Logs check — `web` service logs should show `Uvicorn running on ...`;
+   `worker` service logs should show `daemon startup cron=... dry_run=...
+   env=...` (emitted by `aios.daemon.main.run_daemon`).
+4. If `worker` is missing: check that Nixpacks detected the Procfile (build
+   logs will mention "Using Procfile"). If not, force a fresh build
+   (Railway → Deployments → Redeploy without cache).
+
 ## Automation
 
-- **Task 16.6 (pending):** adds the Scout daemon as a second Railway service
-  via a `[[services]]` section in `railway.toml`. Placeholder is commented in
-  the file. The daemon will run the nightly pipeline unattended.
+- **Task 16.6 (shipped):** Scout daemon runs as the `worker:` process in
+  `Procfile`. Nightly cycle iterates every active client. See "Multi-service
+  config" above for deploy verification.
 - **Task 17 (pending):** end-to-end dry-run validates the full pipeline
   post-deploy as part of CI before promoting a release.
 - **Not automated:** Supabase project creation, migration application, per-client
@@ -157,3 +190,6 @@ Companion SOPs:
 ## Change log
 
 - v1.0 — 2026-04-22 — initial. Closes backlog item 19 (Playwright install on Railway).
+- v1.1 — 2026-04-22 — add "Multi-service config" section clarifying Procfile is
+  canonical (Task 16.6 pre-deploy review fix); `[[services]]` in railway.toml
+  is commented out as forward-migration reference.

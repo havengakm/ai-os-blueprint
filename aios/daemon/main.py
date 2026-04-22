@@ -187,9 +187,15 @@ async def run_daemon(
 
 
 def _install_signal_handlers() -> asyncio.Event:
-    """Install SIGTERM / SIGINT handlers that set the returned Event."""
+    """Install SIGTERM / SIGINT handlers that set the returned Event.
+
+    Must be called from inside a running event loop. ``run_daemon`` is always
+    entered via ``asyncio.run(...)`` so a loop is guaranteed. We use
+    ``get_running_loop()`` rather than the deprecated ``get_event_loop()``
+    (removed-in-future, warns on Python 3.13 which is the Railway runtime).
+    """
     event = asyncio.Event()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _handler(signame: str) -> None:
         logger.info("daemon received %s; setting shutdown event", signame)
