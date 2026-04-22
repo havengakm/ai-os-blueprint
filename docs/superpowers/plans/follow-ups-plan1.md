@@ -515,6 +515,24 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 61. Research selector — polish from Task 14 code review
+
+**Raised by:** Task 14 code-quality review (2026-04-22)
+**Severity:** Suggestion (all defer-worthy; selector shipped merge-ready — "best single-module submission in Task 12-14 window")
+**File:** `systems/scout/outreach/research.py` + `tests/test_outreach/test_research.py`
+
+Two Important (but non-blocking) + ~8 Minor. Bundle into next natural touch of `research.py` (Task 15 composer wire-up).
+
+- **I1 (TRIGGER_HOOK_MAX_RECENCY_DAYS=90 cross-module alignment):** Not drift — matches `claude_deep_research.py:450`'s `has_active_buying_signal` cutoff. Keep 90, don't tighten to 60. Add one-line comment at `research.py:57` explaining the alignment. Consider extracting to shared `systems/scout/enrich/constants.py` if a 3rd callsite emerges.
+- **I2 (DecisionLoggerProtocol kwarg-only narrowing):** Protocol uses `*,` to force kwargs; real `DecisionLogger.log_decision` allows positional-or-keyword. All callsites use kwargs today, no runtime breakage. Either remove the `*` for symmetry with real class, or leave stricter contract. Judgement call.
+- **M3:** Add one-line to `_append_audit` docstring explaining dedup key is `(placeholder, source)` so Plan 7 can attribute reply-rate deltas per placeholder-source pair without double-counting.
+- **M5:** Missing test — undated firmographic event + stale (120d) firmographic → undated wins because stale dropped by 90d cutoff. Currently implicit behavior, lock it in.
+- **M8:** Consider promoting `"component:"` prefix (used in `_append_passthrough` for cta source tagging) to a module constant when a 2nd callsite emerges (e.g. Plan 2 QA agent tagging passthroughs).
+- **M9:** Add one-line banner comment above the public-constants block: "The constants below are Plan 7 learning targets — exposed so the weight-learner can override them."
+- **M10:** Module docstring says "reads `contact.research_data`" (attribute syntax); code uses `contact["research_data"]` (dict subscript). Nitpick clarity — contacts are dicts throughout the pipeline.
+
+All are polish. Bundle with Task 15 work when composer integrates with research selector.
+
 ### 60. Component registry — minor polish from Task 13 code review
 
 **Raised by:** Task 13 code-quality review (2026-04-22)
