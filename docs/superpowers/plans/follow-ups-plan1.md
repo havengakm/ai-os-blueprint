@@ -515,6 +515,32 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 62. Composer — minor polish from Task 15 code review + ComponentVariant invariant enforcement
+
+**Raised by:** Task 15 spec + code review (2026-04-22)
+**Severity:** Mix — one Task 16 acceptance criterion (must-do), rest are minor polish
+**Files:** `systems/scout/outreach/composer.py`, `component_store.py`, `tests/test_outreach/test_component_store.py`
+
+Two Important items already amended at worktree commit `87a3a39` (dry_run forwarding test + COMPONENT_TYPES_ORDERED re-export). These are the remaining polish + the one load-bearing Task 16 gate.
+
+**Task 16 acceptance criterion (MUST DO before merging Task 16):**
+
+- **ComponentVariant learned-stats invariant** — Task 15 added optional `win_rate: float | None = None` and `sample_size: int = 0` fields to `ComponentVariant` so the composer can bandit-score variants read from DB. This weakens Task 13's original structural guarantee (update_variants couldn't clobber learned stats because the dataclass didn't have the fields). Replaced with a documented-contract guarantee. **Task 16's Supabase `update_variants` implementation MUST build its UPDATE SET clause from an explicit allow-list of columns (`variant_content`, `status`, `metadata`, `ab_epsilon`)** — NOT from `dataclasses.asdict(v)` or a generic field-iterator. If a naive impl does `UPDATE ... SET win_rate = $N, sample_size = $M`, it will silently clobber Plan 2 attribution data.
+- **Add a dedicated Task 16 test:** call `update_variants` with a crafted `ComponentVariant(win_rate=0.99, sample_size=999)` and assert the DB row's win_rate/sample_size are unchanged after sync.
+- **Optional tightening of Task 13 test:** `test_sync_preserves_learned_stats_on_update` currently checks the DB row (softer than the original "attributes don't exist on payload" check). Consider adding a FakeBackend allow-list assertion on the `update_variants` call so structural enforcement also lives in the fake.
+
+**Remaining polish (Minor, defer-worthy):**
+
+- **M3:** `_humanize_platforms` dedup loop variable named `seen` but used as output accumulator — rename to `out` for consistency with `_dedup_preserve_order`.
+- **M4:** `_render_template` mutates `fills_missing` via closure; consider returning `tuple[str, list[str]]` instead for functional clarity.
+- **M5:** `_stringify` uses `str(value)` on arbitrary `contact["company"]` types. If value is ever a dict (shouldn't be per contract but no upstream guard visible), body gets `"{'name': 'Acme'}"` embedded. Tighten to `isinstance(value, str)` + empty-fallback, or document the contract in the docstring.
+- **M6:** `ComposerSkip.reason` strings use ad-hoc `f"no_variants_for:{component_type}"` format with `:` separator. Plan 7 attribution may need to parse these — consider a reason-code enum or module-level constant tuple for skip reasons.
+- **M7:** Subject truncation for decision_log `decision` field uses `subject[:60]` — may truncate mid-character-class. Use `subject[:60].rstrip() + "..."` on truncation if readability matters in the audit log.
+- **M8:** `test_bandit_no_win_rate_data_random_tiebreak` uses up to 50 seeds trying to diversify. Cleaner: mock `rng.choice` to return the second element deterministically, assert it was selected. Future maintainers will find the current seed-sweep approach confusing.
+- **M9:** `_score` tuple comparison assumes `variant.win_rate` is `float | None`. If Supabase driver returns `Decimal` (as `_has_changed` wary-guards for `ab_epsilon`), tuple comparison across types may surprise. Protocol docstring on `fetch_approved_variants` should explicitly require `win_rate: float | None` (Decimal coerced backend-side), mirroring how `insert_variants` already calls out DB-side defaults.
+
+Bundle M3-M9 into a single polish commit when next touching composer.py — ideally during Task 16 Supabase backend wire-up (which is the natural touch point for M9 Decimal handling anyway).
+
 ### 61. Research selector — polish from Task 14 code review
 
 **Raised by:** Task 14 code-quality review (2026-04-22)
