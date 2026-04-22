@@ -217,6 +217,33 @@ def test_build_registry_logs_info_on_success(caplog):
 
 
 # ---------------------------------------------------------------------------
+# get_scout_system — singleton + unhashable-registry regression
+# ---------------------------------------------------------------------------
+
+
+def test_get_scout_system_returns_singleton_without_dependency_overrides(deps_env):
+    """Regression: ``get_scout_system()`` called directly (NO
+    ``app.dependency_overrides`` short-circuit) must return the same
+    instance twice and must NOT raise ``TypeError: unhashable type``.
+
+    Guards against a previous bug where ``_get_scout_system_cached`` was
+    ``@lru_cache``d on a ``SystemRegistry`` argument — but ``SystemRegistry``
+    is an unfrozen ``@dataclass`` (``__hash__ = None``), so the first real
+    call would raise. Tests missed it because they hit the
+    ``dependency_overrides`` path instead.
+    """
+    deps_mod, _ = deps_env
+    # Reset the scout-system cache so the test starts clean.
+    deps_mod._scout_system_singleton.cache_clear()
+
+    a = deps_mod.get_scout_system()
+    b = deps_mod.get_scout_system()
+    assert a is b  # singleton
+
+    deps_mod._scout_system_singleton.cache_clear()
+
+
+# ---------------------------------------------------------------------------
 # Single-writer documentation (Item 65 S4)
 # ---------------------------------------------------------------------------
 

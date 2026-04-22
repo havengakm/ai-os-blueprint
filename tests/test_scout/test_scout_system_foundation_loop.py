@@ -2,11 +2,14 @@
 
 Each ``run_<stage>`` method on ScoutSystem must wrap the inner pipeline
 stage with the mandatory foundation-loop calls (load_foundation →
-check_autonomy → find_similar_decisions → retrieve_knowledge[compose only])
-BEFORE dispatching to the inner orchestrator. These tests assert call
-ordering, args, and method-specific behaviour (knowledge retrieval only
-fires for compose; compose fans out per-contact with the existing render
-response shape).
+check_autonomy → find_similar_decisions) BEFORE dispatching to the
+inner orchestrator. Knowledge pulling is uniform across stages: the
+``task_query`` passed to ``load_foundation`` drives the similarity
+search in ``memory_store.load_full_context`` and populates
+``foundation_context['relevant_knowledge']`` — no separate
+``retrieve_knowledge`` call per stage. These tests assert call ordering,
+args, and method-specific behaviour (compose fans out per-contact with
+the existing render response shape).
 """
 from __future__ import annotations
 
@@ -155,8 +158,12 @@ class _StubComposer:
 
 
 @pytest.mark.asyncio
-async def test_run_compose_invokes_knowledge_retrieval():
-    """retrieve_knowledge MUST fire for compose (only stage where it does)."""
+async def test_run_compose_task_query_targets_copywriting_knowledge():
+    """Compose uses a copywriting-framework-targeted ``task_query`` —
+    ``memory_store.load_full_context`` runs the similarity search and
+    populates ``foundation_context['relevant_knowledge']``. No separate
+    ``retrieve_knowledge`` call fires (same uniform 3-prime pattern as
+    every other stage)."""
     from systems.scout.outreach.composer import ComposedDraft
 
     draft = ComposedDraft(
@@ -174,14 +181,15 @@ async def test_run_compose_invokes_knowledge_retrieval():
     await scout.run_compose("c1", [{"contact_id": "X"}], dry_run=True)
 
     scout.memory.load_full_context.assert_awaited_once()
+    load_kwargs = scout.memory.load_full_context.call_args.kwargs
+    assert load_kwargs["client_id"] == "c1"
+    query_lower = load_kwargs["task_query"].lower()
+    assert "copywriting" in query_lower or "outbound" in query_lower
+
     scout.autonomy.check.assert_awaited_once_with("c1", "render_draft")
     scout.patterns.find_similar.assert_awaited_once()
-    scout.knowledge.retrieve.assert_awaited_once()
-    # Query should include a copywriting-framework reference
-    retrieve_kwargs = scout.knowledge.retrieve.call_args.kwargs
-    assert retrieve_kwargs["client_id"] == "c1"
-    assert "copywriting" in retrieve_kwargs["query"].lower() \
-        or "outbound" in retrieve_kwargs["query"].lower()
+    # Uniform behaviour: compose no longer special-cases knowledge retrieval
+    scout.knowledge.retrieve.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -232,7 +240,8 @@ async def test_run_compose_empty_contacts_still_invokes_foundation():
     result = await scout.run_compose("c1", [], dry_run=True)
 
     scout.memory.load_full_context.assert_awaited_once()
-    scout.knowledge.retrieve.assert_awaited_once()
+    # Knowledge comes via load_foundation's task_query, not a separate call
+    scout.knowledge.retrieve.assert_not_awaited()
     assert result["total_eligible"] == 0
     assert result["total_composed"] == 0
     assert result["total_skipped"] == 0

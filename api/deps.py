@@ -163,13 +163,17 @@ def get_trigify_discovery_storage() -> Any:
 def get_scout_system() -> ScoutSystem:
     """ScoutSystem wired to production backends via the registry.
 
-    Memoised per-registry-instance (the registry itself is ``lru_cache``d,
-    so ``from_registry`` is called at most once per process). Tests
-    override this via ``app.dependency_overrides`` to inject mocks.
+    Process-singleton — ``from_registry`` runs at most once per process.
+    Uses a zero-arg cache (rather than ``@lru_cache`` keyed on the
+    registry instance) because ``SystemRegistry`` is an unfrozen
+    ``@dataclass`` and therefore unhashable: keying on it would raise
+    ``TypeError`` on the first real call. ``get_registry`` is already a
+    process-singleton upstream, so one cache is enough. Tests override
+    this via ``app.dependency_overrides`` to inject mocks.
     """
-    return _get_scout_system_cached(get_registry())
+    return _scout_system_singleton()
 
 
 @lru_cache(maxsize=1)
-def _get_scout_system_cached(registry: SystemRegistry) -> ScoutSystem:
-    return ScoutSystem.from_registry(registry)
+def _scout_system_singleton() -> ScoutSystem:
+    return ScoutSystem.from_registry(get_registry())

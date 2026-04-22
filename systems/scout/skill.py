@@ -19,9 +19,12 @@ Two entry points live here:
    pipeline HTTP router and the Scout daemon. Each ``run_<stage>`` wraps
    the corresponding inner orchestrator with the full foundation loop
    (load_foundation → check_autonomy → find_similar_decisions →
-   retrieve_knowledge[compose only] → dispatch). Per-contact decisions
-   are logged by the inner orchestrators; the Scout wrapper does NOT
-   double-log at stage level.
+   dispatch). Knowledge retrieval is uniform across stages: expert
+   content is pulled in via ``memory_store.load_full_context`` inside
+   ``load_foundation``, keyed on the stage-specific ``task_query``
+   (e.g. "cold outbound copywriting frameworks" for compose). Per-contact
+   decisions are logged by the inner orchestrators; the Scout wrapper
+   does NOT double-log at stage level.
 """
 from __future__ import annotations
 
@@ -149,11 +152,14 @@ class ScoutSystem(BaseSystem):
         decision_type: str,
         context_label: str,
     ) -> None:
-        """Run the first three foundation calls (load → autonomy → similar).
+        """Run the three foundation calls (load → autonomy → similar).
 
-        Shared by every ``run_<stage>``. Knowledge retrieval is stage-specific
-        and stays in the caller — only compose retrieves knowledge, the rest
-        skip it to avoid wasting tokens.
+        Shared by every ``run_<stage>``. Knowledge comes in via
+        ``load_foundation`` — ``memory_store.load_full_context`` runs a
+        similarity search on ``task_query`` and populates
+        ``foundation_context['relevant_knowledge']``. No separate
+        ``retrieve_knowledge`` call needed: the stage-specific
+        ``task_query`` is the steering wheel.
         """
         await self.load_foundation(client_id, task_query=task_query)
         await self.check_autonomy(client_id, action_type=decision_type)
@@ -177,11 +183,19 @@ class ScoutSystem(BaseSystem):
     ) -> Any:
         """Dispatch the pull stage with the mandatory foundation loop.
 
-        The ``limit`` parameter is accepted for API parity with other stages
-        but NOT forwarded: ``PullOrchestrator.run`` uses
-        ``max_companies_per_source`` instead. Callers that need per-source
-        caps should invoke the orchestrator directly (daemon path).
+        The ``limit`` parameter is accepted for API parity with other
+        stages but NOT forwarded: ``PullOrchestrator.run`` does not
+        accept ``limit``. Use ``max_companies_per_source`` on the
+        orchestrator instead (daemon path) to cap the batch size. When
+        a caller passes ``limit``, a debug log surfaces the silent-drop
+        so it isn't mistaken for an enforced cap.
         """
+        if limit is not None:
+            logger.debug(
+                "run_pull received limit=%s but PullOrchestrator doesn't accept limit; "
+                "use source-level `max_companies_per_source` to cap batch size",
+                limit,
+            )
         logger.info("scout.run_pull start client=%s dry_run=%s", client_id, dry_run)
         await self._prime_foundation(
             client_id,
@@ -286,30 +300,26 @@ class ScoutSystem(BaseSystem):
         ``ComposedDraft``), and returns the /api/pipeline/render response
         shape.
 
-        Knowledge retrieval fires here (and only here) — expert copywriting
-        frameworks (Sapp / Saraev / Hormozi) are loaded into
-        ``foundation_context`` so future composer iterations can consume
-        them. The current ``Composer.compose`` signature does not accept
-        a ``knowledge`` kwarg, so retrieved knowledge is observed rather
-        than passed through; the call stays for observability and to keep
-        the foundation-loop contract uniform across stages.
+        Knowledge pulling is uniform with every other stage: the
+        ``task_query`` ("cold outbound copywriting frameworks") passed to
+        ``load_foundation`` drives the similarity search inside
+        ``memory_store.load_full_context``, which populates
+        ``foundation_context['relevant_knowledge']``. ``Composer.compose``
+        does not currently consume that field — the populated context is
+        observational until composer is wired to consume it.
         """
+        from systems.scout.outreach.composer import ComposerSkip
+
         logger.info(
             "scout.run_compose start client=%s dry_run=%s contacts=%d",
             client_id, dry_run, len(contacts),
         )
         await self._prime_foundation(
             client_id,
-            task_query="render stage — compose outbound drafts",
+            task_query="cold outbound copywriting frameworks",
             decision_type="render_draft",
             context_label="render stage run",
         )
-        await self.retrieve_knowledge(
-            client_id,
-            query="cold outbound copywriting frameworks",
-            source=None,
-        )
-        logger.debug("scout.run_compose knowledge primed client=%s", client_id)
 
         composer = self._composer_factory()
         composed: list[dict[str, Any]] = []
@@ -317,7 +327,7 @@ class ScoutSystem(BaseSystem):
         for contact in contacts:
             outcome = await composer.compose(client_id, contact, dry_run=dry_run)
             payload = _to_json(outcome)
-            bucket = skipped if type(outcome).__name__ == "ComposerSkip" else composed
+            bucket = skipped if isinstance(outcome, ComposerSkip) else composed
             bucket.append(payload)
         return {
             "client_id": client_id,

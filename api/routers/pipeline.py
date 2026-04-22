@@ -21,8 +21,10 @@ Endpoints now dispatch through ``ScoutSystem`` (via
 ``api.deps.get_scout_system``) rather than constructing stages per
 request. ``ScoutSystem.run_<stage>`` wraps each inner orchestrator with
 the mandatory foundation loop (load_foundation → check_autonomy →
-find_similar_decisions → retrieve_knowledge[render only]) before
-dispatching. Stage construction lives in ``ScoutSystem.from_registry``.
+find_similar_decisions) before dispatching. Expert knowledge is pulled
+in via the stage-specific ``task_query`` inside ``load_foundation`` —
+no separate retrieve_knowledge call per stage. Stage construction
+lives in ``ScoutSystem.from_registry``.
 """
 from __future__ import annotations
 
