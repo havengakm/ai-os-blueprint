@@ -515,6 +515,32 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 72. Task 16.5 approved — Scout as BaseSystem + deferred minor polish
+
+**Raised by:** Task 16.5 delivery + two-stage review (2026-04-22)
+**Severity:** Approved (4 minor polish items deferred)
+**File:** `systems/scout/skill.py`, `api/deps.py`, `api/routers/pipeline.py`
+
+Task 16.5 shipped at worktree commits `66a241c` (initial) + `66709f0` (review fixes). Scout pipeline is now a BaseSystem dispatcher — each of the 6 stage methods (`run_pull/score/screen/identity/enrich/compose`) calls `load_foundation → check_autonomy → find_similar_decisions` before dispatching the inner orchestrator. Pipeline router refactored to dispatch through ScoutSystem. 11 new scout tests + 1 deps regression test (545 passed, 1 skipped).
+
+**Review fixes applied in 66709f0:**
+- Critical: `api/deps.py` had `@lru_cache` keyed on unhashable `SystemRegistry` dataclass — would `TypeError` on first production request (masked by `dependency_overrides` in tests). Replaced with zero-arg `_scout_system_singleton()` that calls `get_registry()` inside the cache body. New regression test at `tests/test_api/test_deps.py::test_get_scout_system_returns_singleton_without_dependency_overrides` exercises the non-overridden path.
+- Important: `run_compose` was firing TWO knowledge retrievals per run (once via `load_foundation` → `load_full_context`, once via explicit `retrieve_knowledge`). Removed the second call; moved intent into `task_query="cold outbound copywriting frameworks"`. All 6 stages now use uniform 3-prime pattern.
+- Important: `type(outcome).__name__ == "ComposerSkip"` replaced with `isinstance(outcome, ComposerSkip)`.
+- Important: `run_pull(limit=...)` now `logger.debug`s when non-None limit arrives (PullOrchestrator doesn't accept limit; use `max_companies_per_source` at source-adapter level).
+
+**Deferred minor polish items (land in a future hardening pass):**
+
+1. **Duplicated `_to_json`** in `systems/scout/skill.py:403-413` and `api/routers/pipeline.py:73-77`. Both do the same `asdict if is_dataclass else passthrough` check. Drift risk if one ever adds `datetime` / `UUID` handling. Move to shared util (`aios/util/serialize.py` or `systems/scout/util.py`) when either side grows a type.
+
+2. **Stale comment block** at `systems/scout/skill.py:348-355` inside `handle()` — says "# 2. CHECK AUTONOMY / Different actions have different autonomy levels" but the surrounding code does no autonomy work. Clean up during the handle()-migration window (conversational interface is not yet wired).
+
+3. **Factory-freshness test** for `from_registry`. Current smoke test asserts factory types only; a stronger assertion would verify factories produce fresh instances per call (`assert scout._pull_factory() is not scout._pull_factory()`). Guards against someone refactoring the lambdas into stored attributes.
+
+4. **Factory-kwarg boilerplate** — 6 `xxx_stage_factory` kwargs + 6 `self._xxx_factory` attributes. Could collapse to `factories: dict[str, Callable] | None = None` with small schema. Minor; not load-bearing. Leave as-is unless a 7th stage lands.
+
+All 4 items are pure code-hygiene improvements. None blocks Task 16.6 (daemon) or Task 17 (e2e dry-run). Fold into the Plan 2 pre-launch hardening pass.
+
 ### 71. Task 16c approved — Railway deploy ready
 
 **Raised by:** Task 16c delivery (2026-04-22)
