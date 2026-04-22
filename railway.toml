@@ -27,10 +27,12 @@ healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-# Scout daemon service placeholder (Task 16.6, pending). When the daemon
-# ships, enable via a second [[services]] section:
-#
-# [[services]]
-# name = "scout-daemon"
-# startCommand = "uv run python -m aios.daemon"
-# restartPolicyType = "always"
+# Scout daemon service (Task 16.6). Long-running worker that iterates
+# active clients and runs the nightly pipeline. Uses the same build +
+# env as the web service. Daemon-level dry-run: set AIOS_DAEMON_DRY_RUN=true
+# in env. Override cron via AIOS_DAEMON_CRON (default "0 2 * * *" UTC).
+
+[[services]]
+name = "scout-daemon"
+startCommand = "uv run python -m aios.daemon"
+restartPolicyType = "always"
