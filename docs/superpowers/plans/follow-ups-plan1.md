@@ -515,6 +515,21 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 71. Task 16c approved — Railway deploy ready
+
+**Raised by:** Task 16c delivery (2026-04-22)
+**Severity:** Approved (no follow-ups)
+**File:** `railway.toml`, `Procfile`, `data/reference/sops/deployment.md`
+
+Task 16c shipped at worktree commit `d2c3e2e`. Closes backlog item 19 (Playwright Chromium install on Railway). Full operator SOP at `data/reference/sops/deployment.md` covering migration order + env vars + setup_client.sh + smoke verification + 10-row error/resolution table. Full suite 532/532 + 1 skipped (unchanged). No regressions.
+
+**Key additions:**
+- `buildCommand = "uv sync --frozen && uv run playwright install --with-deps chromium"` — installs Chromium with OS deps during Railway build
+- Procfile comment placeholder for Task 16.6 daemon worker
+- `[[services]]` comment placeholder in railway.toml for future daemon service
+
+Plan 1 deploy path is unblocked. Next: Task 16.5 (Scout as BaseSystem — activates the foundation learning loop) → Task 16.6 (autonomous daemon) → Task 17 (e2e dry-run).
+
 ### 70. Task 16b Step 3 approved — load_components + setup_client + enrich.py cleanup
 
 **Raised by:** Task 16b Step 3 review (2026-04-22)
