@@ -121,7 +121,7 @@ class EnrichStorageBackend(Protocol):
         """Merge ``research_data_patch`` into ``contacts.research_data``
         JSONB (deep merge: dict keys upsert, list values extend + dedupe
         on a composite key), set ``email_verified`` / ``email_catch_all``
-        top-level columns, stamp ``last_enriched_at``.
+        top-level columns, stamp ``enriched_at``.
         """
         ...
 
@@ -432,7 +432,7 @@ def _dedupe_key(item: Any) -> Any:
 
 
 def _utc_now_iso() -> str:
-    """ISO-8601 UTC timestamp for ``last_enriched_at``.
+    """ISO-8601 UTC timestamp for ``enriched_at``.
 
     Factored into a tiny helper so tests that need a deterministic
     timestamp can monkeypatch it.
