@@ -515,6 +515,17 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 67. Task 1.5.9b — minor nits from review
+
+**Raised by:** Task 1.5.9b review (2026-04-22)
+**Severity:** Minor
+**File:** `systems/scout/sources/trigify_discovery.py`
+
+- **N1:** Missing targeted test for the `engager has employer but no linkedin_url → skip` path. The guard at `_process_engager` is structurally trivial (OR condition), but a dedicated regression test would protect against future edits that inadvertently drop the linkedin_url check. Add when next touching the module.
+- **N2:** Line-count reporting discrepancy — implementer reported 605; actual `wc -l` is 602. Cosmetic.
+
+Bundle with Task 1.5.9c polish pass OR any natural future touch of the module.
+
 ### 65. Task 16b Step 1 approved — Step 2 prep notes
 
 **Raised by:** Task 16b Step 1 background review (2026-04-22)
