@@ -515,6 +515,59 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 80. Post-merge end-to-end machine test — gaps exposed, fix plan for next session
+
+**Raised by:** Kirsten operator session (2026-04-23, post-merge)
+**Severity:** Priority — these gate Plan 2 MVP-send readiness
+**File:** `scripts/ingest_clutch_corpus.py`, `systems/scout/outreach/research.py`, `data/reference/sequences/cro_growth_ugc_agency/components/`, identity waterfall, Voyage setup
+
+After merging Plan 1 to main at `1e77e1e`, operator ran an end-to-end "machine test" against a real-data corpus (15 agencies sampled from `clutch.co-scraper/out/NICHE_creative_branding_deduped.csv`). The test exposed several structural gaps that patching around won't close — they need focused fixes.
+
+**Context established in this session:**
+- Offer identity: **AIOS + Scout deployment**, not pipeline audit. Setup fee $2,500 + retainer contingent on 10 qualified meetings in 60 days.
+- Target ICP: specialist agencies (CRO / Branding / Creative).
+- Client Zero = operator's own outbound to specialist agencies. Proof-of-concept before selling externally.
+- ESP: Smartlead (6 inboxes already warmed, ~120-180 send/day capacity).
+- MVP send target: 8-17 contacts/day to hit 10-in-60-days on 1-2% meeting rate.
+- Volume does NOT require Plan 1.5 cost waterfall (it matters at 1000s/day; MVP runs on low volume).
+
+**Gaps exposed by the machine test:**
+
+1. **`scripts/ingest_clutch_corpus.py` marks contacts as post-enrich.** Script sets `status='enriched'` + `enriched_at=NOW()`, which blocks both identity and enrich stages (enrich filter requires `enriched_at IS NULL`). Clutch corpus data is INPUT to enrich, not output. Fix: change the script to mark contacts `status='new'` (or `'pulled'`), leave `enriched_at=NULL`, let the pipeline advance through stages naturally. Store scraper text in `raw_data.clutch_snapshot` (not in `research_data.website_content` — that's for post-Claude structured output).
+
+2. **Clutch corpus has no person-level identity data.** Scraper captures company-level info (name, domain, industry, website content, Clutch metadata) but NOT `first_name`/`last_name`/`title`/`email` at the decision-maker level. AIOS identity stage (Hunter domain search + Apollo people search + Claude scraper) failed to resolve decision-makers for ALL 15 small agencies in the test sample. Enrich stage then filters out these contacts (`first_name IS NOT NULL` requirement at `systems/scout/supabase_backends/enrich.py:52`), producing 0 research and 0 composable drafts.
+
+   **Two options, pick one before next session:**
+   - **Option A — Add Apollo People API adapter to the identity waterfall.** Resolves decision-makers from company domain. ~$0.02/lookup via Apollo credits. Correct long-term answer.
+   - **Option B — CSV ingest with pre-resolved contacts.** Operator supplies `company,domain,first_name,last_name,title,email` rows (from LinkedIn Sales Navigator export OR Apollo one-off search OR hand-research). Skip AIOS identity resolution entirely. Simpler; good for first 100-200 MVP contacts.
+
+3. **Bootstrap component templates reference placeholders the Research selector doesn't produce.** YAMLs use `{{company_name}}`, `{{pain_hook_reference}}`, `{{company_size_band}}`, `{{conversion_stage_reference}}`, `{{niche_label}}`, `{{calendly_link}}`, `{{sender_title}}`, `{{sender_company}}`. Research selector produces: `icebreaker_content`, `trigger_hook`, `pain_evidence`, `cta_content` (from `research_data.citable_details` + `buying_signals` + `trigger_events`). These are different names — so placeholder filling is a no-op.
+
+   **Two-part fix:**
+   - Author real component copy using the Research selector's actual output names + direct-contact placeholders (`{{first_name}}`, `{{company}}`) + client_facts placeholders (`{{operator_name}}`, `{{call_to_action}}`).
+   - OPTIONAL: extend Research selector to produce more named fills (e.g., `{{company_name}}` from `contact.company`, `{{sender_title}}` from `client_facts.sender_title`). This is a smallish code change with meaningful UX impact.
+
+4. **Voyage embedder free tier is non-viable at enrich volume.** Free tier = 3 RPM / 10K TPM. Every decision_log write tries to embed; enrich orchestrator logs ~10 decisions per contact. Result: 429s cascade, runs take 10+ minutes instead of 2. Operator resolved this by adding Voyage payment + $10 credit during the session. NOTHING to fix in code — just document the requirement in `data/reference/sops/embedder-setup.md` (add explicit note: "payment method REQUIRED for any real-data run, not just for cost — free tier rate limit makes production impossible").
+
+5. **Enrich orchestrator dispatch-log verbosity.** Emits one `enrich_contact` decision per (contact × adapter) evaluation pair, even when the adapter short-circuits. 5 seeded contacts × ~10 adapter evaluations = 53 decisions, mostly informational. This creates decision_log noise and fights with Voyage rate limits. Lower-priority fix: collapse per-contact adapter evaluations into one summary decision with per-adapter outcomes in the context JSONB (~2 hours).
+
+**Fix plan for next session (half-day):**
+
+- **Task A — Rewrite `ingest_clutch_corpus.py`** to mark status='new'+enriched_at=NULL, move scraper content to `raw_data`, let the pipeline run naturally. (~1 hr)
+- **Task B — Choose and ship identity-resolution path** (Option A: Apollo People adapter; OR Option B: pre-resolved CSV ingest). Operator decides A vs B before session. (~2-3 hrs)
+- **Task C — Operator authors real component copy (2-3 variants/type × 6 types) using the Research selector's actual output contract.** Code delta: extend Research selector to produce ~3-4 more named fills if helpful. (Operator: ~1 day authoring in parallel; me: ~2 hrs code)
+- **Task D — Update `data/reference/sops/embedder-setup.md`** to flag Voyage payment-method as mandatory (1 line change).
+
+After A+B+C+D, re-run machine test. Expected: drafts with complete component tuples, sparse `fills_missing`, signal counts > 1 per draft, sendable prose. Only then do we wire the Smartlead adapter for actual sending (Plan 2 MVP).
+
+**What today's session proved:**
+- ✅ Plan 1 merged cleanly (76 commits, 696 tests green)
+- ✅ Acceptance harness works end-to-end on fixtures + live Supabase
+- ✅ Ingest + daemon + enrich + compose architecture is correct
+- ✅ Machine test exposed real data/contract gaps before Kirsten shipped real copy into them
+- ✅ Session converged on: MVP-send is ~1 week out (not 2-3 weeks) once A+B+C land
+- ✅ Copy authoring is the right highest-leverage operator work
+
 ### 79. Plan 1 merged — Task 17D live dry-run PASS + Task 19 cleanup
 
 **Raised by:** Plan 1 merge (2026-04-23)
