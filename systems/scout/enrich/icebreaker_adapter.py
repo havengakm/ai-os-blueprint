@@ -313,8 +313,9 @@ class IcebreakerAdapter:
 
         # --- retry ONCE with nudge ---
         retry_prompt = prompt + (
-            f"\n\nREGENERATE. Your previous attempt violated a rule: "
-            f"{violation}. Rewrite it without that violation."
+            f"\n\nREGENERATE. Your previous draft was:\n{icebreaker!r}\n\n"
+            f"It violated a rule: {violation}. "
+            f"Keep the same angle but rewrite to remove that violation."
         )
         icebreaker_retry = await _call_claude(client, retry_prompt)
         total_cost_cents += self.cost_cents_per_call
@@ -490,13 +491,26 @@ def _render_prompt(
         )
     elif tier == 3:
         sig = selected_event or {}
-        base_fields["signal_category"] = str(sig.get("category") or "unknown")
-        base_fields["signal_type"] = str(sig.get("type") or "unknown")
+        base_fields["signal_category"] = _humanize_taxonomy_slug(
+            str(sig.get("category") or "unknown")
+        )
+        base_fields["signal_type"] = _humanize_taxonomy_slug(
+            str(sig.get("type") or "unknown")
+        )
         base_fields["signal_summary"] = str(sig.get("summary") or "")
     elif tier == 4:
         base_fields["citable_details_bulleted"] = _format_citables(citable_details)
 
     return template.format(**base_fields)
+
+
+def _humanize_taxonomy_slug(slug: str) -> str:
+    """Turn internal taxonomy slugs into friendly prose for Claude prompts.
+
+    Internal: 'funding_round' | 'operational_organizational' | 'm_and_a'
+    Friendly: 'funding round' | 'operational organizational' | 'm and a'
+    """
+    return slug.replace("_", " ").strip() or "unknown"
 
 
 def _format_citables(citable_details: list[dict[str, Any]]) -> str:

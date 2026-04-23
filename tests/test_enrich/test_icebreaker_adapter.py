@@ -137,6 +137,9 @@ async def test_tier_1_frustrated_trigger(_env):
     assert result.cost_cents == 1
     assert result.icebreaker_content.startswith("Saw")
     assert fake.create_calls, "Claude should have been called"
+    # Verify the Tier 1 prompt fired, not a sibling tier's
+    prompt_sent = fake.create_calls[0]["messages"][0]["content"]
+    assert "recently posted something frustrated" in prompt_sent
 
 
 async def test_tier_2_neutral_trigger(_env):
@@ -158,6 +161,8 @@ async def test_tier_2_neutral_trigger(_env):
     assert result.ok is True
     assert result.tier == 2
     assert result.reason == "tier_2_generated"
+    prompt_sent = fake.create_calls[0]["messages"][0]["content"]
+    assert "engaged with relevant content neutrally" in prompt_sent
 
 
 async def test_tier_3_structural_signal(_env):
@@ -184,6 +189,11 @@ async def test_tier_3_structural_signal(_env):
     assert result.ok is True
     assert result.tier == 3
     assert result.reason == "tier_3_generated"
+    prompt_sent = fake.create_calls[0]["messages"][0]["content"]
+    assert "structural signal just hit" in prompt_sent
+    # Humanized slug check: 'funding_round' → 'funding round' before prompt injection
+    assert "funding round" in prompt_sent
+    assert "funding_round" not in prompt_sent
 
 
 async def test_tier_4_citable_fallback(_env):
@@ -205,6 +215,8 @@ async def test_tier_4_citable_fallback(_env):
     assert result.ok is True
     assert result.tier == 4
     assert result.reason == "tier_4_generated"
+    prompt_sent = fake.create_calls[0]["messages"][0]["content"]
+    assert "Fall back to website citation" in prompt_sent
 
 
 async def test_no_source_material(_env):
