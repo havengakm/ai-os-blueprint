@@ -515,6 +515,33 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 78. Task 17D harness shipped — acceptance test ready for operator
+
+**Raised by:** Task 17D harness delivery + combined review (2026-04-23)
+**Severity:** Approved (harness only; actual run is operator-gated)
+**File:** `scripts/plan1_acceptance_preflight.py`, `scripts/plan1_acceptance_verify.py`, `scripts/plan1_acceptance.sh`, `data/reference/sops/plan1-acceptance-run.md`, `tests/test_scripts/`
+
+Task 17D harness shipped at worktree commits `46d4cc8` (initial) + `f829e76` (review-hedge fix). Test suite 652 → 696 passed + 1 skipped (+44 tests: 29 preflight + 15 verify). Ruff clean, em-dash clean, under 250 lines for the SOP.
+
+**Artifacts shipped:**
+- `scripts/plan1_acceptance_preflight.py` (585 lines): 8 read-only checks (env, schema, client existence, business_context + client_facts seeded, knowledge_base populated, autonomy_rules covering 7 decision types, component_variants complete per type with status=approved, ≥10 pipeline-eligible contacts). Human + `--json` output, exit codes 0/1/2 + per-failure fix hints.
+- `scripts/plan1_acceptance_verify.py` (508 lines): post-run query against `decision_log` windowed by started_at + markdown report to `data/reports/plan1-acceptance-{timestamp}.md`. Reports stage-by-stage decision counts + component-tuple completeness + per-draft hallucination eyeball context.
+- `scripts/plan1_acceptance.sh` (104 lines, executable): one-command orchestrator `preflight → run_daemon_once --dry-run → verify` with explicit exit-code capture per step.
+- `data/reference/sops/plan1-acceptance-run.md` (238 lines): operator SOP matching trigify template — prereqs, running, reading report, go/no-go criteria, common errors, escalation.
+
+**Spec deviations (all verified against codebase):**
+1. No `foundation_loaded=true` / `memory_context_summary` key in decision_log → adapted to "presence of ≥1 decision per stage" as proxy. Weaker than implied (BaseSystem.load_foundation degrades silently if memory_store unwired) — hedge added to markdown report in fix commit `f829e76`.
+2. No `draft_preview` in render_draft context → composer gates `persist_draft` on `not dry_run`; report shows `component_tuple` + `signals_referenced` + variant_keys and directs operator to cross-ref YAML + raw_data.
+3. Env var: `SUPABASE_SERVICE_ROLE_KEY` (per `config/settings.py`), not `SUPABASE_SERVICE_KEY`.
+4. Pipeline-eligible statuses: `new | screened | ready | enriched` (backend convention), not the speculative names in the plan.
+5. Drafts-delta is observational (dry-run doesn't persist `outreach_drafts`); real evidence is `render_draft` decision_log rows with complete component tuples.
+6. Added `research_contact` as 7th pipeline decision_type (research stage emits it alongside render).
+7. 44 tests vs ~15 spec floor — justified (pass+fail pairs per check, JSON + CLI paths, stringified-context edge cases). Tests run in 0.03s.
+
+**Upgrade path (captured in the SOP):** emit a real `foundation_summary` key from `_prime_foundation` so the verify check becomes necessary AND sufficient, not just necessary. Land before Plan 7 operator dashboard.
+
+**Remaining operator action** (blocks Plan 1 → main merge): run `./scripts/plan1_acceptance.sh <client-id>` against a seeded Supabase project, eyeball the resulting markdown report for hallucinations, green-light the merge.
+
 ### 77. Task 18 shipped — four Plan 1 SOPs
 
 **Raised by:** Task 18 delivery + review (2026-04-23)
