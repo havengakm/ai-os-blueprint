@@ -1,5 +1,5 @@
 """Tests for Trigify behavioral-signal adapter."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -469,7 +469,7 @@ async def test_trigify_raises_on_rate_limit(_env):
 
 @pytest.mark.asyncio
 async def test_trigify_computes_recency_days(_env):
-    """published_at 10 days before 2026-04-21 → recency_days ≈ 10."""
+    """published_at 10 days before now → recency_days ≈ 10 (time-invariant)."""
     contact = {
         "contact_id": "c14",
         "linkedin_url": "https://linkedin.com/in/jane",
@@ -477,10 +477,11 @@ async def test_trigify_computes_recency_days(_env):
         "company": "",
         "trigify_search_ids": ["s1"],
     }
+    ten_days_ago = datetime.now(tz=timezone.utc) - timedelta(days=10)
     result_item = _trigify_result(
         result_id="r14",
         profile_url="https://linkedin.com/in/jane",
-        published_at="2026-04-11T12:00:00Z",
+        published_at=ten_days_ago.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     mock_client = AsyncMock()
     mock_client.get.return_value = _mock_response(_page_response([result_item]))
@@ -490,10 +491,9 @@ async def test_trigify_computes_recency_days(_env):
 
     assert result.ok is True
     ev = result.data["trigger_events"][0]
-    # currentDate is 2026-04-20; published 2026-04-11 → 9 days ago.
-    # Accept 8–11 to allow for clock variance in test environments.
     assert ev["recency_days"] is not None
-    assert 8 <= ev["recency_days"] <= 11
+    # Allow ±1 day for clock drift between fixture creation and adapter call.
+    assert 9 <= ev["recency_days"] <= 11
 
 
 @pytest.mark.asyncio
@@ -534,11 +534,13 @@ async def test_trigify_naive_datetime_normalises_to_utc(_env):
         "company": "",
         "trigify_search_ids": ["s1"],
     }
-    # Naive timestamp — no Z, no offset. This is the edge case that was broken.
+    # Naive timestamp (no Z, no offset) 10 days ago — the edge case that was
+    # broken. Time-invariant so it doesn't drift over the lifetime of the test.
+    ten_days_ago = datetime.now(tz=timezone.utc) - timedelta(days=10)
     result_item = _trigify_result(
         result_id="r-naive",
         profile_url="https://linkedin.com/in/jane",
-        published_at="2026-04-11T12:00:00",
+        published_at=ten_days_ago.strftime("%Y-%m-%dT%H:%M:%S"),
     )
     mock_client = AsyncMock()
     mock_client.get.return_value = _mock_response(_page_response([result_item]))
@@ -551,4 +553,5 @@ async def test_trigify_naive_datetime_normalises_to_utc(_env):
     assert result.ok is True
     ev = result.data["trigger_events"][0]
     assert isinstance(ev["recency_days"], int)
-    assert 8 <= ev["recency_days"] <= 11
+    # Allow ±1 day for clock drift between fixture creation and adapter call.
+    assert 9 <= ev["recency_days"] <= 11

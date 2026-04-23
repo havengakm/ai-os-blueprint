@@ -156,7 +156,9 @@ async def test_select_fills_happy_path_fills_all_four() -> None:
     assert fills.trigger_hook == "Raised Series B last month"
     assert fills.pain_evidence == "Grew client pipeline 3x in 90d"
     assert fills.cta_content == "Worth a 20-minute call?"
-    assert len(fills.sources_used) == 4  # one per placeholder
+    # 4 enrich sources + 1 first_name audit entry; productised client_facts
+    # weren't passed so those placeholders don't add audit entries.
+    assert len(fills.sources_used) == 5
 
 
 # --------------------------------------------------------------------------- #
@@ -175,7 +177,10 @@ async def test_select_fills_empty_research_returns_none() -> None:
     assert fills.trigger_hook is None
     assert fills.pain_evidence is None
     assert fills.cta_content is None
-    assert fills.sources_used == []
+    # The only source that always fires is first_name (falls back to "there"
+    # when the contact column is blank but here contact.first_name is set).
+    assert len(fills.sources_used) == 1
+    assert fills.sources_used[0]["placeholder"] == "first_name"
 
 
 # --------------------------------------------------------------------------- #
@@ -389,7 +394,10 @@ async def test_decision_log_emitted_with_correct_shape() -> None:
     assert entry["client_id"] == "client-1"
     assert entry["decision_type"] == "research_contact"
     assert entry["decision"].startswith("research_fills:contact-1:")
-    assert entry["decision"].endswith(":4of4")
+    # 5 of 10 filled: the 4 enrich-sourced placeholders + first_name fallback.
+    # No client_facts passed and no short_company_name on the contact -> the
+    # other 5 productised slots are None.
+    assert entry["decision"].endswith(":5of10")
     assert entry["source"] == "system"
     assert entry["confidence"] is None
 
@@ -399,10 +407,15 @@ async def test_decision_log_emitted_with_correct_shape() -> None:
     assert context["dry_run"] is False
     assert context["placeholders_filled"] == [
         "icebreaker_content", "trigger_hook", "pain_evidence", "cta_content",
+        "first_name",
     ]
-    assert context["placeholders_empty"] == []
+    assert context["placeholders_empty"] == [
+        "short_company_name", "operator_name",
+        "offer_promise", "offer_period", "offer_risk_reversal",
+    ]
     assert isinstance(context["sources_used"], list)
-    assert len(context["sources_used"]) == 4
+    # 4 enrich sources + 1 first_name audit entry.
+    assert len(context["sources_used"]) == 5
     # Component tuple records the variant_keys that were in play.
     assert context["component_tuple"]["cta"] == "cta_v1"
     assert context["component_tuple"]["pain_hook"] == "pain_hook_v1"
@@ -629,3 +642,280 @@ async def test_detail_truncated_to_max_chars() -> None:
 
     assert fills.pain_evidence is not None
     assert len(fills.pain_evidence) == 160
+
+
+# --------------------------------------------------------------------------- #
+# Productised placeholder contract — _select_first_name                         #
+# --------------------------------------------------------------------------- #
+
+def test_select_first_name_returns_stripped_value_when_present() -> None:
+    from systems.scout.outreach.research import _select_first_name
+
+    assert _select_first_name({"first_name": "  Jane  "}) == "Jane"
+
+
+def test_select_first_name_falls_back_when_empty_or_missing() -> None:
+    from systems.scout.outreach.research import _select_first_name
+
+    assert _select_first_name({"first_name": ""}) == "there"
+    assert _select_first_name({"first_name": "   "}) == "there"
+    assert _select_first_name({}) == "there"
+    assert _select_first_name({"first_name": None}) == "there"
+    assert _select_first_name({"first_name": 42}) == "there"  # type: ignore[dict-item]
+
+
+# --------------------------------------------------------------------------- #
+# Productised placeholder contract — _select_short_company_name                 #
+# --------------------------------------------------------------------------- #
+
+def test_select_short_company_name_reads_from_research_data() -> None:
+    from systems.scout.outreach.research import _select_short_company_name
+
+    contact = {"research_data": {"short_company_name": "Acme"}}
+    assert _select_short_company_name(contact) == "Acme"
+
+
+def test_select_short_company_name_strips_whitespace() -> None:
+    from systems.scout.outreach.research import _select_short_company_name
+
+    contact = {"research_data": {"short_company_name": "  Acme  "}}
+    assert _select_short_company_name(contact) == "Acme"
+
+
+def test_select_short_company_name_returns_none_on_empty_or_missing() -> None:
+    from systems.scout.outreach.research import _select_short_company_name
+
+    assert _select_short_company_name({"research_data": {"short_company_name": ""}}) is None
+    assert _select_short_company_name({"research_data": {"short_company_name": "   "}}) is None
+    assert _select_short_company_name({"research_data": {}}) is None
+    assert _select_short_company_name({}) is None
+
+
+def test_select_short_company_name_tolerates_non_dict_research_data() -> None:
+    from systems.scout.outreach.research import _select_short_company_name
+
+    assert _select_short_company_name({"research_data": "garbage"}) is None
+    assert _select_short_company_name({"research_data": None}) is None
+
+
+# --------------------------------------------------------------------------- #
+# Productised placeholder contract — _select_from_client_facts                  #
+# --------------------------------------------------------------------------- #
+
+def test_select_from_client_facts_returns_value_when_present() -> None:
+    from systems.scout.outreach.research import _select_from_client_facts
+
+    assert _select_from_client_facts({"operator_name": "Kirsten"}, "operator_name") == "Kirsten"
+
+
+def test_select_from_client_facts_strips_whitespace() -> None:
+    from systems.scout.outreach.research import _select_from_client_facts
+
+    assert _select_from_client_facts({"operator_name": "  Kirsten  "}, "operator_name") == "Kirsten"
+
+
+def test_select_from_client_facts_none_on_missing_or_bad_type() -> None:
+    from systems.scout.outreach.research import _select_from_client_facts
+
+    assert _select_from_client_facts({}, "operator_name") is None
+    assert _select_from_client_facts({"operator_name": ""}, "operator_name") is None
+    assert _select_from_client_facts({"operator_name": "   "}, "operator_name") is None
+    assert _select_from_client_facts({"operator_name": None}, "operator_name") is None
+    assert _select_from_client_facts({"operator_name": 42}, "operator_name") is None
+
+
+# --------------------------------------------------------------------------- #
+# Productised placeholder contract — select_fills integration                   #
+# --------------------------------------------------------------------------- #
+
+async def test_select_fills_with_full_client_facts_populates_all_six() -> None:
+    contact = mk_contact()
+    # Seed short_company_name in research_data.
+    contact["research_data"]["short_company_name"] = "Acme"
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    fills = await selector.select_fills(
+        "client-1", contact, components,
+        client_facts={
+            "operator_name": "Kirsten",
+            "offer_promise": "20 booked calls",
+            "offer_period": "30 days",
+            "offer_risk_reversal": "or you don't pay",
+        },
+    )
+
+    assert fills.first_name == "Jane"
+    assert fills.short_company_name == "Acme"
+    assert fills.operator_name == "Kirsten"
+    assert fills.offer_promise == "20 booked calls"
+    assert fills.offer_period == "30 days"
+    assert fills.offer_risk_reversal == "or you don't pay"
+
+    # Audit trail records every productised source.
+    sources_by_pl = {s["placeholder"]: s for s in fills.sources_used}
+    assert sources_by_pl["first_name"]["source"] == "contact_column"
+    assert sources_by_pl["first_name"]["type"] == "identity"
+    assert sources_by_pl["short_company_name"]["source"] == "contact_research_data"
+    assert sources_by_pl["short_company_name"]["type"] == "identity"
+    for key in ("operator_name", "offer_promise", "offer_period", "offer_risk_reversal"):
+        assert sources_by_pl[key]["source"] == "client_facts"
+        assert sources_by_pl[key]["type"] == "client_fact"
+
+
+async def test_select_fills_without_client_facts_defaults_to_none() -> None:
+    contact = mk_contact()  # no short_company_name in research_data
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    # Default path — no kwarg, no crash.
+    fills = await selector.select_fills("client-1", contact, components)
+
+    # first_name still falls back to the contact column.
+    assert fills.first_name == "Jane"
+    assert fills.short_company_name is None
+    assert fills.operator_name is None
+    assert fills.offer_promise is None
+    assert fills.offer_period is None
+    assert fills.offer_risk_reversal is None
+
+
+async def test_select_fills_with_blank_first_name_uses_there_fallback() -> None:
+    contact = mk_contact(first_name="")
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    fills = await selector.select_fills("client-1", contact, components)
+
+    assert fills.first_name == "there"
+    # Audit trail still records the fill — placeholder is always filled.
+    first_name_src = next(s for s in fills.sources_used if s["placeholder"] == "first_name")
+    assert first_name_src["source"] == "contact_column"
+
+
+async def test_select_fills_partial_client_facts_fills_only_present_keys() -> None:
+    contact = mk_contact()
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    fills = await selector.select_fills(
+        "client-1", contact, components,
+        client_facts={"operator_name": "Kirsten"},
+    )
+
+    assert fills.operator_name == "Kirsten"
+    assert fills.offer_promise is None
+    assert fills.offer_period is None
+    assert fills.offer_risk_reversal is None
+
+
+async def test_select_fills_decision_log_reports_10_of_10_surface() -> None:
+    """Regression guard: after extending PLACEHOLDER_FIELDS the decision-log
+    'filled N of total' ratio must reflect the productised surface."""
+    contact = mk_contact(
+        citable_details=[{"type": "case_study", "detail": "fact", "source": "x"}],
+        trigger_events=[
+            {
+                "type": "funding_round", "detail": "Raised Series B",
+                "source": "claude_web_triggers", "recency_days": 10,
+            },
+        ],
+    )
+    contact["research_data"]["short_company_name"] = "Acme"
+    components = mk_default_components()
+    logger = FakeLogger()
+    selector = ResearchSelector(decision_logger=logger)
+
+    await selector.select_fills(
+        "client-1", contact, components,
+        client_facts={
+            "operator_name": "Kirsten",
+            "offer_promise": "20 calls",
+            "offer_period": "30 days",
+            "offer_risk_reversal": "or free",
+        },
+    )
+
+    entry = logger.entries[0]
+    # 10 placeholders, all 10 filled.
+    assert entry["decision"].endswith(":10of10")
+    assert entry["context"]["placeholders_empty"] == []
+    assert set(entry["context"]["placeholders_filled"]) == {
+        "icebreaker_content", "trigger_hook", "pain_evidence", "cta_content",
+        "first_name", "short_company_name", "operator_name",
+        "offer_promise", "offer_period", "offer_risk_reversal",
+    }
+
+
+# --------------------------------------------------------------------------- #
+# _select_icebreaker_content — adapter output takes priority                    #
+# --------------------------------------------------------------------------- #
+
+async def test_icebreaker_content_prefers_adapter_output_over_trigger_events() -> None:
+    contact = mk_contact(trigger_events=[
+        {
+            "type": "behavioral_signal", "detail": "Legacy trigger-event icebreaker",
+            "source": "trigify_linkedin", "match_key": "profile", "recency_days": 5,
+        },
+    ])
+    # IcebreakerAdapter (Task D) writes this — must win over trigger_events.
+    contact["research_data"]["icebreaker_content"] = "Adapter-written line"
+    contact["research_data"]["icebreaker_tier"] = "tier_1"
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    fills = await selector.select_fills("client-1", contact, components)
+
+    assert fills.icebreaker_content == "Adapter-written line"
+    ice_src = next(s for s in fills.sources_used if s["placeholder"] == "icebreaker_content")
+    assert ice_src["source"] == "icebreaker_adapter:tier_tier_1"
+    assert ice_src["type"] == "icebreaker"
+
+
+def test_select_icebreaker_content_falls_back_to_trigger_events() -> None:
+    from systems.scout.outreach.research import _select_icebreaker_content
+
+    contact = {"research_data": {"icebreaker_content": "   "}}  # blank adapter output
+    trigger_events = [
+        {
+            "type": "funding_round", "detail": "Raised Series B",
+            "source": "claude_web_triggers", "match_key": "profile", "recency_days": 10,
+        },
+    ]
+    detail, src = _select_icebreaker_content(contact, trigger_events)
+
+    assert detail == "Raised Series B"
+    assert src is not None
+    assert src["type"] == "funding_round"
+
+
+def test_select_icebreaker_content_returns_none_when_both_empty() -> None:
+    from systems.scout.outreach.research import _select_icebreaker_content
+
+    contact: dict[str, Any] = {"research_data": {}}
+    detail, src = _select_icebreaker_content(contact, [])
+
+    assert detail is None
+    assert src is None
+
+
+def test_select_icebreaker_content_no_tier_uses_generic_source() -> None:
+    from systems.scout.outreach.research import _select_icebreaker_content
+
+    contact = {"research_data": {"icebreaker_content": "Adapter line"}}  # no tier
+    detail, src = _select_icebreaker_content(contact, [])
+
+    assert detail == "Adapter line"
+    assert src is not None
+    assert src["source"] == "icebreaker_adapter"
+
+
+def test_select_icebreaker_content_tolerates_non_dict_research_data() -> None:
+    from systems.scout.outreach.research import _select_icebreaker_content
+
+    contact = {"research_data": "garbage"}
+    detail, src = _select_icebreaker_content(contact, [])
+
+    # Falls through to the empty trigger_events list -> (None, None).
+    assert detail is None
+    assert src is None

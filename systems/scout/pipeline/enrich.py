@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from systems.scout.enrich.icebreaker_adapter import IcebreakerAdapter
     from systems.scout.enrich.orchestrator import EnrichOrchestrator
 
 
@@ -159,10 +160,15 @@ class EnrichStage:
         storage: EnrichStorageBackend,
         *,
         archive_floor: int = _DEFAULT_ARCHIVE_FLOOR,
+        icebreaker_adapter: "IcebreakerAdapter | None" = None,
     ) -> None:
         self._orchestrator = orchestrator
         self._storage = storage
         self._archive_floor = archive_floor
+        # Optional post-processor — runs AFTER the fan-out merge so it can
+        # see both trigify and deep-research outputs. Clients that do not
+        # want icebreakers simply omit this.
+        self._icebreaker_adapter = icebreaker_adapter
 
     async def run(
         self,
@@ -225,6 +231,31 @@ class EnrichStage:
 
             # Merge every adapter's data into one patch.
             merged = _merge_adapter_data(orc_result.adapter_results)
+
+            # Stage-level post-processor: icebreaker generator. Runs AFTER
+            # the merge so it can read trigger_events (trigify) AND
+            # structural_signals / citable_details (deep research) in one
+            # pass. Injected only when the client wants icebreakers — a
+            # missing adapter is a no-op, not an error.
+            if self._icebreaker_adapter is not None:
+                ib_result = await self._icebreaker_adapter.generate(
+                    contact=contact_dict,
+                    merged_research_data=merged,
+                    client_id=client_id,
+                    tier_budget=contact.icp_tier,
+                    dry_run=dry_run,
+                )
+                result.total_cost_cents += ib_result.cost_cents
+                if ib_result.ok and ib_result.icebreaker_content:
+                    merged["icebreaker_content"] = ib_result.icebreaker_content
+                    merged["icebreaker_tier"] = ib_result.tier
+                    result.by_adapter_hit["icebreaker"] = (
+                        result.by_adapter_hit.get("icebreaker", 0) + 1
+                    )
+                else:
+                    result.by_adapter_skip["icebreaker"] = (
+                        result.by_adapter_skip.get("icebreaker", 0) + 1
+                    )
 
             # Lift email_verified / email_catch_all OUT of the patch onto
             # top-level columns. Missing keys → None (storage can treat

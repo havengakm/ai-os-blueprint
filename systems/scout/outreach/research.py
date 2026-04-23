@@ -72,12 +72,30 @@ class ResearchFills:
     Any field may be ``None`` when no source qualified — composer falls back
     to a generic variant. ``sources_used`` has one entry per filled
     placeholder, deduped by ``(placeholder, source)``.
+
+    The productised MVP surface is 10 placeholders total: the four
+    enrich-sourced slots (icebreaker_content / trigger_hook / pain_evidence /
+    cta_content) plus six deployment-agnostic fills (first_name,
+    short_company_name, operator_name, offer_promise, offer_period,
+    offer_risk_reversal). The first two come from the contact row + the
+    IcebreakerAdapter output; the last four come from the per-client
+    ``client_facts`` table (preloaded by the caller).
     """
 
+    # Existing enrich-sourced fills.
     icebreaker_content: str | None
     trigger_hook: str | None
     pain_evidence: str | None
     cta_content: str | None
+
+    # Productised placeholder contract — deployment-agnostic.
+    first_name: str  # falls back to "there" when blank; never None.
+    short_company_name: str | None
+    operator_name: str | None
+    offer_promise: str | None
+    offer_period: str | None
+    offer_risk_reversal: str | None
+
     sources_used: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -110,6 +128,8 @@ class ResearchSelector:
 
     PLACEHOLDER_FIELDS: tuple[str, ...] = (
         "icebreaker_content", "trigger_hook", "pain_evidence", "cta_content",
+        "first_name", "short_company_name", "operator_name",
+        "offer_promise", "offer_period", "offer_risk_reversal",
     )
 
     def __init__(self, decision_logger: DecisionLoggerProtocol | None = None) -> None:
@@ -121,11 +141,18 @@ class ResearchSelector:
         contact: dict[str, Any],
         component_selections: dict[str, ComponentVariant],
         *,
+        client_facts: dict[str, Any] | None = None,
         dry_run: bool = False,
     ) -> ResearchFills:
         """Pick fills for each placeholder. ``dry_run`` flows into the log
         context (Plan 7 filters rehearsal runs) but does not alter selection.
+
+        ``client_facts`` is a flat ``{key: value}`` lookup pre-loaded by the
+        caller (see ``Composer.compose``). Empty/None is tolerated — the
+        productised fills fall back to None and the composer will surface
+        them via ``fills_missing`` at render time. No DB access happens here.
         """
+        facts: dict[str, Any] = client_facts or {}
         rd = contact.get("research_data") or {}
         citable_details = _listify(rd.get("citable_details"))
         buying_signals = _listify(rd.get("buying_signals"))
@@ -134,7 +161,7 @@ class ResearchSelector:
 
         sources_used: list[dict[str, Any]] = []
 
-        icebreaker_content, src = _select_icebreaker(trigger_events)
+        icebreaker_content, src = _select_icebreaker_content(contact, trigger_events)
         if src is not None:
             _append_source(sources_used, "icebreaker_content", src)
 
@@ -153,11 +180,56 @@ class ResearchSelector:
         if cta_content is not None and cta_component is not None:
             _append_passthrough(sources_used, cta_component, cta_content)
 
+        # Productised fills — deployment-agnostic.
+        first_name = _select_first_name(contact)
+        _append_audit(
+            sources_used,
+            placeholder="first_name",
+            source="contact_column",
+            detail_preview=first_name,
+            event_type="identity",
+        )
+
+        short_company_name = _select_short_company_name(contact)
+        if short_company_name is not None:
+            _append_audit(
+                sources_used,
+                placeholder="short_company_name",
+                source="contact_research_data",
+                detail_preview=short_company_name,
+                event_type="identity",
+            )
+
+        operator_name = _select_from_client_facts(facts, "operator_name")
+        offer_promise = _select_from_client_facts(facts, "offer_promise")
+        offer_period = _select_from_client_facts(facts, "offer_period")
+        offer_risk_reversal = _select_from_client_facts(facts, "offer_risk_reversal")
+        for placeholder, value in (
+            ("operator_name", operator_name),
+            ("offer_promise", offer_promise),
+            ("offer_period", offer_period),
+            ("offer_risk_reversal", offer_risk_reversal),
+        ):
+            if value is not None:
+                _append_audit(
+                    sources_used,
+                    placeholder=placeholder,
+                    source="client_facts",
+                    detail_preview=value,
+                    event_type="client_fact",
+                )
+
         fills = ResearchFills(
             icebreaker_content=icebreaker_content,
             trigger_hook=trigger_hook,
             pain_evidence=pain_evidence,
             cta_content=cta_content,
+            first_name=first_name,
+            short_company_name=short_company_name,
+            operator_name=operator_name,
+            offer_promise=offer_promise,
+            offer_period=offer_period,
+            offer_risk_reversal=offer_risk_reversal,
             sources_used=sources_used,
         )
         await self._emit_decision(client_id, contact, fills, component_selections, dry_run)
@@ -249,6 +321,71 @@ def _detail_or_none(
     if not isinstance(detail, str) or not detail.strip():
         return None, None
     return detail[:_DETAIL_MAX_CHARS], item
+
+
+def _select_first_name(contact: dict[str, Any]) -> str:
+    """Always returns a non-empty string; falls back to ``'there'`` when blank.
+
+    Mirrors ``composer._coalesce_first_name`` so ResearchFills carries an
+    audit-complete value even though the composer resolves the actual
+    placeholder via its own special-case branch.
+    """
+    raw = contact.get("first_name")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return "there"
+
+
+def _select_short_company_name(contact: dict[str, Any]) -> str | None:
+    """Read ``research_data.short_company_name`` — populated by the ingest script."""
+    rd = contact.get("research_data") or {}
+    if not isinstance(rd, dict):
+        return None
+    v = rd.get("short_company_name")
+    if isinstance(v, str) and v.strip():
+        return v.strip()
+    return None
+
+
+def _select_from_client_facts(facts: dict[str, Any], key: str) -> str | None:
+    """Flat lookup into ``client_facts``. ``None`` on missing or non-string."""
+    v = facts.get(key)
+    if isinstance(v, str) and v.strip():
+        return v.strip()
+    return None
+
+
+def _select_icebreaker_content(
+    contact: dict[str, Any],
+    trigger_events: list[dict[str, Any]],
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Prefer IcebreakerAdapter output; fall back to legacy trigger-event selection.
+
+    The IcebreakerAdapter (Task D) writes a pre-rendered icebreaker sentence
+    to ``research_data.icebreaker_content`` and optionally an
+    ``icebreaker_tier`` label. When that sentence is present we skip the
+    trigger-event bandit entirely and surface a synthetic source for the
+    audit trail so Plan 7 can attribute outcomes back to the adapter tier.
+    Absent adapter output, the original trigger-event ranking takes over.
+    """
+    rd = contact.get("research_data") or {}
+    if isinstance(rd, dict):
+        adapted = rd.get("icebreaker_content")
+        if isinstance(adapted, str) and adapted.strip():
+            text = adapted.strip()
+            tier = rd.get("icebreaker_tier")
+            source = (
+                f"icebreaker_adapter:tier_{tier}"
+                if isinstance(tier, str) and tier
+                else "icebreaker_adapter"
+            )
+            pseudo_event = {
+                "type": "icebreaker",
+                "detail": text,
+                "source": source,
+            }
+            return text, pseudo_event
+    return _select_icebreaker(trigger_events)
 
 
 def _select_icebreaker(

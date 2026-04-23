@@ -56,11 +56,13 @@ class FakeStorage:
         *,
         variants_by_type: dict[str, list[ComponentVariant]] | None = None,
         active_directories: list[str] | None = None,
+        client_facts: dict[str, Any] | None = None,
         persist_raises: Exception | None = None,
         logger: FakeLogger | ExplodingLogger | None = None,
     ) -> None:
         self._variants_by_type = variants_by_type or {}
         self._active_directories = active_directories or []
+        self._client_facts = client_facts or {}
         self._persist_raises = persist_raises
         self._logger = logger or FakeLogger()
         self.persisted_drafts: list[dict[str, Any]] = []
@@ -77,6 +79,9 @@ class FakeStorage:
 
     async def fetch_active_directories(self, client_id: str) -> list[str]:
         return list(self._active_directories)
+
+    async def fetch_client_facts(self, client_id: str) -> dict[str, Any]:
+        return dict(self._client_facts)
 
     async def persist_draft(
         self,
@@ -774,6 +779,157 @@ async def test_decision_log_context_has_channel_round_signals() -> None:
 # --------------------------------------------------------------------------- #
 # Extra: single-variant pool skips bandit                                       #
 # --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+# Productised placeholder contract — client_facts wiring                        #
+# --------------------------------------------------------------------------- #
+
+async def test_operator_name_renders_from_client_facts() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            signature_content="— {{operator_name}}",
+        ),
+        client_facts={"operator_name": "Kirsten"},
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "— Kirsten" in result.body
+    assert "operator_name" not in result.fills_missing
+
+
+async def test_operator_name_empty_when_client_facts_missing() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            signature_content="— {{operator_name}}",
+        ),
+        client_facts={},  # deliberately empty
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "— " in result.body  # placeholder renders empty
+    assert "operator_name" in result.fills_missing
+
+
+async def test_offer_promise_period_risk_reversal_render_together() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            offer_frame_content=(
+                "We deliver {{offer_promise}} in {{offer_period}}, "
+                "{{offer_risk_reversal}}."
+            ),
+        ),
+        client_facts={
+            "offer_promise": "20 booked calls",
+            "offer_period": "30 days",
+            "offer_risk_reversal": "or you don't pay",
+        },
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "We deliver 20 booked calls in 30 days, or you don't pay." in result.body
+    assert "offer_promise" not in result.fills_missing
+    assert "offer_period" not in result.fills_missing
+    assert "offer_risk_reversal" not in result.fills_missing
+
+
+async def test_offer_fields_flagged_missing_when_client_facts_incomplete() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            offer_frame_content=(
+                "We deliver {{offer_promise}} in {{offer_period}}, "
+                "{{offer_risk_reversal}}."
+            ),
+        ),
+        client_facts={"offer_promise": "20 calls"},  # two keys missing
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "offer_promise" not in result.fills_missing
+    assert "offer_period" in result.fills_missing
+    assert "offer_risk_reversal" in result.fills_missing
+
+
+async def test_short_company_name_renders_from_research_data() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            subject_content="Quick question about {{short_company_name}}",
+        ),
+    )
+    composer = mk_composer(storage)
+    contact = mk_contact(research_data_override={
+        "short_company_name": "Acme",
+        "citable_details": [],
+        "buying_signals": [],
+        "trigger_events": [],
+    })
+
+    result = await composer.compose("client-1", contact)
+
+    assert isinstance(result, ComposedDraft)
+    assert result.subject == "Quick question about Acme"
+    assert "short_company_name" not in result.fills_missing
+
+
+async def test_short_company_name_missing_flagged_when_absent() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            subject_content="Quick question about {{short_company_name}}",
+        ),
+    )
+    composer = mk_composer(storage)
+    # research_data without short_company_name.
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert result.subject == "Quick question about "
+    assert "short_company_name" in result.fills_missing
+
+
+async def test_backward_compat_no_client_facts_still_renders() -> None:
+    """Regression guard: tests that don't seed client_facts still produce
+    a valid draft. Matches the legacy composer contract."""
+    storage = FakeStorage(variants_by_type=mk_variants_by_type())
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert result.persisted_draft_id == "draft-1"
+
+
+async def test_icebreaker_adapter_output_wins_over_trigger_events_in_composer() -> None:
+    """Integration: adapter-written icebreaker surfaces through the composer."""
+    storage = FakeStorage(variants_by_type=mk_variants_by_type())
+    composer = mk_composer(storage)
+    contact = mk_contact(
+        trigger_events=[
+            {
+                "type": "behavioral_signal", "detail": "Legacy trigger line",
+                "source": "trigify_linkedin", "match_key": "profile",
+                "recency_days": 5,
+            },
+        ],
+    )
+    contact["research_data"]["icebreaker_content"] = "Adapter-written line"
+
+    result = await composer.compose("client-1", contact)
+
+    assert isinstance(result, ComposedDraft)
+    assert "noticed Adapter-written line" in result.body
+    assert "noticed Legacy trigger line" not in result.body
+
 
 async def test_single_variant_pool_skips_bandit() -> None:
     # With exactly one variant per type, RNG should not be consulted — we

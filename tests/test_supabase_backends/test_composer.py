@@ -79,6 +79,46 @@ async def test_fetch_active_directories_returns_list() -> None:
     ]
 
 
+async def test_fetch_client_facts_flattens_jsonb_to_strings() -> None:
+    """JSONB value column can be any JSON type. Only strings + numeric scalars
+    survive; bool/None/dict/list are skipped silently."""
+    fake = FakeSupabaseClient(
+        tables={
+            "client_facts": [
+                {"client_id": "c1", "key": "operator_name", "value": "Kirsten"},
+                {"client_id": "c1", "key": "padded_str", "value": "  trimmed  "},
+                {"client_id": "c1", "key": "empty_str", "value": "   "},
+                {"client_id": "c1", "key": "int_val", "value": 42},
+                {"client_id": "c1", "key": "float_val", "value": 3.14},
+                {"client_id": "c1", "key": "bool_true", "value": True},
+                {"client_id": "c1", "key": "bool_false", "value": False},
+                {"client_id": "c1", "key": "null_val", "value": None},
+                {"client_id": "c1", "key": "dict_val", "value": {"en": "Hi"}},
+                {"client_id": "c1", "key": "list_val", "value": ["a", "b"]},
+                {"client_id": "c1", "key": "", "value": "empty_key_skipped"},
+                {"client_id": "c2", "key": "other_client", "value": "nope"},
+            ]
+        }
+    )
+    backend = SupabaseComposerBackend(fake)
+    result = await backend.fetch_client_facts("c1")
+
+    # Backend passes strings through verbatim; research.py strips on read.
+    # Whitespace-only values are rejected here so they never reach research.py.
+    assert result == {
+        "operator_name": "Kirsten",
+        "padded_str": "  trimmed  ",
+        "int_val": "42",
+        "float_val": "3.14",
+    }
+
+
+async def test_fetch_client_facts_empty_returns_empty_dict() -> None:
+    fake = FakeSupabaseClient()
+    backend = SupabaseComposerBackend(fake)
+    assert await backend.fetch_client_facts("c1") == {}
+
+
 async def test_persist_draft_inserts_and_returns_uuid() -> None:
     fake = FakeSupabaseClient()
     backend = SupabaseComposerBackend(fake)

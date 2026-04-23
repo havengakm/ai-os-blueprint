@@ -1,0 +1,13 @@
+---
+variant_key: "v5_hey_firstname"
+component_type: "subject_line"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  hey {{first_name}}
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: "Friend-tone. Simplest possible casual opener."
+  framework_anchor: "friend-tone curiosity"
+ab_epsilon: 0.1

@@ -19,6 +19,7 @@ Implementation: [aios/foundation/embedder.py](../../../aios/foundation/embedder.
 ## Inputs
 
 - `VOYAGE_API_KEY` from the Voyage dashboard: https://www.voyageai.com/.
+- **REQUIRED: payment method on the Voyage account.** The free tier is 3 RPM, which cascades into 429s as soon as an enrich-stage batch touches 5+ contacts. Symptom: the Claude Deep Research prompt gets through but every call that follows it in the same minute fails, the daemon logs a wall of `429 rate limit`, and icebreaker_content stays empty. Add a payment method before the first real run; $10 of credit covers thousands of contacts.
 - Model name. Default: `voyage-3` (1024-dim). MUST match the `VECTOR(1024)` columns defined across migrations 001 and 005 (see [scripts/sql/005_foundation_completion.sql](../../../scripts/sql/005_foundation_completion.sql)).
 - Optional: `VOYAGE_MODEL` environment override (only when intentionally changing models alongside a vector-column migration).
 

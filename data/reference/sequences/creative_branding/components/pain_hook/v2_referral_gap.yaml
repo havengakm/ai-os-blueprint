@@ -1,0 +1,15 @@
+---
+variant_key: "v2_referral_gap"
+component_type: "pain_hook"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  Most firms at your stage are still relying on referrals. That works
+  until it doesn't, and the gap between projects is usually when it
+  stops working.
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: "Lifted from base-camp-agents Touch-2 overwhelmed_founder pain angle."
+  framework_anchor: "real-talk agency frustration"
+ab_epsilon: 0.1

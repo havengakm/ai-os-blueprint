@@ -1,0 +1,18 @@
+---
+variant_key: "v2_loom_offer"
+component_type: "cta"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  Ok if I send over a 2-min loom showing exactly what I'd do?
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Low-commitment ask per Kirsten's instruction. Loom pattern precedent:
+    base-camp-agents Touch-2 agency_founder CTA ("Want me to send you a
+    quick Loom showing how I'd build this for {company}?") and the
+    INTERESTED reply macro. Tests whether shifting the commitment down
+    (loom vs call) outperforms the reply-chat variant.
+  framework_anchor: "loom offer"
+ab_epsilon: 0.1

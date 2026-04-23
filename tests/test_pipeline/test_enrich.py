@@ -997,6 +997,157 @@ async def test_summary_decision_type_and_context_shape():
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Extra: icebreaker adapter wiring (Task D)
+# ---------------------------------------------------------------------------
+
+
+class _FakeIcebreakerAdapter:
+    """In-memory IcebreakerAdapter substitute for stage-wiring tests."""
+
+    def __init__(self, *, content: str, tier: int, cost_cents: int = 1,
+                 reason: str = "tier_3_generated", ok: bool = True) -> None:
+        self._content = content
+        self._tier = tier
+        self._cost = cost_cents
+        self._reason = reason
+        self._ok = ok
+        self.calls: list[dict[str, Any]] = []
+
+    async def generate(
+        self,
+        *,
+        contact: dict[str, Any],
+        merged_research_data: dict[str, Any],
+        client_id: str,
+        tier_budget: str,
+        dry_run: bool = False,
+    ):
+        self.calls.append(
+            {
+                "contact": contact,
+                "merged_research_data": merged_research_data,
+                "client_id": client_id,
+                "tier_budget": tier_budget,
+                "dry_run": dry_run,
+            }
+        )
+        # Lightweight stand-in for IcebreakerResult — only the attrs the
+        # stage reads.
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            ok=self._ok,
+            icebreaker_content=self._content,
+            tier=self._tier,
+            cost_cents=self._cost,
+            reason=self._reason,
+        )
+
+
+async def test_icebreaker_adapter_injects_content_and_tier_into_patch():
+    """When icebreaker_adapter is injected and returns content, it merges
+    into research_data_patch and the tier_budget is passed through."""
+    contact = mk_contact("c1", tier="A")
+    storage = FakeStorage([contact])
+    orc = FakeOrchestrator()
+    orc.set_response(
+        "c1",
+        mk_orc(
+            "c1",
+            "A",
+            adapter_results={
+                "claude_deep_research": mk_er(
+                    "claude_deep_research",
+                    data={"structural_signals": [
+                        {"category": "financial_growth", "type": "funding_round",
+                         "evidence_url": "u", "summary": "Series B"},
+                    ]},
+                    cost=3,
+                ),
+            },
+            total_cost_cents=3,
+        ),
+    )
+
+    ib = _FakeIcebreakerAdapter(content="Saw the Series B, that usually gets messy fast.", tier=3)
+    stage = EnrichStage(orc, storage, icebreaker_adapter=ib)
+
+    result = await stage.run(CLIENT)
+
+    # The adapter was called exactly once with the merged orchestrator data.
+    assert len(ib.calls) == 1
+    call = ib.calls[0]
+    assert call["tier_budget"] == "A"
+    assert call["client_id"] == CLIENT
+    assert call["merged_research_data"]["structural_signals"][0]["type"] == "funding_round"
+
+    # The icebreaker fields landed in the persisted patch.
+    patch = storage.updates[0]["research_data_patch"]
+    assert patch["icebreaker_content"] == "Saw the Series B, that usually gets messy fast."
+    assert patch["icebreaker_tier"] == 3
+
+    # Cost was added to the run total.
+    assert result.total_cost_cents == 4  # 3 from orchestrator + 1 from icebreaker
+    # And counted as a per-adapter hit.
+    assert result.by_adapter_hit["icebreaker"] == 1
+
+
+async def test_icebreaker_adapter_none_is_backward_compat():
+    """Stage works exactly as before when icebreaker_adapter is not injected."""
+    contact = mk_contact("c1", tier="A")
+    storage = FakeStorage([contact])
+    orc = FakeOrchestrator()
+    orc.set_response(
+        "c1",
+        mk_orc(
+            "c1",
+            "A",
+            adapter_results={
+                "claude_research": mk_er("claude_research", data={"summary": "x"}),
+            },
+        ),
+    )
+
+    stage = EnrichStage(orc, storage)  # no icebreaker_adapter
+    result = await stage.run(CLIENT)
+
+    patch = storage.updates[0]["research_data_patch"]
+    assert "icebreaker_content" not in patch
+    assert "icebreaker_tier" not in patch
+    assert "icebreaker" not in result.by_adapter_hit
+    assert "icebreaker" not in result.by_adapter_skip
+
+
+async def test_icebreaker_empty_content_counts_as_skip():
+    """Icebreaker returning ok=True but empty content (e.g. no_source_material,
+    banned_word_retry_exhausted) records a skip, not a hit, and does NOT
+    inject fields into the patch."""
+    contact = mk_contact("c1", tier="A")
+    storage = FakeStorage([contact])
+    orc = FakeOrchestrator()
+    orc.set_response(
+        "c1",
+        mk_orc(
+            "c1",
+            "A",
+            adapter_results={
+                "claude_research": mk_er("claude_research", data={"summary": "x"}),
+            },
+        ),
+    )
+    ib = _FakeIcebreakerAdapter(content="", tier=0, cost_cents=0,
+                                reason="no_source_material")
+    stage = EnrichStage(orc, storage, icebreaker_adapter=ib)
+
+    result = await stage.run(CLIENT)
+
+    patch = storage.updates[0]["research_data_patch"]
+    assert "icebreaker_content" not in patch
+    assert "icebreaker_tier" not in patch
+    assert result.by_adapter_skip.get("icebreaker") == 1
+    assert "icebreaker" not in result.by_adapter_hit
+
+
 async def test_archive_floor_passed_to_storage():
     class FloorCapture(FakeStorage):
         def __init__(self, contacts):

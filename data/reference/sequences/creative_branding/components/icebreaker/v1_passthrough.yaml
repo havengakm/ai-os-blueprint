@@ -1,0 +1,18 @@
+---
+variant_key: "v1_passthrough"
+component_type: "icebreaker"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  {{icebreaker_content}}
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Passthrough. Actual copy is written per-contact by the IcebreakerAdapter
+    (systems/scout/enrich/icebreaker_adapter.py) using one of 4 tier-specific
+    prompts. Tier is selected from research_data based on signal availability:
+    Tier 1 (frustrated Trigify post) > Tier 2 (neutral Trigify engagement) >
+    Tier 3 (structural signal, e.g. funding/hiring) > Tier 4 (website citation).
+  framework_anchor: "real-talk signal passthrough"
+ab_epsilon: 0.1
