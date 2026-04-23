@@ -566,7 +566,7 @@ class ClaudeDeepResearchAdapter:
             "sources_fetched": sources_fetched,
         }
 
-        if citable_details or buying_signals:
+        if citable_details or buying_signals or structural_signals:
             reason = "research_complete"
         else:
             reason = "research_complete_sparse"

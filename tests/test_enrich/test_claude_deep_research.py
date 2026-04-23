@@ -615,9 +615,8 @@ async def test_deep_research_structural_signals_happy_path(_env, monkeypatch):
     result = await adapter.enrich(_CONTACT)
 
     assert result.ok is True
-    # reason is driven by citable_details + buying_signals (not structural_signals);
-    # with both empty in this payload, 'research_complete_sparse' is expected.
-    assert result.reason in ("research_complete", "research_complete_sparse")
+    # structural_signals contribute to research_complete reason (Tier 3 icebreaker feed).
+    assert result.reason == "research_complete"
     signals = result.data["structural_signals"]
     assert len(signals) == 2
     assert signals[0]["category"] == "financial_growth"
