@@ -515,6 +515,33 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 77. Task 18 shipped — four Plan 1 SOPs
+
+**Raised by:** Task 18 delivery + review (2026-04-23)
+**Severity:** Approved
+**File:** `data/reference/sops/foundation-wiring.md`, `component-authoring.md`, `embedder-setup.md`, `email-compliance.md`
+
+Task 18 shipped at worktree commit `6f9080e`. Four new SOPs under `data/reference/sops/` covering the Plan 1 foundation + copy + compliance surface. All follow the trigify-monitor-authoring template (Purpose / Trigger / Inputs / Outputs / domain sections / QA / Common errors / Escalation / Automation notes / Change log), em-dash clean, under 250 lines each.
+
+**Docs shipped:**
+- `foundation-wiring.md` (191 lines): 6-module boot order, mandatory 5-step foundation loop, Scout's `_prime_foundation` helper, QA queries + test paths. Adapted file paths — `BaseSystem` lives at `systems/base.py`, `MemoryStore` at `aios/memory/store.py`, not the speculative `aios/foundation/` paths in the plan.
+- `component-authoring.md` (201 lines): YAML schema for 6 component types, status lifecycle `draft → approved → paused → killed`, per-type placeholder tables, ε=0.1 bandit flow, offer-score scorecard reference.
+- `embedder-setup.md` (184 lines): Voyage wiring (`voyage-3`, 1024-dim, 128 batch, 6.0 cents/1M tokens, 500-cent cap all verified against [aios/foundation/embedder.py](../../../aios/foundation/embedder.py)). Cost guards tied to `feedback_cost_management.md`. Rotation procedure for `VOYAGE_API_KEY`.
+- `email-compliance.md` (169 lines): Plan-1 bookmark stub. 10-point safe-send checklist + `opt_outs` schema + keyword list. Full send-time compliance logic lands in Plan 2 alongside SendStage.
+
+**Bookmarked references** (flagged inline so readers don't chase dead links):
+- `rules/global-writing-guardrails.md` — authored in a later task.
+- `skills/meta/validate-writing.md` — ditto.
+- `data/knowledge/experts/hormozi/offer-scorecard.md` — authored when first offer-scorecard pass lands.
+
+**Cross-file accuracy verified:**
+- Voyage constants match `embedder.py` exactly.
+- Migration 005 `decision_log_decision_type_check` CHECK includes all 7 Plan-1 types: `research_contact, render_draft, component_selection, screen_contact, identity_lookup, source_selection, enrich_contact`.
+- Migration 006 `component_variants.component_type` enum = exactly `subject_line | icebreaker | pain_hook | offer_frame | cta | signature`; status enum = `draft | approved | paused | killed`.
+- 1024-dim pgvector columns consistent across migrations 001 + 005.
+
+Plan 1 remaining: Task 17D (operator-run live dry-run) + Task 19 (final verification + merge).
+
 ### 76. Task 17C approved — daemon compose stage closed
 
 **Raised by:** Task 17C delivery + two-stage review (2026-04-23)
