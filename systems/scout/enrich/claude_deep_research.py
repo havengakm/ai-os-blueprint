@@ -27,7 +27,7 @@ from systems.scout.enrich.base import EnrichResult
 
 logger = logging.getLogger(__name__)
 
-SONNET_MODEL = "claude-sonnet-4-6-20251001"
+SONNET_MODEL = "claude-sonnet-4-6"
 # Bumped from 800 -> 1200 to accommodate the structural_signals array (Task C).
 # Validator caps structural_signals at 8 entries, so cost stays bounded.
 MAX_TOKENS = 1200

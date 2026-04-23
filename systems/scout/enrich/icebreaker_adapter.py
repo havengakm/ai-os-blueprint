@@ -37,7 +37,7 @@ from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
-SONNET_MODEL = "claude-sonnet-4-6-20251001"
+SONNET_MODEL = "claude-sonnet-4-6"
 # Icebreakers are at most 2 sentences + JSON wrapper. 200 is plenty.
 MAX_TOKENS = 200
 

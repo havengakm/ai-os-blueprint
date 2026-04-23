@@ -27,7 +27,7 @@ from systems.scout.enrich.base import EnrichResult
 
 logger = logging.getLogger(__name__)
 
-SONNET_MODEL = "claude-sonnet-4-6-20251001"
+SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 800
 
 VALID_EVENT_TYPES = frozenset(
