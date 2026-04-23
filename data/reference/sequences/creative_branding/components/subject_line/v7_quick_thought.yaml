@@ -1,0 +1,16 @@
+---
+variant_key: "v7_quick_thought"
+component_type: "subject_line"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  quick thought {{first_name}}
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Peer-to-peer value signalling (I did the thinking, sharing with you)
+    that works WITHOUT requiring the icebreaker to fire. Bandit pair
+    with v5 (noticed something) — routes safely when icebreaker is thin.
+  framework_anchor: "value-signalling curiosity"
+ab_epsilon: 0.1

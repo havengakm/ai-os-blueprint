@@ -1,0 +1,19 @@
+---
+variant_key: "v5_noticed_something"
+component_type: "subject_line"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  {{first_name}} noticed something
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Value-signalling (I have something for you) vs time-asking (give me
+    your time). Body must deliver the observation via {{icebreaker_content}}.
+    If IcebreakerAdapter returns tier=0 (no source material), this subject
+    over-promises — pair with v7 (quick thought) so bandit can route
+    safely. For MVP, every contact runs Claude Deep Research so at least
+    Tier 4 website fallback populates icebreaker_content.
+  framework_anchor: "value-signalling curiosity"
+ab_epsilon: 0.1
