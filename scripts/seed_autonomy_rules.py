@@ -39,10 +39,11 @@ ACTION_TYPES: tuple[str, ...] = (
     "system_config",
     "enrichment_choice",
     "framework_selection",
-    # 005_foundation_completion.sql (7)
+    # 005_foundation_completion.sql (8)
     "research_contact",
     "render_draft",
     "component_selection",
+    "score_contact",
     "screen_contact",
     "identity_lookup",
     "source_selection",

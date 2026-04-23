@@ -58,6 +58,25 @@ PIPELINE_DECISION_TYPES: tuple[str, ...] = (
     "research_contact",
 )
 
+# Stages that legitimately emit zero decision_log rows when the dataset has
+# nothing to do (e.g. pull with no active sources; screen when all contacts
+# are already past 'screened'; research inside compose only fires for variants
+# that reference a research placeholder). These are reported as warnings,
+# not pass/fail blockers.
+OPTIONAL_STAGE_TYPES: frozenset[str] = frozenset({
+    "source_selection",
+    "score_contact",
+    "screen_contact",
+    "research_contact",
+})
+
+# Stages that MUST emit at least one decision for a valid acceptance run.
+# If any of these is missing, the foundation loop didn't actually fire for
+# contact-level work, which is a real failure.
+REQUIRED_STAGE_TYPES: frozenset[str] = (
+    frozenset(PIPELINE_DECISION_TYPES) - OPTIONAL_STAGE_TYPES
+)
+
 COMPONENT_TYPES: tuple[str, ...] = (
     "subject_line",
     "icebreaker",
@@ -96,6 +115,7 @@ class VerifyReport:
     decisions_by_type: dict[str, int] = field(default_factory=dict)
     stages_with_evidence: list[str] = field(default_factory=list)
     stages_missing_evidence: list[str] = field(default_factory=list)
+    optional_stages_missing: list[str] = field(default_factory=list)
     render_evidence: list[RenderDraftEvidence] = field(default_factory=list)
     drafts_delta: int = 0
     auto_pass: bool = False
@@ -248,17 +268,27 @@ def run_verify(
 
     reasons: list[str] = []
 
-    if report.total_decisions < len(PIPELINE_DECISION_TYPES):
+    if report.total_decisions < len(REQUIRED_STAGE_TYPES):
         reasons.append(
             f"only {report.total_decisions} decision_log rows "
-            f"(expected >= {len(PIPELINE_DECISION_TYPES)})"
+            f"(expected >= {len(REQUIRED_STAGE_TYPES)} covering required stages)"
         )
 
-    if report.stages_missing_evidence:
+    required_missing = [
+        s for s in report.stages_missing_evidence if s in REQUIRED_STAGE_TYPES
+    ]
+    if required_missing:
         reasons.append(
-            "missing foundation-loop evidence for stages: "
-            f"{report.stages_missing_evidence}"
+            "missing foundation-loop evidence for REQUIRED stages: "
+            f"{required_missing}"
         )
+
+    # Optional stages are reported as warnings in the markdown report but do
+    # not block acceptance pass/fail.
+    optional_missing = [
+        s for s in report.stages_missing_evidence if s in OPTIONAL_STAGE_TYPES
+    ]
+    report.optional_stages_missing = optional_missing
 
     # A single successful render_draft with a complete component_tuple is
     # enough: the composer fans out per-contact, some may skip, but at
@@ -297,12 +327,26 @@ def _render_markdown(report: VerifyReport) -> str:
     lines.append(f"- Cycle window end:   `{report.completed_at}`")
     lines.append(f"- Decisions logged: {report.total_decisions}")
     lines.append(f"- Drafts persisted to outreach_drafts: {report.drafts_delta}")
-    foundation_mark = "PASS" if not report.stages_missing_evidence else "FAIL"
+    # Foundation-loop PASS requires only the REQUIRED stages. Optional
+    # stages (e.g. source_selection when no sources are configured, or
+    # screen_contact when contacts are already past that state) may
+    # legitimately emit zero decisions and are reported as warnings below.
+    required_missing = [
+        s for s in report.stages_missing_evidence if s in REQUIRED_STAGE_TYPES
+    ]
+    foundation_mark = "PASS" if not required_missing else "FAIL"
     lines.append(
-        f"- Foundation loop fired on all stages: {foundation_mark} "
-        f"(stages with evidence: {len(report.stages_with_evidence)}/"
-        f"{len(PIPELINE_DECISION_TYPES)})"
+        f"- Foundation loop fired on required stages: {foundation_mark} "
+        f"(required: {len(REQUIRED_STAGE_TYPES) - len(required_missing)}/"
+        f"{len(REQUIRED_STAGE_TYPES)}, "
+        f"optional: {len(OPTIONAL_STAGE_TYPES) - len(report.optional_stages_missing)}/"
+        f"{len(OPTIONAL_STAGE_TYPES)})"
     )
+    if report.optional_stages_missing:
+        lines.append(
+            f"- Optional stages with no decisions (informational): "
+            f"{report.optional_stages_missing}"
+        )
     lines.append(f"- Automated checks: {'PASS' if report.auto_pass else 'FAIL'}")
     if report.failure_reasons:
         lines.append("")
@@ -508,10 +552,18 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"report written: {output}")
     print(f"decisions logged: {report.total_decisions}")
+    required_present = len(REQUIRED_STAGE_TYPES) - len([
+        s for s in report.stages_missing_evidence if s in REQUIRED_STAGE_TYPES
+    ])
     print(
-        f"stages with evidence: {len(report.stages_with_evidence)}/"
-        f"{len(PIPELINE_DECISION_TYPES)}"
+        f"required stages with evidence: {required_present}/"
+        f"{len(REQUIRED_STAGE_TYPES)}"
     )
+    if report.optional_stages_missing:
+        print(
+            f"optional stages missing (informational, not blocking): "
+            f"{report.optional_stages_missing}"
+        )
     if not report.auto_pass:
         print("recommendation: AUTO FAIL")
         for r in report.failure_reasons:

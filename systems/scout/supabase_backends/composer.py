@@ -98,22 +98,26 @@ class SupabaseComposerBackend:
             eligible = eligible[:limit]
 
         # Composer.compose reads ``contact_id`` (DB column is ``id``).
-        # ``offer_label`` is intentionally absent — the contacts table has
-        # no such column. Multi-offer routing is a Plan 2 concern; for now
-        # Composer.compose sees ``offer_label=""`` and either matches an
-        # empty-labelled variant or skips cleanly with a logged decision.
+        # ``offer_label`` is sourced from ``research_data.offer_label`` — the
+        # contacts table has no top-level column, and multi-offer routing is
+        # a Plan 2 concern. For Plan 1 (single offer per client), operators
+        # seed research_data.offer_label per contact (or let it default to
+        # ""). Composer.compose will skip with a logged decision if no
+        # matching variants exist.
         out: list[dict[str, Any]] = []
         for row in eligible:
+            research_data = row.get("research_data") or {}
             out.append(
                 {
                     "contact_id": row["id"],
                     "niche": row.get("niche") or "",
+                    "offer_label": research_data.get("offer_label") or "",
                     "first_name": row.get("first_name"),
                     "company": row.get("company"),
                     "email": row.get("email"),
                     "icp_tier": row.get("icp_tier"),
                     "icp_score": row.get("icp_score"),
-                    "research_data": row.get("research_data") or {},
+                    "research_data": research_data,
                 }
             )
         return out
