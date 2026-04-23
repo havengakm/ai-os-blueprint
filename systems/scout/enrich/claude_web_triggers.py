@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import date, datetime
 from typing import Any
 
@@ -26,6 +27,25 @@ from systems.scout.enrich.base import EnrichResult
 
 
 logger = logging.getLogger(__name__)
+
+# Phrases that indicate Claude genuinely searched and found no events. When the
+# response is prose-only (no JSON block) AND contains one of these, we treat
+# the result as a legitimate "no signals" outcome rather than a parse failure.
+_NO_SIGNAL_PHRASES = (
+    "no trigger events",
+    "no trigger event",
+    "not found",
+    "no signals",
+    "no news",
+    "no recent news",
+    "no relevant news",
+    "no relevant events",
+    "no recent events",
+    "no events",
+)
+
+_FENCE_HEAD_RE = re.compile(r"^\s*```(?:json)?\s*", re.IGNORECASE)
+_FENCE_TAIL_RE = re.compile(r"\s*```\s*$")
 
 SONNET_MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 800
@@ -163,6 +183,64 @@ def _default_data() -> dict[str, Any]:
         "reasoning": "",
         "searches_performed": 0,
     }
+
+
+def _extract_json_object(text: str) -> str | None:
+    """Return the first balanced JSON object substring found in ``text``.
+
+    Handles Claude responses in all observed shapes:
+      - bare JSON:                     ``{"trigger_events": []}``
+      - fenced JSON:                   ``` ```json\n{...}\n``` ```
+      - prose-prefixed fenced JSON:    ``"Based on X: \n```json\n{...}\n```"``
+      - prose-prefixed bare JSON:      ``"Here is the JSON: {...}"``
+      - prose with no JSON:            returns ``None``
+
+    Strategy: strip leading/trailing code fences if present, then brace-count
+    to find the first balanced ``{...}`` block. Brace counting is preferred
+    over a naive regex because prose prefixes may legitimately contain ``{``
+    or ``}`` (e.g. "{company name}" in a template).
+    """
+    if not text:
+        return None
+
+    stripped = _FENCE_HEAD_RE.sub("", text)
+    stripped = _FENCE_TAIL_RE.sub("", stripped)
+
+    # Brace-count scan. Respect string quoting so `{` / `}` inside a string
+    # literal don't fool the counter.
+    start = stripped.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(stripped)):
+        ch = stripped[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return stripped[start : i + 1]
+    return None
+
+
+def _looks_like_no_signal_prose(text: str) -> bool:
+    """True when prose-only text contains a clear 'nothing found' phrase."""
+    lower = text.lower()
+    return any(phrase in lower for phrase in _NO_SIGNAL_PHRASES)
 
 
 def _extract_text_block(content: list[Any]) -> str:
@@ -304,12 +382,49 @@ class ClaudeWebTriggersAdapter:
         searches_performed = _extract_search_count(response.usage)
 
         # --- parse ---
-        try:
-            parsed: dict[str, Any] = json.loads(raw_text)
-        except json.JSONDecodeError:
+        # Claude ignores the "no prose, no code fences" instruction ~half the
+        # time — returning prose prefixes, ```json fences, or both. Try to
+        # extract a balanced JSON object before giving up.
+        candidate = _extract_json_object(raw_text)
+        if candidate is None:
+            # Prose-only response. Distinguish "Claude searched and found
+            # nothing" (legitimate empty result) from "Claude emitted garbage"
+            # (true parse failure).
+            if _looks_like_no_signal_prose(raw_text):
+                logger.info(
+                    "claude_web_triggers no_signals_found contact_id=%s",
+                    contact_id,
+                )
+                data = _default_data()
+                data["searches_performed"] = searches_performed
+                return EnrichResult(
+                    adapter_name=self.name,
+                    ok=True,
+                    cost_cents=self.cost_cents_per_call,
+                    reason="no_signals_found",
+                    data=data,
+                    raw_response={},
+                )
             logger.warning(
                 "claude_web_triggers parse_failed contact_id=%s raw=%r",
-                contact_id, raw_text[:200],
+                contact_id, raw_text[:500],
+            )
+            data = _default_data()
+            data["searches_performed"] = searches_performed
+            return EnrichResult(
+                adapter_name=self.name,
+                ok=True,
+                cost_cents=self.cost_cents_per_call,
+                reason="parse_failed",
+                data=data,
+                raw_response={},
+            )
+        try:
+            parsed: dict[str, Any] = json.loads(candidate)
+        except json.JSONDecodeError:
+            logger.warning(
+                "claude_web_triggers parse_failed contact_id=%s raw=%r candidate=%r",
+                contact_id, raw_text[:500], candidate[:500],
             )
             data = _default_data()
             data["searches_performed"] = searches_performed

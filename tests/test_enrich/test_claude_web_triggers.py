@@ -375,6 +375,138 @@ async def test_web_triggers_raises_on_anthropic_error(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_web_triggers_parses_fenced_json(monkeypatch):
+    """Claude wraps JSON in ```json ... ``` fences → parses cleanly."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    payload = _triggers_response([_event()])
+    wrapped = f"```json\n{payload}\n```"
+    client = _make_client(wrapped)
+
+    from systems.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
+    adapter = ClaudeWebTriggersAdapter(anthropic_client=client)
+    result = await adapter.enrich(_contact())
+
+    assert result.ok is True
+    assert result.reason == "triggers_found"
+    assert len(result.data["trigger_events"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_web_triggers_parses_prose_prefixed_bare_json(monkeypatch):
+    """Claude prepends prose then emits bare JSON → parses cleanly."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    payload = _triggers_response([_event()])
+    prose = f"Based on the search results, here is the JSON: {payload}"
+    client = _make_client(prose)
+
+    from systems.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
+    adapter = ClaudeWebTriggersAdapter(anthropic_client=client)
+    result = await adapter.enrich(_contact())
+
+    assert result.ok is True
+    assert result.reason == "triggers_found"
+    assert len(result.data["trigger_events"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_web_triggers_parses_prose_prefixed_fenced_json(monkeypatch):
+    """Claude prepends prose AND wraps in fences — the common Sonnet shape."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    payload = _triggers_response([_event(type_="executive_hire", detail="New CRO hired")])
+    prose = (
+        "Based on the search results, I have found clear, well-sourced "
+        "trigger events for PR Worx. Here is the strictly valid JSON output:"
+        f"\n\n```json\n{payload}\n```"
+    )
+    client = _make_client(prose)
+
+    from systems.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
+    adapter = ClaudeWebTriggersAdapter(anthropic_client=client)
+    result = await adapter.enrich(_contact())
+
+    assert result.ok is True
+    assert result.reason == "triggers_found"
+    assert len(result.data["trigger_events"]) == 1
+    assert result.data["trigger_events"][0]["type"] == "executive_hire"
+
+
+@pytest.mark.asyncio
+async def test_web_triggers_prose_only_no_signals_found(monkeypatch):
+    """Prose-only response with 'no trigger events' → reason='no_signals_found'
+    (not parse_failed). The pipeline treats this as a legitimate empty result."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    prose = (
+        "Based on the search results, no trigger events (funding rounds, "
+        "executive hires, product launches, expansions, layoffs, or major "
+        "press coverage) from the last 90 days were found for Inkblot Design."
+    )
+    client = _make_client(prose)
+
+    from systems.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
+    adapter = ClaudeWebTriggersAdapter(anthropic_client=client)
+    result = await adapter.enrich(_contact())
+
+    assert result.ok is True
+    assert result.cost_cents == 5  # billed regardless
+    assert result.reason == "no_signals_found"
+    assert result.data["trigger_events"] == []
+    assert result.data["has_active_trigger"] is False
+
+
+@pytest.mark.asyncio
+async def test_web_triggers_prose_only_no_match_is_parse_failed(monkeypatch):
+    """Pure prose with neither a JSON object nor a 'no signals' phrase
+    remains parse_failed (genuine failure mode)."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    prose = "I think maybe something happened but I can't say what."
+    client = _make_client(prose)
+
+    from systems.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
+    adapter = ClaudeWebTriggersAdapter(anthropic_client=client)
+    result = await adapter.enrich(_contact())
+
+    assert result.ok is True
+    assert result.reason == "parse_failed"
+    assert result.data["trigger_events"] == []
+
+
+@pytest.mark.asyncio
+async def test_web_triggers_extract_json_helper_handles_edge_cases():
+    """Unit test for _extract_json_object — brace-counting correctness."""
+    from systems.scout.enrich.claude_web_triggers import _extract_json_object
+
+    # Bare JSON
+    assert _extract_json_object('{"a": 1}') == '{"a": 1}'
+
+    # Fenced JSON
+    assert _extract_json_object('```json\n{"a": 1}\n```') == '{"a": 1}'
+
+    # Prose prefix + bare JSON
+    assert _extract_json_object('Here: {"a": 1}') == '{"a": 1}'
+
+    # First balanced block wins — stops the scan on nested structures so
+    # the caller (json.loads) always sees a well-formed candidate. If an
+    # earlier block isn't valid JSON, the caller falls through to
+    # parse_failed, which is the safe outcome.
+    assert _extract_json_object('prefix {first} later {"a": 1}') == '{first}'
+
+    # Nested objects (must return the OUTER balanced block)
+    assert _extract_json_object('{"a": {"b": 1}}') == '{"a": {"b": 1}}'
+
+    # Braces inside strings must not affect the counter
+    assert _extract_json_object('{"s": "has } inside"}') == '{"s": "has } inside"}'
+
+    # No JSON at all
+    assert _extract_json_object("just prose") is None
+    assert _extract_json_object("") is None
+
+
+@pytest.mark.asyncio
 async def test_web_triggers_aclose_lifecycle(monkeypatch):
     """Lazily-created client closed on aclose(); injected client untouched."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
