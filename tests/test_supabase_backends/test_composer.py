@@ -290,6 +290,41 @@ async def test_fetch_eligible_contacts_empty_returns_empty_list() -> None:
     assert result == []
 
 
+async def test_fetch_eligible_contacts_applies_server_side_ordering() -> None:
+    """Supabase default caps results at ~1000 rows. Without server-side
+    ordering, a client with >1000 eligible contacts would get an arbitrary
+    slice, not the top-scoring slice. The contacts query must include both
+    ``.order("icp_tier")`` and ``.order("icp_score", desc=True)``."""
+
+    class OrderCapturingClient(FakeSupabaseClient):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            self.contacts_orders: list[tuple[str, bool]] = []
+
+        def table(self, name: str):  # type: ignore[override]
+            builder = super().table(name)
+            if name == "contacts":
+                original_execute = builder.execute
+                orders_ref = self.contacts_orders
+
+                def capturing_execute():
+                    orders_ref.extend(builder._orders)
+                    return original_execute()
+
+                builder.execute = capturing_execute  # type: ignore[method-assign]
+            return builder
+
+    fake = OrderCapturingClient(
+        tables={"contacts": [_enriched_contact(contact_id="u1", tier="A")]}
+    )
+    backend = SupabaseComposerBackend(fake)
+
+    await backend.fetch_eligible_contacts("c1")
+
+    assert ("icp_tier", False) in fake.contacts_orders
+    assert ("icp_score", True) in fake.contacts_orders
+
+
 async def test_fetch_eligible_contacts_filters_by_client_id() -> None:
     fake = FakeSupabaseClient(
         tables={

@@ -114,7 +114,9 @@ class ComposerStorageBackend(Protocol):
         """Return contacts eligible for compose — status ``'enriched'``,
         ``icp_tier`` in A/B/C, no existing ``outreach_drafts`` row yet.
         Caller iterates and passes each to ``Composer.compose()``. If
-        ``limit`` is ``None``, no cap."""
+        ``limit`` is ``None``, no cap. ``limit`` caps the returned
+        eligible set (after excluding contacts that already have a
+        draft), not the candidate pool."""
         ...
 
     async def fetch_approved_variants(

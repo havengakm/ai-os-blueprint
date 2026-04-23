@@ -16,7 +16,8 @@ from systems.scout.supabase_backends._base import SupabaseLike, insert_decision_
 
 #: Contacts whose ``icp_tier`` is one of these are allowed into compose.
 #: D-tier is the "maybe someday" bucket; archived/killed are dropped upstream.
-_COMPOSE_TIERS: tuple[str, ...] = ("A", "B", "C")
+#: Dict doubles as sort key: lower rank = higher priority.
+_TIER_RANK: dict[str, int] = {"A": 0, "B": 1, "C": 2}
 
 
 class SupabaseComposerBackend:
@@ -45,6 +46,12 @@ class SupabaseComposerBackend:
         icp_score desc so the highest-value contacts compose first when
         ``limit`` caps the batch. If perf matters later, swap in an RPC.
         """
+        # Single-daemon assumption: a concurrent nightly run could insert a draft
+        # between the contacts fetch and the drafts fetch, producing duplicate
+        # compositions. Current cadence is one daemon instance per client, so this
+        # is acceptable. Concurrent workers would require a UNIQUE (client_id,
+        # contact_id) constraint on outreach_drafts (migration 002 has only an
+        # index, not a constraint).
         query = (
             self._client.table("contacts")
             .select(
@@ -53,7 +60,9 @@ class SupabaseComposerBackend:
             )
             .eq("client_id", client_id)
             .eq("status", "enriched")
-            .in_("icp_tier", list(_COMPOSE_TIERS))
+            .in_("icp_tier", list(_TIER_RANK))
+            .order("icp_tier")
+            .order("icp_score", desc=True)
         )
         resp = query.execute()
         rows = resp.data or []
@@ -75,12 +84,13 @@ class SupabaseComposerBackend:
                 if d.get("contact_id") is not None
             }
 
+        # Python sort is a deterministic tiebreaker — set-difference above
+        # preserves insertion order, but an explicit re-sort guards against
+        # any backend returning rows out of order.
         eligible = [row for row in rows if row["id"] not in drafted]
         eligible.sort(
             key=lambda r: (
-                _COMPOSE_TIERS.index(r.get("icp_tier"))
-                if r.get("icp_tier") in _COMPOSE_TIERS
-                else len(_COMPOSE_TIERS),
+                _TIER_RANK.get(r.get("icp_tier"), 99),
                 -(r.get("icp_score") or 0),
             )
         )

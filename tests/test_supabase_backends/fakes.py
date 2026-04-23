@@ -58,6 +58,7 @@ class _QueryBuilder:
         self._ignore_duplicates: bool = False
         self._filters: list[tuple[str, str, Any]] = []
         self._limit: int | None = None
+        self._orders: list[tuple[str, bool]] = []
 
     # ---- op chain ----------------------------------------------------
 
@@ -112,6 +113,10 @@ class _QueryBuilder:
 
     def limit(self, n: int) -> "_QueryBuilder":
         self._limit = n
+        return self
+
+    def order(self, col: str, desc: bool = False) -> "_QueryBuilder":
+        self._orders.append((col, desc))
         return self
 
     # ---- execute -----------------------------------------------------
