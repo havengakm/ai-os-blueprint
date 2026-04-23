@@ -110,34 +110,67 @@ def _scale(raw: int, raw_max: int, cap: int) -> int:
 
 
 def _score_fit(contact: dict[str, Any], icp: dict[str, Any], cap: int) -> int:
+    """Score fit signals, scaled over fields that have data.
+
+    Sparse-data contacts (e.g. ingest payloads missing industry/employees/
+    geography but with a populated title) were landing below archive_floor
+    purely because of missing-field penalties. The archive path then threw
+    away perfectly viable contacts pre-enrich.
+
+    Fix: scale raw → cap against the sum of raw weights for fields that
+    were actually provided, not the full 40-point default. A title-only
+    contact with a matching title scores 15/15*cap = cap, not 15/40*cap.
+    Fully-populated contacts still behave as before (raw_max == 40).
+
+    A field is "provided" when it is non-None on the contact. The ICP
+    match result (present-and-matched vs present-and-unmatched) still maps
+    to points-or-zero — we only gate INCLUSION in the denominator on
+    "was there data to evaluate at all".
+    """
     raw = 0
+    raw_max = 0
+
     industries: list[str] = icp.get("industries") or []
-    contact_industry: str = (contact.get("industry") or "").lower()
-    # Substring match (config term in contact industry) — same direction as title
-    # and geography. ICP authors broad terms ("consulting"); vendor data returns
-    # specific taxonomy ("management consulting", "IT consulting") — substring
-    # bridges the two.
-    if contact_industry and any(i.lower() in contact_industry for i in industries if i):
-        raw += _RAW_FIT_INDUSTRY
+    contact_industry_raw = contact.get("industry")
+    if contact_industry_raw is not None:
+        raw_max += _RAW_FIT_INDUSTRY
+        contact_industry = str(contact_industry_raw).lower()
+        # Substring match (config term in contact industry) — same direction
+        # as title and geography. ICP authors broad terms ("consulting");
+        # vendor data returns specific taxonomy ("management consulting") —
+        # substring bridges the two.
+        if contact_industry and any(i.lower() in contact_industry for i in industries if i):
+            raw += _RAW_FIT_INDUSTRY
 
     titles: list[str] = icp.get("titles") or []
-    contact_title: str = (contact.get("title") or "").lower()
-    if contact_title and any(t.lower() in contact_title for t in titles):
-        raw += _RAW_FIT_TITLE
+    contact_title_raw = contact.get("title")
+    if contact_title_raw is not None:
+        raw_max += _RAW_FIT_TITLE
+        contact_title = str(contact_title_raw).lower()
+        if contact_title and any(t.lower() in contact_title for t in titles):
+            raw += _RAW_FIT_TITLE
 
     emp_min: int | None = icp.get("employee_min")
     emp_max: int | None = icp.get("employee_max")
     employees = contact.get("employees")
-    if employees is not None and emp_min is not None and emp_max is not None:
-        if emp_min <= employees <= emp_max:
+    if employees is not None:
+        raw_max += _RAW_FIT_EMPLOYEES
+        if emp_min is not None and emp_max is not None and emp_min <= employees <= emp_max:
             raw += _RAW_FIT_EMPLOYEES
 
     geos: list[str] = icp.get("geographies") or []
-    contact_geo: str = (contact.get("geography") or "").lower()
-    if contact_geo and any(g.lower() in contact_geo for g in geos):
-        raw += _RAW_FIT_GEOGRAPHY
+    contact_geo_raw = contact.get("geography")
+    if contact_geo_raw is not None:
+        raw_max += _RAW_FIT_GEOGRAPHY
+        contact_geo = str(contact_geo_raw).lower()
+        if contact_geo and any(g.lower() in contact_geo for g in geos):
+            raw += _RAW_FIT_GEOGRAPHY
 
-    return _scale(raw, _DEFAULT_FIT_RAW_MAX, cap)
+    # No fit fields provided at all → 0 fit, as before. Otherwise scale
+    # against the available-field total (raw_max), not the default 40.
+    if raw_max == 0:
+        return 0
+    return _scale(raw, raw_max, cap)
 
 
 def _score_reach(contact: dict[str, Any], cap: int) -> int:

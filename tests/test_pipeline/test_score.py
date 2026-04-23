@@ -71,10 +71,15 @@ def test_score_v1_hits_all_fit_signals():
 
 
 def test_score_v1_partial_fit():
+    """Only industry + title set (employees, geography are None).
+    _score_fit scales over PROVIDED fields (industry+title raw_max=30), so
+    a perfect-match partial contact scales to the full fit cap.
+    """
     contact = _contact(industry="SaaS", title="Founder")
     score = score_v1(contact, _BASE_CONFIG)
-    # fit: 15 + 15 = 30; reach: 0; recency: 0 → 30
-    assert score == 30
+    # fit raw = 30 (industry + title), available raw_max = 30 → scaled to cap = 40.
+    # reach: 0; recency: 0 → total 40
+    assert score == 40
 
 
 def test_score_v1_industry_match_is_case_insensitive():
@@ -88,7 +93,10 @@ def test_score_v1_industry_match_is_case_insensitive():
     # Contact has capital-C spelling; must still match
     contact = _contact(industry="Fractional CFO")
     score = score_v1(contact, config_lower)
-    assert score == 15  # industry fit only, nothing else set
+    # industry raw=15, available raw_max=15 (only industry provided) → scaled
+    # to full fit cap (40). Case-insensitive match is what's under test —
+    # the score value just confirms the match fired.
+    assert score == 40
 
 
 def test_score_v1_industry_broad_term_matches_specific():
@@ -101,7 +109,9 @@ def test_score_v1_industry_broad_term_matches_specific():
     }
     contact = _contact(industry="management consulting")
     score = score_v1(contact, config)
-    assert score == 15  # industry fit only
+    # industry raw=15, available raw_max=15 → scaled to full fit cap (40).
+    # Substring behaviour is what's under test, not the exact score.
+    assert score == 40
 
 
 def test_score_v1_industry_unrelated_still_fails():
@@ -335,6 +345,67 @@ def test_score_v1_custom_reach_weight():
     # reach raw = 10 + 5 + 5 = 20; default_reach_max = 20; cap = 40 → scaled = 40
     # fit = 0 (no icp); recency = 0 → total = 40
     assert score == 40
+
+
+def test_score_v1_sparse_contact_stays_above_archive_floor():
+    """Regression: ingest CSV payloads often lack industry/employees/geography
+    but have title + email_verified. Before the Option-A fit scaling fix, such
+    contacts scored ~25 and got archived by score_v2 despite being viable.
+    They must now score at or above the 35 archive floor.
+    """
+    contact = _contact(
+        title="Founder",
+        email="founder@acme.com",
+        email_verified=True,
+        # industry, employees, geography all None
+        # no linkedin, no phone
+    )
+    score = score_v1(contact, _BASE_CONFIG)
+    # fit: only title provided → raw=15, raw_max=15 → scaled 15/15*40 = 40
+    # reach: verified email only (raw=10), default raw_max=20, cap=20 → 10
+    # recency: 0
+    # total: 50 — comfortably above archive_floor=35
+    assert score >= _DEFAULT_THRESHOLDS["archive_floor"]
+    assert score == 50
+
+
+def test_score_v1_fully_populated_regression():
+    """When every fit field is provided, behaviour is unchanged from the
+    pre-Option-A implementation — raw_max==default (40), no scaling effect."""
+    contact = _contact(
+        industry="SaaS",
+        title="CEO",
+        employees=100,
+        geography="United Kingdom",
+        email="a@b.com",
+        email_verified=True,
+        linkedin_url="https://linkedin.com/in/x",
+        phone="+441234567890",
+        raw_data={"funding_event_last_180d": True, "recent_hiring": True},
+    )
+    score = score_v1(contact, _BASE_CONFIG)
+    # fit: raw=40, raw_max=40, cap=40 → 40 (identical to pre-fix)
+    # reach: 20, recency: 10 → total 70
+    assert score == 70
+
+
+def test_score_v1_mixed_sparse_proportional():
+    """Mix: industry missing, employees+geography+title set, one of those
+    matches. Scaled against provided fields only (title + employees +
+    geography = raw_max 25), not the full 40."""
+    # Title matches ("Founder" matches ICP titles), employees in band,
+    # geography NOT matching ("Germany" not in UK/Ireland).
+    contact = _contact(
+        industry=None,
+        title="Founder",
+        employees=50,
+        geography="Germany",
+    )
+    score = score_v1(contact, _BASE_CONFIG)
+    # fit: raw = 15 (title) + 5 (employees) = 20; raw_max = 15 + 5 + 5 = 25
+    # scaled: 20/25 * 40 = 32
+    # reach: 0, recency: 0
+    assert score == 32
 
 
 def test_score_v1_custom_recency_weight():
