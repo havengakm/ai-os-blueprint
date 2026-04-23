@@ -1,0 +1,14 @@
+---
+variant_key: "v1_15min_call"
+component_type: "cta"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  Worth a 15-minute call next week to walk through what we'd look at?
+  {{calendly_link}}
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: "BOOTSTRAP PLACEHOLDER — replace with real copy via component-authoring SOP (Task 18)."
+  framework_anchor: "Sapp low-commitment close"
+ab_epsilon: 0.1

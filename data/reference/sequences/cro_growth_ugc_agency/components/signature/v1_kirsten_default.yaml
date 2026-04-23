@@ -1,0 +1,14 @@
+---
+variant_key: "v1_kirsten_default"
+component_type: "signature"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  Kirsten
+  {{sender_title}}
+  {{sender_company}}
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: "BOOTSTRAP PLACEHOLDER — replace with real copy via component-authoring SOP (Task 18)."
+ab_epsilon: 0.1

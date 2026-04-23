@@ -1,0 +1,15 @@
+---
+variant_key: "v1_ad_activity_observation"
+component_type: "icebreaker"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  Noticed {{company_name}} has been running {{ad_activity_observation}} —
+  the pattern we see at similar shops is conversion drop-off at
+  {{pain_hook_reference}}.
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: "BOOTSTRAP PLACEHOLDER — replace with real copy via component-authoring SOP (Task 18)."
+  framework_anchor: "Sapp 6-step close, step 2 (observation-led)"
+ab_epsilon: 0.1
