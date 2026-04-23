@@ -515,6 +515,35 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 76. Task 17C approved — daemon compose stage closed
+
+**Raised by:** Task 17C delivery + two-stage review (2026-04-23)
+**Severity:** Approved (+0 new backlog; race-condition mitigations deferred)
+**File:** `systems/scout/outreach/composer.py`, `systems/scout/supabase_backends/composer.py`, `aios/daemon/client_worker.py`, `aios/daemon/main.py`, `scripts/run_daemon_once.py`
+
+Task 17C shipped at worktree commits `8477fc0` (initial) + `fbda58f` (code-quality review fixes). `ComposerStorageBackend.fetch_eligible_contacts` added to the Protocol; `SupabaseComposerBackend` implements it; `aios/daemon/client_worker.py` compose stage no longer raises `NotImplementedError`. Closes the gap flagged in item 73. Test suite 642 → 652 passed + 1 skipped.
+
+**Eligibility contract:** contacts with `status="enriched"` AND `icp_tier IN ("A","B","C")` AND no existing `outreach_drafts` row for `(client_id, contact_id)`. NOT-EXISTS enforced client-side (two queries + set-difference in Python — Supabase Python client chain-builder doesn't support sub-selects cleanly without an RPC). Server-side ordering `.order("icp_tier").order("icp_score", desc=True)` ensures the Supabase default ~1000-row cap truncates the lowest-scoring tail, not an arbitrary slice.
+
+**Schema discoveries:**
+- No `sequence_round` column exists — collapsed round-based re-entry semantics to "any existing draft blocks". Round-based re-entry is Plan 2 scope (90-day cool-off + `sequence_round` column).
+- No `offer_label` column on contacts — multi-offer routing is a Plan 2 concern; Composer defaults to empty offer_label and logs a skip if variants can't match.
+- `outreach_drafts` has only `idx_drafts_contact` INDEX, no UNIQUE constraint on `(client_id, contact_id)`. The two-query NOT-EXISTS filter has an inherent race window — acceptable under single-daemon cadence; documented in code comment.
+
+**Code-quality review findings (all fixed in `fbda58f`):**
+1. Added server-side `.order()` chain to contacts query (1000-row truncation risk).
+2. Protocol docstring now clarifies `limit` caps the **post-draft-exclusion** set, not the candidate pool (matters for any future RPC implementation).
+3. Inline single-daemon race-condition comment added to `fetch_eligible_contacts` body.
+4. Nice-to-have: replaced `_COMPOSE_TIERS` tuple + `.index()` sort-key with `_TIER_RANK` dict.
+
+**Deferred for Plan 2:**
+- UNIQUE constraint on `outreach_drafts (client_id, contact_id, sequence_round)` once `sequence_round` exists.
+- Multi-offer routing in composer eligibility (requires `contacts.offer_label` or a per-client offer-selection rule).
+
+**Observability follow-up (minor, not a blocker):** `client_worker.py` compose stage logs "no eligible contacts" on empty but doesn't log eligible-count on the happy path. Operator investigating "why only 3 drafts tonight?" has to dig into decision_log. Land with Task 18 SOPs.
+
+Task 17 remaining: Part D — operator-run live dry-run on real Supabase (requires operator credentials + Supabase project; not subagent work).
+
 ### 75. AutonomyGate cache invalidation edge case
 
 **Raised by:** Task 17A+B review (2026-04-22)
