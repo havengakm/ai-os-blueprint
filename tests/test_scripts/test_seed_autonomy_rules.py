@@ -95,17 +95,17 @@ class FakeSupabase:
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 
-def test_action_types_is_19() -> None:
-    assert len(ACTION_TYPES) == 19
-    assert len(set(ACTION_TYPES)) == 19  # no duplicates
+def test_action_types_is_20() -> None:
+    assert len(ACTION_TYPES) == 20
+    assert len(set(ACTION_TYPES)) == 20  # no duplicates
 
 
-def test_full_run_upserts_all_19_when_empty() -> None:
+def test_full_run_upserts_all_20_when_empty() -> None:
     fake = FakeSupabase()
     summary = seed_autonomy_rules(fake, client_id="client-abc")
 
-    assert summary == {"created": 19, "skipped": 0, "errors": 0}
-    assert len(fake._upsert_calls) == 19
+    assert summary == {"created": 20, "skipped": 0, "errors": 0}
+    assert len(fake._upsert_calls) == 20
     for call in fake._upsert_calls:
         assert call["table"] == "autonomy_rules"
         assert call["on_conflict"] == "client_id,action_type"
@@ -126,11 +126,11 @@ def test_skips_existing_rows() -> None:
     )
     summary = seed_autonomy_rules(fake, client_id="c1")
 
-    assert summary["created"] == 17
+    assert summary["created"] == 18
     assert summary["skipped"] == 2
     assert summary["errors"] == 0
-    # Only 17 upserts were actually made
-    assert len(fake._upsert_calls) == 17
+    # Only 18 upserts were actually made
+    assert len(fake._upsert_calls) == 18
     upserted_types = {c["payload"]["action_type"] for c in fake._upsert_calls}
     assert "copy_variant" not in upserted_types
     assert "send_timing" not in upserted_types
@@ -140,8 +140,8 @@ def test_dry_run_does_not_write() -> None:
     fake = FakeSupabase()
     summary = seed_autonomy_rules(fake, client_id="c1", dry_run=True)
 
-    # Dry-run classifies all 19 as "would create"
-    assert summary == {"created": 19, "skipped": 0, "errors": 0}
+    # Dry-run classifies all 20 as "would create"
+    assert summary == {"created": 20, "skipped": 0, "errors": 0}
     # But no writes happened
     assert fake._upsert_calls == []
 
@@ -171,4 +171,4 @@ def test_main_uses_injected_client(monkeypatch: pytest.MonkeyPatch,
 
     assert rc == 0
     captured = capsys.readouterr()
-    assert "19 created" in captured.out
+    assert "20 created" in captured.out
