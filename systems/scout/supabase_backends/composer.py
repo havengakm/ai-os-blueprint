@@ -182,6 +182,45 @@ class SupabaseComposerBackend:
             return []
         return list(rows[0].get("active_directories") or [])
 
+    async def fetch_client_facts(self, client_id: str) -> dict[str, Any]:
+        """Return a flat ``{key: value_str}`` view of the ``client_facts`` table.
+
+        JSONB ``value`` column gets flattened to a string: plain strings
+        pass through, numbers are stringified, nulls are skipped, and
+        nested JSON (list/dict) is dropped — the composer placeholder
+        contract is string-only. Mirrors ``memory.store.retrieve_facts``
+        but without async (the Supabase Python client is sync) and with
+        the flattening logic the composer needs baked in.
+        """
+        resp = (
+            self._client.table("client_facts")
+            .select("key, value")
+            .eq("client_id", client_id)
+            .execute()
+        )
+        out: dict[str, Any] = {}
+        for row in resp.data or []:
+            key = row.get("key")
+            if not isinstance(key, str) or not key:
+                continue
+            value = row.get("value")
+            if value is None:
+                continue
+            if isinstance(value, str):
+                if value.strip():
+                    out[key] = value
+                continue
+            if isinstance(value, bool):
+                # bool is a subclass of int — skip; facts are text/number only.
+                continue
+            if isinstance(value, (int, float)):
+                out[key] = str(value)
+                continue
+            # dict / list / anything else: not representable as a single
+            # placeholder value. Skip silently; operator will notice via
+            # fills_missing at compose time.
+        return out
+
     async def persist_draft(
         self,
         client_id: str,

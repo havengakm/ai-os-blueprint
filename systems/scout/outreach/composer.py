@@ -55,11 +55,21 @@ _PLATFORM_LABELS: dict[str, str] = {
 }
 _DECISION_SUBJECT_PREVIEW: int = 60
 # Map {{placeholder}} name -> ResearchFills attribute.
+# ``first_name`` is deliberately absent — the composer resolves it via its
+# own ``_coalesce_first_name`` branch (falls back to "there", never flagged
+# as missing). The other productised placeholders route through ResearchFills
+# so the ``{{short_company_name}} / {{operator_name}} / {{offer_*}}`` slots
+# surface in ``fills_missing`` when their source is empty.
 _RESEARCH_PLACEHOLDER_ATTRS: dict[str, str] = {
     "icebreaker_content": "icebreaker_content",
     "trigger_hook": "trigger_hook",
     "pain_evidence": "pain_evidence",
     "cta_content": "cta_content",
+    "short_company_name": "short_company_name",
+    "operator_name": "operator_name",
+    "offer_promise": "offer_promise",
+    "offer_period": "offer_period",
+    "offer_risk_reversal": "offer_risk_reversal",
 }
 
 
@@ -134,6 +144,17 @@ class ComposerStorageBackend(Protocol):
         """Return ``client_config.active_directories``; empty list means none."""
         ...
 
+    async def fetch_client_facts(self, client_id: str) -> dict[str, Any]:
+        """Return a flat ``{key: value_str}`` lookup of this client's facts.
+
+        Used by ResearchSelector to fill deployment-agnostic placeholders
+        (``operator_name``, ``offer_promise``, ``offer_period``,
+        ``offer_risk_reversal``). Empty dict when the client has no facts
+        — the composer will then surface the missing placeholders via
+        ``fills_missing`` so operators can spot unseeded deployments.
+        """
+        ...
+
     async def persist_draft(
         self,
         client_id: str,
@@ -195,6 +216,10 @@ class Composer:
             client_id, niche, offer_label,
         )
         active_directories = await self._storage.fetch_active_directories(client_id)
+        # Per-contact fetch for MVP — compose() is the per-contact entry point
+        # (the batch loop lives in the daemon). Plan 7 can add a per-batch
+        # cache layer here if the DB hit-rate becomes a concern.
+        client_facts = await self._storage.fetch_client_facts(client_id)
         has_ad_activity_enabled = any(
             d in AD_ACTIVITY_DIRECTORIES for d in active_directories
         )
@@ -237,7 +262,8 @@ class Composer:
             selections[component_type] = self._bandit_select(pool)
 
         fills = await self._research.select_fills(
-            client_id, contact, selections, dry_run=dry_run,
+            client_id, contact, selections,
+            client_facts=client_facts, dry_run=dry_run,
         )
 
         fills_missing: list[str] = []
