@@ -515,6 +515,50 @@ Max runs open-weights models (GLM 5.1, Mimi Pro — Chinese open model) for chro
 
 Ties into `feedback_cost_management.md` (hard caps + auto-pause) — this is the "what do we do when we're approaching the cap" alternative to the current default (pause + ask operator).
 
+### 79. Plan 1 merged — Task 17D live dry-run PASS + Task 19 cleanup
+
+**Raised by:** Plan 1 merge (2026-04-23)
+**Severity:** Approved — Plan 1 live on main at merge commit `1e77e1e`
+**File:** all Plan 1 artifacts (221 files, +40,245 lines)
+
+**Task 17D live dry-run outcome.** Operator (Kirsten) ran `./scripts/plan1_acceptance.sh kirsten-client-zero` against a seeded Supabase project:
+- Preflight: 17/17 green
+- Daemon cycle: 7 stages `ok`, 0 errors, 82s wall-clock
+- Decisions logged: 48 (enrich_contact 33, icp_threshold 3, identity_lookup 1, render_draft 10, + 1 component_selection)
+- Drafts composed: 10/10 with complete 6-component tuples (subject_line + icebreaker + pain_hook + offer_frame + cta + signature)
+- Required stages with evidence: 3/3 (identity_lookup, enrich_contact, render_draft)
+- Optional stages silent (pull/score/screen/research, legitimately no-op for fixture dataset)
+- Verify exit 2 = AUTOMATED CHECKS PASSED + operator eyeball review. Operator greenlit merge.
+
+**Task 19 cleanup shipped in the merge (3 commits, `aec7a23` + `974058e` + `32f7c52`):**
+
+| Issue | Fix |
+|---|---|
+| `scripts/load_knowledge.py` failing PGRST 42P10 — missing UNIQUE(client_id, source, title) on knowledge_base | `scripts/sql/010_knowledge_base_unique.sql` (idempotent DO-block) |
+| `scripts/seed_autonomy_rules.py` missing `score_contact` action_type — Scout.run_score's autonomy check silently degraded | Added to ACTION_TYPES list (19 → 20); updated 4 test assertions |
+| `SupabaseComposerBackend.fetch_eligible_contacts` returned empty offer_label, composer skipped all drafts with `no_variants_for:subject_line` | Read `offer_label` from `research_data.offer_label` (operator seeds via SQL UPDATE until Plan 2 introduces `client_config.default_offer_label`) |
+| `scripts/plan1_acceptance_verify.py` treated every stage as mandatory, produced false-AUTO-FAIL even when pipeline correctly skipped no-op stages | Split into REQUIRED (identity/enrich/render_draft) + OPTIONAL (source/score/screen/research); optional stages report as warnings, not blockers |
+| `data/knowledge/*.md` missing YAML frontmatter required by loader | Added title / source / category / tags for 3 seed knowledge files |
+| `data/reports/` runtime reports tracked in git | Added to .gitignore |
+| `.env` auto-load missing from preflight + verify scripts | `scripts/plan1_acceptance_{preflight,verify}.py` now call `load_dotenv(_REPO_ROOT / ".env")` at startup — matches daemon behavior (committed earlier at `7498b47`) |
+| Seed scripts + acceptance harness couldn't find `.env` when invoked from fresh shells | Operator-side fix via direnv (`.envrc` committed); NOT a code change |
+
+**Plan 1 deliverables committed at `974058e`:**
+- 6 component_variant YAMLs under `data/reference/sequences/cro_growth_ugc_agency/components/` (Task 13 component registry bootstrap, status=approved)
+- `context/kirsten-client-zero/` example client context (3 markdown files with frontmatter, blueprint-template convention)
+- `.envrc` (direnv auto-load for .env)
+
+**Rough edges discovered but deferred to follow-up work:**
+
+1. **Preflight false positives.** `scripts/plan1_acceptance_preflight.py` reported `business_context` + `autonomy_rules` tables as 200-OK (reachable) when they were actually absent from a partial pre-Plan-1 schema. Root cause: PostgREST returns 200 for tables that match some permission cache state even when information_schema shows them missing. Fix: cross-check preflight schema checks against `information_schema.tables` explicitly, not just a raw table SELECT. Land as part of Plan 1.5 acceptance harness pass.
+2. **Seed scripts don't auto-load `.env`.** `scripts/seed_autonomy_rules.py`, `scripts/load_knowledge.py`, `scripts/load_context.py`, `scripts/load_components.py` all read `os.environ` directly without dotenv. Operator must `source .env` or use direnv. Apply the same 4-line `try: from dotenv import load_dotenv; load_dotenv(...) except ImportError: pass` pattern to each. Bundle into one commit.
+3. **Test suite not isolated from `.env`.** Tests in `tests/test_config_settings.py`, `tests/test_enrich/test_zerobounce.py`, etc. fail when an operator has a real `.env` in the worktree root because `pydantic-settings` reads the file even when tests `monkeypatch.delenv()`. Fix: add `get_settings.cache_clear()` at test start AND pass `_env_file=None` to Settings() via an autouse conftest fixture. Current workaround: `mv .env .env.test-disabled` before test runs.
+4. **`cron_secret` required but unused by daemon.** `config/settings.py` declares it as a required field (no default), but only the HTTP cron-trigger middleware reads it. Daemon run fails with pydantic validation error until operator sets `CRON_SECRET` in `.env`. Fix: make `cron_secret` optional with a default of empty string, OR move it to a separate settings class that only the API imports.
+5. **`component_variants.offer_label` vs `contacts` mismatch.** The waterfall of `client_config.offer_label` → `research_data.offer_label` → `contact.offer_label` column is not well defined. Plan 2 should introduce `client_config.default_offer_label` as the canonical source, with `research_data.offer_label` as the per-contact override for multi-offer clients.
+6. **Icebreaker filtered out when no ad-activity directory active.** Composer's `_filter_ad_activity_variants` drops the only shipped icebreaker variant (`v1_ad_activity_observation`) unless `client_config.active_directories` contains one of `{google_ads_library, linkedin_ads_library, meta_ads_library}`. Operators must enable one of these OR author a non-ad-activity icebreaker variant. Ship a second generic-icebreaker YAML as part of Plan 2 copy authoring.
+
+**Plan 1 → Plan 1.5 handoff.** Plan 1 merged to main at `1e77e1e`. Plan 1.5 begins on a fresh branch from there. Plan 2 (send infrastructure) remains strictly downstream of Plan 1.5. The rough-edges list above will be prioritized alongside Plan 1.5 Task 1.5.7 acceptance.
+
 ### 78. Task 17D harness shipped — acceptance test ready for operator
 
 **Raised by:** Task 17D harness delivery + combined review (2026-04-23)
