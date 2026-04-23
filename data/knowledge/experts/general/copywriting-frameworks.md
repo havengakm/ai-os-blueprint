@@ -1,3 +1,14 @@
+---
+title: "Copywriting Frameworks"
+source: "AIOS reference library"
+category: framework
+tags:
+  - copywriting
+  - cold-email
+  - landing-page
+  - ads
+---
+
 # Copywriting Frameworks
 
 Reference frameworks for cold outreach, ads, landing pages, and content. The AI OS selects the right framework based on the avatar, signal, and context.

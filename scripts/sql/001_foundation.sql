@@ -3,8 +3,28 @@
 -- Requires: pgvector extension (enabled by default on Supabase).
 -- All tables are client_id scoped with RLS enabled.
 
--- Enable vector extension
+-- Enable required extensions
 create extension if not exists vector;
+create extension if not exists pgcrypto;
+
+
+-- ── Clients ───────────────────────────────────────────────────────────────────
+-- Identity row for the deployed client. Every productised deployment has exactly
+-- one row here (the client whose AIOS this is). All other tables FK to clients(id)
+-- so cascade deletes propagate cleanly when a client record is removed.
+
+create table if not exists clients (
+    id              text primary key,
+    name            text not null,
+    status          text not null default 'active' check (
+        status in ('active', 'paused', 'churned')
+    ),
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+alter table clients enable row level security;
+
 
 -- ── Context Registry ──────────────────────────────────────────────────────────
 -- Structured context beyond RAG chunks: people, strategies, objectives, projects
@@ -220,6 +240,10 @@ begin
     return new;
 end;
 $$;
+
+create or replace trigger clients_updated_at
+    before update on clients
+    for each row execute function update_updated_at();
 
 create or replace trigger context_registry_updated_at
     before update on context_registry

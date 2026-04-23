@@ -1,3 +1,13 @@
+---
+title: "Nick Saraev — AI Positioning & Offer Strategy"
+source: "Nick Saraev (LeftClick, Maker School)"
+category: principle
+tags:
+  - ai-positioning
+  - offer-strategy
+  - productisation
+---
+
 # Nick Saraev — AI Positioning & Offer Strategy
 
 Source: Nick Saraev (LeftClick, Maker School). Several million in AI product/service sales.

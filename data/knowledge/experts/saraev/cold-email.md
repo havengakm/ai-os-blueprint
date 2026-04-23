@@ -1,3 +1,13 @@
+---
+title: "Nick Saraev Cold Email Templates"
+source: "Nick Saraev (Maker School)"
+category: swipe_file
+tags:
+  - cold-email
+  - templates
+  - swipe-file
+---
+
 # Nick Saraev Cold Email Templates — Reference
 
 Source: Nick Saraev's Maker School templates. Use for brainstorming additional email angles.

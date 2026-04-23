@@ -1,0 +1,15 @@
+---
+variant_key: "v1_conversion_dropoff"
+component_type: "pain_hook"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  Most agencies at {{company_size_band}} headcount hit a ceiling at
+  {{conversion_stage_reference}} — the creative is working, the funnel
+  below it isn't.
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: "BOOTSTRAP PLACEHOLDER — replace with real copy via component-authoring SOP (Task 18)."
+  framework_anchor: "Hormozi pain-agitation"
+ab_epsilon: 0.1

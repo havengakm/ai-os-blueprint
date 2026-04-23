@@ -1,0 +1,13 @@
+---
+variant_key: "v1_question_hook"
+component_type: "subject_line"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  quick question about {{company_name}}'s {{pain_hook_reference}}
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: "BOOTSTRAP PLACEHOLDER — replace with real copy via component-authoring SOP (Task 18)."
+  framework_anchor: "Hormozi curiosity-gap"
+ab_epsilon: 0.1

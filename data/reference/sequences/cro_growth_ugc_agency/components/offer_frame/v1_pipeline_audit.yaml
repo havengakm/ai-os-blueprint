@@ -1,0 +1,15 @@
+---
+variant_key: "v1_pipeline_audit"
+component_type: "offer_frame"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  We run a 20-minute pipeline audit for {{niche_label}} shops —
+  output is a ranked list of the top three conversion leaks with a
+  fix for each. No pitch if it's not a fit.
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: "BOOTSTRAP PLACEHOLDER — replace with real copy via component-authoring SOP (Task 18)."
+  framework_anchor: "Hormozi value-stack (quantified deliverable)"
+ab_epsilon: 0.1
