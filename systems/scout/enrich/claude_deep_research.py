@@ -89,6 +89,22 @@ _NAV_RE = re.compile(r"<nav[^>]*>.*?</nav>", re.I | re.S)
 _FOOTER_RE = re.compile(r"<footer[^>]*>.*?</footer>", re.I | re.S)
 
 
+_CODE_FENCE_OPEN_RE = re.compile(r"^```(?:json)?\s*", re.IGNORECASE)
+_CODE_FENCE_CLOSE_RE = re.compile(r"\s*```\s*$")
+
+
+def _strip_code_fences(text: str) -> str:
+    """Strip optional ```json ... ``` fences. No-op on clean JSON.
+
+    Claude Sonnet 4.6 usually returns strict JSON when asked, but
+    occasionally wraps responses in ```json fences in complex-prompt
+    contexts. This rescues those without mangling clean responses.
+    """
+    out = _CODE_FENCE_OPEN_RE.sub("", text)
+    out = _CODE_FENCE_CLOSE_RE.sub("", out)
+    return out
+
+
 def _clean_html(raw: str) -> str:
     """Strip scripts, styles, navs, footers from HTML."""
     html = _SCRIPT_RE.sub("", raw)
@@ -509,9 +525,10 @@ class ClaudeDeepResearchAdapter:
         )
         raw_text = response.content[0].text.strip()
 
-        # --- parse ---
+        # --- parse (defensive: strip optional ```json fences) ---
+        parse_text = _strip_code_fences(raw_text)
         try:
-            parsed: dict[str, Any] = json.loads(raw_text)
+            parsed: dict[str, Any] = json.loads(parse_text)
         except json.JSONDecodeError:
             logger.warning(
                 "claude_deep_research parse_failed contact_id=%s raw=%r",

@@ -49,6 +49,21 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
 # --------------------------------------------------------------------------- #
+# Defensive parse helper — Claude occasionally wraps JSON in code fences        #
+# --------------------------------------------------------------------------- #
+
+_CODE_FENCE_OPEN_RE = re.compile(r"^```(?:json)?\s*", re.IGNORECASE)
+_CODE_FENCE_CLOSE_RE = re.compile(r"\s*```\s*$")
+
+
+def _strip_code_fences(text: str) -> str:
+    """Strip optional ```json ... ``` fences. No-op on clean JSON."""
+    out = _CODE_FENCE_OPEN_RE.sub("", text)
+    out = _CODE_FENCE_CLOSE_RE.sub("", out)
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Tier-selection regexes                                                        #
 # --------------------------------------------------------------------------- #
 
@@ -545,8 +560,9 @@ async def _call_claude(client: Any, prompt: str) -> str | None:
         messages=[{"role": "user", "content": prompt}],
     )
     raw_text = response.content[0].text.strip()
+    parse_text = _strip_code_fences(raw_text)
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(parse_text)
     except json.JSONDecodeError:
         logger.warning("icebreaker parse_failed raw=%r", raw_text[:200])
         return None
