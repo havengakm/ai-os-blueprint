@@ -1,0 +1,13 @@
+---
+variant_key: "v1_reply_chat"
+component_type: "cta"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  Open to a quick chat next week? Happy to walk you through how it works.
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: "Reply-soft close. No link in first email."
+  framework_anchor: "reply-soft"
+ab_epsilon: 0.1
