@@ -318,6 +318,15 @@ def _render_markdown(report: VerifyReport) -> str:
     lines.append("## Foundation-loop trace (per pipeline stage)")
     lines.append("")
     lines.append(
+        "> Note: this section proves `_prime_foundation` dispatched for "
+        "each stage. `BaseSystem.load_foundation` degrades silently if "
+        "`memory_store` is not wired (returns empty context), so the "
+        "proxy is necessary but not sufficient. Cross-check with the "
+        "preflight's context + knowledge + autonomy row-count results "
+        "to confirm data actually loaded."
+    )
+    lines.append("")
+    lines.append(
         "Each row below is a pipeline decision_type. "
         "Presence of at least one decision_log row of that type within "
         "the cycle window is proxy evidence that `_prime_foundation` + "
