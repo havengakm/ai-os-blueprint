@@ -242,8 +242,9 @@ def _default_data() -> dict[str, Any]:
 
 _SYSTEM_PROMPT = (
     "You are a B2B research analyst. Given scraped website content about a company, "
-    "extract citable details and buying signals. Return strict JSON only — no prose, "
-    "no code fences. Never invent specifics. Every detail must have a source from the content."
+    "extract citable details, buying signals, and structural signals. "
+    "Return strict JSON only, no prose, no code fences. "
+    "Never invent specifics. Every detail must have a source from the content."
 )
 
 _USER_TEMPLATE = """\
