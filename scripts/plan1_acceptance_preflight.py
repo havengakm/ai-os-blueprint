@@ -41,6 +41,15 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+# Load .env from the repo root so os.environ reflects what pydantic-settings
+# would see. Matches the daemon / run_daemon_once behaviour, so preflight and
+# the actual run can never disagree on whether env is configured.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_REPO_ROOT / ".env")
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 
