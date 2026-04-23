@@ -28,7 +28,9 @@ from systems.scout.enrich.base import EnrichResult
 logger = logging.getLogger(__name__)
 
 SONNET_MODEL = "claude-sonnet-4-6-20251001"
-MAX_TOKENS = 800
+# Bumped from 800 -> 1200 to accommodate the structural_signals array (Task C).
+# Validator caps structural_signals at 8 entries, so cost stays bounded.
+MAX_TOKENS = 1200
 CONTENT_CHAR_LIMIT = 20_000
 MAX_PAGES = 8
 FETCH_GAP_SECONDS = 1.0
@@ -40,6 +42,37 @@ ACTIVE_SIGNAL_CATEGORIES = frozenset(
     {"hiring", "expansion", "product_launch", "leadership_change", "funding"}
 )
 VALID_SIGNAL_CATEGORIES = ACTIVE_SIGNAL_CATEGORIES | {"tooling", "other"}
+
+# Structural signals: canonical 5-category B2B Signal Taxonomy.
+# Source: data/reference/signals/b2b-signal-taxonomy.md
+# Icebreaker adapter Tier 3 reads research_data.structural_signals[].
+VALID_STRUCTURAL_CATEGORIES = frozenset({
+    "operational_organizational", "financial_growth", "technographic",
+    "social_engagement", "negative_pain",
+})
+
+VALID_STRUCTURAL_TYPES_BY_CATEGORY: dict[str, frozenset[str]] = {
+    "operational_organizational": frozenset({
+        "new_leadership", "hiring_spike", "headless_growth",
+        "geographic_expansion", "m_and_a",
+    }),
+    "financial_growth": frozenset({
+        "funding_round", "major_contract_win", "ipo_filing",
+        "profitability_milestone",
+    }),
+    "technographic": frozenset({
+        "software_migration", "trial_tool_install", "legacy_decay",
+        "emerging_tech_adoption",
+    }),
+    "social_engagement": frozenset({
+        "how_to_query", "problem_aware_engagement", "alumni_move",
+        "event_attendance", "referral_request",
+    }),
+    "negative_pain": frozenset({
+        "downsizing", "cs_failure", "market_share_decline",
+        "founder_burnout",
+    }),
+}
 
 _COMPANY_PATHS = [
     "/about", "/about-us", "/services", "/what-we-do", "/approach",
@@ -149,10 +182,51 @@ def _validate_buying_signals(raw: Any) -> list[dict[str, str]]:
     return out
 
 
+def _validate_structural_signals(
+    raw: Any,
+    *,
+    sources_fetched: list[str],
+) -> list[dict[str, str]]:
+    """Validate structural_signals against the 5-category taxonomy.
+
+    Drops entries that are not dicts, miss required keys, use unknown categories
+    or subtypes, or cite an evidence_url that was not in sources_fetched (prevents
+    Claude from inventing URLs). Truncates summary to 200 chars. Caps at 8.
+    """
+    if not isinstance(raw, list):
+        return []
+    allowed_urls = set(sources_fetched)
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        if not all(k in item for k in ("category", "type", "evidence_url", "summary")):
+            continue
+        category = str(item["category"])
+        if category not in VALID_STRUCTURAL_CATEGORIES:
+            continue
+        subtype = str(item["type"])
+        if subtype not in VALID_STRUCTURAL_TYPES_BY_CATEGORY[category]:
+            continue
+        evidence_url = str(item["evidence_url"])
+        if evidence_url not in allowed_urls:
+            continue
+        out.append({
+            "category": category,
+            "type": subtype,
+            "evidence_url": evidence_url,
+            "summary": str(item["summary"])[:200],
+        })
+        if len(out) >= 8:
+            break
+    return out
+
+
 def _default_data() -> dict[str, Any]:
     return {
         "citable_details": [],
         "buying_signals": [],
+        "structural_signals": [],
         "pain_match": "",
         "pain_category": "other",
         "has_active_buying_signal": False,
@@ -179,11 +253,15 @@ Industry: {industry}
 Employees: {employees}
 Contact title: {title}
 {trigger_block}
+<available_source_urls>
+{sources_list}
+</available_source_urls>
+
 <scraped_content>
 {content}
 </scraped_content>
 
-Extract research from the scraped content above. Return STRICT JSON with this exact shape — no prose, no code fences:
+Extract research from the scraped content above. Return STRICT JSON with this exact shape, no prose, no code fences:
 
 {{
   "citable_details": [
@@ -191,6 +269,9 @@ Extract research from the scraped content above. Return STRICT JSON with this ex
   ],
   "buying_signals": [
     {{"category": "hiring", "detail": "specific signal <= 160 chars", "source": "about"}}
+  ],
+  "structural_signals": [
+    {{"category": "financial_growth", "type": "funding_round", "evidence_url": "<one of available_source_urls>", "summary": "plain-language 1 sentence <= 200 chars"}}
   ],
   "pain_match": "most likely business pain <= 160 chars",
   "pain_category": "pipeline|delivery|retention|positioning|pricing|team|tooling|other",
@@ -200,6 +281,20 @@ Extract research from the scraped content above. Return STRICT JSON with this ex
 
 Valid buying_signal.category values: hiring, expansion, tooling, product_launch, leadership_change, funding, other.
 Valid pain_category values: pipeline, delivery, retention, positioning, pricing, team, tooling, other.
+
+structural_signals: classify any business-movement hits against this 5-category taxonomy. Use EXACTLY these slug values.
+
+  - operational_organizational: new_leadership, hiring_spike, headless_growth, geographic_expansion, m_and_a
+  - financial_growth: funding_round, major_contract_win, ipo_filing, profitability_milestone
+  - technographic: software_migration, trial_tool_install, legacy_decay, emerging_tech_adoption
+  - social_engagement: how_to_query, problem_aware_engagement, alumni_move, event_attendance, referral_request
+  - negative_pain: downsizing, cs_failure, market_share_decline, founder_burnout
+
+Rules for structural_signals:
+  - evidence_url MUST be one of the URLs listed in <available_source_urls>. Do not invent URLs.
+  - summary is plain-language, 1 sentence, <= 200 chars, no jargon, no buzzwords.
+  - Only include structural_signals that are directly stated in the scraped content. Do not guess or infer.
+
 Only include entries that are directly supported by the scraped content.\
 """
 
@@ -390,6 +485,8 @@ class ClaudeDeepResearchAdapter:
         else:
             trigger_block = ""
 
+        sources_list = "\n".join(sources_fetched)
+
         user_message = _USER_TEMPLATE.format(
             company=company,
             domain=domain,
@@ -397,6 +494,7 @@ class ClaudeDeepResearchAdapter:
             employees=contact.get("employees") or "unknown",
             title=contact.get("title") or "unknown",
             trigger_block=trigger_block,
+            sources_list=sources_list,
             content=aggregated,
         )
 
@@ -432,6 +530,10 @@ class ClaudeDeepResearchAdapter:
         # --- validate ---
         citable_details = _validate_citable_details(parsed.get("citable_details"))
         buying_signals = _validate_buying_signals(parsed.get("buying_signals"))
+        structural_signals = _validate_structural_signals(
+            parsed.get("structural_signals"),
+            sources_fetched=sources_fetched,
+        )
 
         pain_match = str(parsed.get("pain_match") or "")[:160]
         pain_category = str(parsed.get("pain_category") or "other")
@@ -455,6 +557,7 @@ class ClaudeDeepResearchAdapter:
         data = {
             "citable_details": citable_details,
             "buying_signals": buying_signals,
+            "structural_signals": structural_signals,
             "pain_match": pain_match,
             "pain_category": pain_category,
             "has_active_buying_signal": has_active_buying_signal,
@@ -470,9 +573,10 @@ class ClaudeDeepResearchAdapter:
 
         logger.info(
             "claude_deep_research contact_id=%s category=%s confidence=%.2f "
-            "citable=%d signals=%d cost_cents=%d",
+            "citable=%d signals=%d structural=%d cost_cents=%d",
             contact_id, pain_category, confidence,
-            len(citable_details), len(buying_signals), self.cost_cents_per_call,
+            len(citable_details), len(buying_signals), len(structural_signals),
+            self.cost_cents_per_call,
         )
 
         return EnrichResult(

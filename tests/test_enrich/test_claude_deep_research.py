@@ -552,6 +552,235 @@ async def test_deep_research_aclose_closes_lazy_resources(_env):
     lazy_client.close.assert_awaited_once()
 
 
+# --------------------------------------------------------------------------- #
+# Structural signals tests (Task C: B2B Signal Taxonomy)                        #
+# --------------------------------------------------------------------------- #
+
+
+_STRUCTURAL_SOURCE_URL = "https://acme-consulting.com/about-us"
+_STRUCTURAL_SOURCE_URL_2 = "https://www.linkedin.com/company/acme-consulting/posts/"
+
+
+def _structural_browser() -> _FakeBrowser:
+    """Browser that returns content for about-us and the LinkedIn posts page.
+
+    These two URLs are the source set available for structural_signals tests;
+    evidence_urls outside this set must be rejected by the validator.
+    """
+    about_html = _load_fixture("about_page.html")
+    linkedin_html = _load_fixture("linkedin_company_page.html")
+    url_map = {
+        _STRUCTURAL_SOURCE_URL: about_html,
+        _STRUCTURAL_SOURCE_URL_2: linkedin_html,
+    }
+    return _FakeBrowser(url_map=url_map, default_html="")
+
+
+def _response_with_structural(structural_signals: list[dict]) -> str:
+    """Base response payload with custom structural_signals list."""
+    payload = {
+        "citable_details": [],
+        "buying_signals": [],
+        "structural_signals": structural_signals,
+        "pain_match": "pipeline",
+        "pain_category": "pipeline",
+        "confidence": 0.7,
+        "reasoning": "structural test",
+    }
+    return json.dumps(payload)
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_signals_happy_path(_env, monkeypatch):
+    """Two valid structural_signals (funding + founder_burnout) both kept."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    fake_client = _FakeAnthropic(_response_with_structural([
+        {
+            "category": "financial_growth",
+            "type": "funding_round",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            "summary": "Closed a Series B round in Q1 to fund US expansion",
+        },
+        {
+            "category": "negative_pain",
+            "type": "founder_burnout",
+            "evidence_url": _STRUCTURAL_SOURCE_URL_2,
+            "summary": "Founder posted about 80-hour weeks and hiring delays",
+        },
+    ]))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    # reason is driven by citable_details + buying_signals (not structural_signals);
+    # with both empty in this payload, 'research_complete_sparse' is expected.
+    assert result.reason in ("research_complete", "research_complete_sparse")
+    signals = result.data["structural_signals"]
+    assert len(signals) == 2
+    assert signals[0]["category"] == "financial_growth"
+    assert signals[0]["type"] == "funding_round"
+    assert signals[0]["evidence_url"] == _STRUCTURAL_SOURCE_URL
+    assert "Series B" in signals[0]["summary"]
+    assert signals[1]["category"] == "negative_pain"
+    assert signals[1]["type"] == "founder_burnout"
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_rejects_unknown_category(_env, monkeypatch):
+    """category='made_up_category' → entry dropped."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    fake_client = _FakeAnthropic(_response_with_structural([
+        {
+            "category": "made_up_category",
+            "type": "funding_round",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            "summary": "Should be dropped, bad category",
+        },
+    ]))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    assert result.data["structural_signals"] == []
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_rejects_invalid_subtype(_env, monkeypatch):
+    """Valid category but subtype not in taxonomy → dropped."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    fake_client = _FakeAnthropic(_response_with_structural([
+        {
+            "category": "financial_growth",
+            "type": "aliens_landed",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            "summary": "Valid category, invalid subtype",
+        },
+    ]))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    assert result.data["structural_signals"] == []
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_rejects_invented_url(_env, monkeypatch):
+    """evidence_url not in sources_fetched → dropped (prevents URL hallucination)."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    fake_client = _FakeAnthropic(_response_with_structural([
+        {
+            "category": "financial_growth",
+            "type": "funding_round",
+            "evidence_url": "https://not-in-sources.com/fake",
+            "summary": "Should be dropped, invented URL",
+        },
+    ]))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    assert result.data["structural_signals"] == []
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_drops_missing_required_keys(_env, monkeypatch):
+    """Entry missing 'summary' → dropped; a complete entry in the same list is kept."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    fake_client = _FakeAnthropic(_response_with_structural([
+        {
+            "category": "financial_growth",
+            "type": "funding_round",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            # summary missing
+        },
+        {
+            "category": "operational_organizational",
+            "type": "hiring_spike",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            "summary": "Opened 8 new engineering roles this month",
+        },
+    ]))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    signals = result.data["structural_signals"]
+    assert len(signals) == 1
+    assert signals[0]["type"] == "hiring_spike"
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_caps_at_eight(_env, monkeypatch):
+    """12 valid entries → validator keeps exactly 8."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    # 12 valid entries, all using the same valid category/subtype/url pair
+    entries = [
+        {
+            "category": "operational_organizational",
+            "type": "hiring_spike",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            "summary": f"Hiring signal number {i}",
+        }
+        for i in range(12)
+    ]
+    fake_client = _FakeAnthropic(_response_with_structural(entries))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    assert len(result.data["structural_signals"]) == 8
+
+
+@pytest.mark.asyncio
+async def test_deep_research_structural_truncates_summary(_env, monkeypatch):
+    """Summary > 200 chars → truncated to 200."""
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    browser = _structural_browser()
+    fake_client = _FakeAnthropic(_response_with_structural([
+        {
+            "category": "technographic",
+            "type": "software_migration",
+            "evidence_url": _STRUCTURAL_SOURCE_URL,
+            "summary": "x" * 400,
+        },
+    ]))
+
+    from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+    adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
+    result = await adapter.enrich(_CONTACT)
+
+    assert result.ok is True
+    signals = result.data["structural_signals"]
+    assert len(signals) == 1
+    assert len(signals[0]["summary"]) == 200
+
+
+def test_deep_research_default_data_includes_structural_signals():
+    """_default_data() exposes structural_signals: [] so parse-failed rows are well-shaped."""
+    from systems.scout.enrich.claude_deep_research import _default_data
+    data = _default_data()
+    assert "structural_signals" in data
+    assert data["structural_signals"] == []
+
+
 @pytest.mark.asyncio
 async def test_deep_research_linkedin_reachable_when_company_pages_empty(_env, monkeypatch):
     """Regression: LinkedIn URLs (positions 15-16 in the combined URL list) were previously
