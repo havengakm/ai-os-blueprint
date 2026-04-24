@@ -44,8 +44,8 @@ AD_ACTIVITY_DIRECTORIES: frozenset[str] = frozenset({
 #: icebreaker and who_i_am, and ``pain_hook`` is back in required
 #: with empathy-led content.
 COMPONENT_TYPES_REQUIRED: tuple[str, ...] = (
-    "subject_line", "icebreaker", "bridge", "who_i_am", "credibility",
-    "pain_hook", "offer_frame", "cta", "signature",
+    "subject_line", "icebreaker", "bridge", "who_i_am", "pain_hook",
+    "credibility", "offer_frame", "cta", "signature",
 )
 #: Component types the composer will USE if variants are available,
 #: but will skip silently when the pool is empty. v3 has none —
@@ -55,14 +55,15 @@ COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ()
 #: Union of required + optional, ordered for iteration. Exported for
 #: backward compatibility + symmetry with the pre-v2 surface.
 COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
-    "subject_line", "icebreaker", "bridge", "who_i_am", "credibility",
-    "pain_hook", "offer_frame", "cta", "signature",
+    "subject_line", "icebreaker", "bridge", "who_i_am", "pain_hook",
+    "credibility", "offer_frame", "cta", "signature",
 )
 #: Body rendering order — top-to-bottom as the prospect reads it.
-#: v3: bridge sits between icebreaker and who_i_am. Optional types
-#: are dropped silently when absent from the selection map.
+#: v3: bridge sits between icebreaker and who_i_am; pain_hook precedes
+#: credibility so empathy sets up the proof. Optional types are dropped
+#: silently when absent from the selection map.
 _BODY_COMPONENTS: tuple[str, ...] = (
-    "icebreaker", "bridge", "who_i_am", "credibility", "pain_hook",
+    "icebreaker", "bridge", "who_i_am", "pain_hook", "credibility",
     "offer_frame", "cta", "signature",
 )
 _BODY_SEPARATOR: str = "\n\n"

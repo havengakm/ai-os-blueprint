@@ -747,10 +747,11 @@ async def test_body_assembly_order_and_separator() -> None:
     result = await composer.compose("client-1", mk_contact())
 
     assert isinstance(result, ComposedDraft)
-    # v3 body order: icebreaker, bridge, who_i_am, credibility, pain_hook,
-    # offer_frame, cta, signature.
+    # v3 body order: icebreaker, bridge, who_i_am, pain_hook, credibility,
+    # offer_frame, cta, signature. Pain precedes credibility so empathy
+    # sets up the proof.
     assert result.body == (
-        "ICE\n\nBRIDGE\n\nWHOIAM\n\nCRED\n\nPAIN\n\nOFFER\n\nCTA\n\nSIG"
+        "ICE\n\nBRIDGE\n\nWHOIAM\n\nPAIN\n\nCRED\n\nOFFER\n\nCTA\n\nSIG"
     )
 
 
