@@ -180,7 +180,7 @@ class ResearchSelector:
 
         sources_used: list[dict[str, Any]] = []
 
-        icebreaker_content, src = _select_icebreaker_content(contact, trigger_events)
+        icebreaker_content, src = _select_icebreaker_content(contact)
         if src is not None:
             _append_source(sources_used, "icebreaker_content", src)
 
@@ -387,35 +387,44 @@ def _select_from_client_facts(facts: dict[str, Any], key: str) -> str | None:
 
 def _select_icebreaker_content(
     contact: dict[str, Any],
-    trigger_events: list[dict[str, Any]],
 ) -> tuple[str | None, dict[str, Any] | None]:
-    """Prefer IcebreakerAdapter output; fall back to legacy trigger-event selection.
+    """Only use IcebreakerAdapter output — no unvalidated trigger-event fallback.
 
-    The IcebreakerAdapter (Task D) writes a pre-rendered icebreaker sentence
-    to ``research_data.icebreaker_content`` and optionally an
-    ``icebreaker_tier`` label. When that sentence is present we skip the
-    trigger-event bandit entirely and surface a synthetic source for the
-    audit trail so Plan 7 can attribute outcomes back to the adapter tier.
-    Absent adapter output, the original trigger-event ranking takes over.
+    The IcebreakerAdapter (Task D) writes a pre-rendered, voice-validated
+    icebreaker sentence to ``research_data.icebreaker_content`` with an
+    optional ``icebreaker_tier`` label.
+
+    Historically this function fell back to ``_select_icebreaker(trigger_events)``
+    when the adapter's output was absent. That fallback was MVP scaffolding
+    from before the IcebreakerAdapter existed, and it silently bypassed
+    every voice rule and banned-word check — letting raw Claude-generated
+    trigger_event text (e.g. "signalling active local networking activity")
+    land directly in outbound drafts. Removed so adapter failures are
+    visible to the operator via ``fills_missing`` instead of being masked.
+
+    The legacy ``_select_icebreaker`` helper is retained for its own tests
+    and any future, explicitly opt-in pathway, but is no longer invoked
+    from the select path.
     """
     rd = contact.get("research_data") or {}
-    if isinstance(rd, dict):
-        adapted = rd.get("icebreaker_content")
-        if isinstance(adapted, str) and adapted.strip():
-            text = adapted.strip()
-            tier = rd.get("icebreaker_tier")
-            source = (
-                f"icebreaker_adapter:tier_{tier}"
-                if isinstance(tier, str) and tier
-                else "icebreaker_adapter"
-            )
-            pseudo_event = {
-                "type": "icebreaker",
-                "detail": text,
-                "source": source,
-            }
-            return text, pseudo_event
-    return _select_icebreaker(trigger_events)
+    if not isinstance(rd, dict):
+        return None, None
+    adapted = rd.get("icebreaker_content")
+    if not (isinstance(adapted, str) and adapted.strip()):
+        return None, None
+    text = adapted.strip()
+    tier = rd.get("icebreaker_tier")
+    source = (
+        f"icebreaker_adapter:tier_{tier}"
+        if isinstance(tier, str) and tier
+        else "icebreaker_adapter"
+    )
+    pseudo_event = {
+        "type": "icebreaker",
+        "detail": text,
+        "source": source,
+    }
+    return text, pseudo_event
 
 
 def _select_icebreaker(

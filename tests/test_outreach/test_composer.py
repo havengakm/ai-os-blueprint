@@ -253,6 +253,9 @@ async def test_happy_path_fills_renders_persists_logs() -> None:
             },
         ],
     )
+    # IcebreakerAdapter-written content — required since research.py no longer
+    # falls back to raw trigger_events for the icebreaker placeholder.
+    contact["research_data"]["icebreaker_content"] = "Raised Series B last month"
     storage = FakeStorage(variants_by_type=mk_variants_by_type())
     composer = mk_composer(storage)
 
