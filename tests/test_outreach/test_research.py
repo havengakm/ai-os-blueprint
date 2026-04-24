@@ -145,6 +145,9 @@ async def test_select_fills_happy_path_fills_all_four() -> None:
             },
         ],
     )
+    # IcebreakerAdapter writes the icebreaker sentence directly; trigger_events
+    # no longer fall back into the icebreaker slot.
+    contact["research_data"]["icebreaker_content"] = "Saw their Iroko work this morning. Really sharp."
     components = mk_default_components()
     logger = FakeLogger()
     selector = ResearchSelector(decision_logger=logger)
@@ -152,7 +155,7 @@ async def test_select_fills_happy_path_fills_all_four() -> None:
     fills = await selector.select_fills("client-1", contact, components)
 
     assert isinstance(fills, ResearchFills)
-    assert fills.icebreaker_content == "Raised Series B last month"
+    assert fills.icebreaker_content == "Saw their Iroko work this morning. Really sharp."
     assert fills.trigger_hook == "Raised Series B last month"
     assert fills.pain_evidence == "Grew client pipeline 3x in 90d"
     assert fills.cta_content == "Worth a 20-minute call?"
@@ -209,8 +212,14 @@ async def test_missing_trigger_events_only_pain_and_cta_fill() -> None:
 # 4. profile-match trigger preferred over domain-match                          #
 # --------------------------------------------------------------------------- #
 
-async def test_profile_match_preferred_over_domain_match() -> None:
-    contact = mk_contact(trigger_events=[
+def test_profile_match_preferred_over_domain_match() -> None:
+    # The legacy _select_icebreaker trigger-event ranking is retained as a
+    # module-level helper but is no longer invoked from the select_fills path
+    # (the fallback was bypassing voice validation — see research.py docstring).
+    # Test the ranking directly so we keep coverage of the logic.
+    from systems.scout.outreach.research import _select_icebreaker
+
+    events = [
         {
             "type": "behavioral_signal", "detail": "Domain match event",
             "source": "trigify_linkedin", "match_key": "domain", "recency_days": 5,
@@ -221,21 +230,20 @@ async def test_profile_match_preferred_over_domain_match() -> None:
             "source": "trigify_linkedin", "match_key": "profile", "recency_days": 5,
             "engagement": {"likes": 0, "comments": 0, "shares": 0},
         },
-    ])
-    components = mk_default_components()
-    selector = ResearchSelector()
-
-    fills = await selector.select_fills("client-1", contact, components)
-
-    assert fills.icebreaker_content == "Profile match event"
+    ]
+    detail, _ = _select_icebreaker(events)
+    assert detail == "Profile match event"
 
 
 # --------------------------------------------------------------------------- #
 # 5. Recency weighting — recent (7d) preferred over older (80d) same match_key  #
 # --------------------------------------------------------------------------- #
 
-async def test_recency_weighting_prefers_fresher_event() -> None:
-    contact = mk_contact(trigger_events=[
+def test_recency_weighting_prefers_fresher_event() -> None:
+    # Legacy ranking helper — still tested directly (see note above).
+    from systems.scout.outreach.research import _select_icebreaker
+
+    events = [
         {
             "type": "behavioral_signal", "detail": "Older post",
             "source": "trigify_linkedin", "match_key": "profile", "recency_days": 80,
@@ -244,22 +252,21 @@ async def test_recency_weighting_prefers_fresher_event() -> None:
             "type": "behavioral_signal", "detail": "Newer post",
             "source": "trigify_linkedin", "match_key": "profile", "recency_days": 7,
         },
-    ])
-    components = mk_default_components()
-    selector = ResearchSelector()
-
-    fills = await selector.select_fills("client-1", contact, components)
-
-    assert fills.icebreaker_content == "Newer post"
+    ]
+    detail, _ = _select_icebreaker(events)
+    assert detail == "Newer post"
 
 
 # --------------------------------------------------------------------------- #
 # 6. Engagement weighting (trigify only)                                        #
 # --------------------------------------------------------------------------- #
 
-async def test_engagement_weighting_prefers_high_engagement() -> None:
+def test_engagement_weighting_prefers_high_engagement() -> None:
+    # Legacy ranking helper — still tested directly (see note above).
     # Both profile-match, both same recency band (<30d); engagement is the tiebreak.
-    contact = mk_contact(trigger_events=[
+    from systems.scout.outreach.research import _select_icebreaker
+
+    events = [
         {
             "type": "behavioral_signal", "detail": "Low engagement",
             "source": "trigify_linkedin", "match_key": "profile", "recency_days": 10,
@@ -270,13 +277,9 @@ async def test_engagement_weighting_prefers_high_engagement() -> None:
             "source": "trigify_linkedin", "match_key": "profile", "recency_days": 10,
             "engagement": {"likes": 40, "comments": 10, "shares": 5},  # sum=55
         },
-    ])
-    components = mk_default_components()
-    selector = ResearchSelector()
-
-    fills = await selector.select_fills("client-1", contact, components)
-
-    assert fills.icebreaker_content == "High engagement"
+    ]
+    detail, _ = _select_icebreaker(events)
+    assert detail == "High engagement"
 
 
 # --------------------------------------------------------------------------- #
@@ -383,6 +386,8 @@ async def test_decision_log_emitted_with_correct_shape() -> None:
             },
         ],
     )
+    # IcebreakerAdapter output — no trigger-events fallback in the select path.
+    contact["research_data"]["icebreaker_content"] = "Saw their Iroko work this morning. Really sharp."
     components = mk_default_components()
     logger = FakeLogger()
     selector = ResearchSelector(decision_logger=logger)
@@ -492,25 +497,25 @@ async def test_no_logger_returns_fills_silently() -> None:
 # --------------------------------------------------------------------------- #
 
 async def test_sources_used_deduplicates_across_placeholders() -> None:
-    # One funding_round event satisfies BOTH icebreaker and trigger_hook.
+    # Icebreaker comes from the adapter; trigger_hook comes from trigger_events.
+    # These are now separately sourced (no trigger-events fallback for the
+    # icebreaker slot), so the audit trail records one row per placeholder.
     event = {
         "type": "funding_round", "detail": "Raised Series B last month",
         "source": "claude_web_triggers", "recency_days": 10,
     }
     contact = mk_contact(trigger_events=[event])
+    contact["research_data"]["icebreaker_content"] = "Saw their Iroko work this morning. Really sharp."
     components = mk_default_components(include_cta=False)
     selector = ResearchSelector()
 
     fills = await selector.select_fills("client-1", contact, components)
 
-    # Both placeholders should be filled from the same event.
-    assert fills.icebreaker_content == "Raised Series B last month"
+    assert fills.icebreaker_content == "Saw their Iroko work this morning. Really sharp."
     assert fills.trigger_hook == "Raised Series B last month"
 
-    # Different placeholders with same source are allowed (one each, Plan 7 needs
-    # per-placeholder rows). Dedup is WITHIN (placeholder, source) — verified via
-    # a second call where we pretend the helper re-ran: source still appears once
-    # per placeholder. So for this test we just assert the expected pair shape.
+    # Dedup is WITHIN (placeholder, source): each placeholder appears exactly
+    # once in the audit trail.
     placeholders = [s["placeholder"] for s in fills.sources_used]
     assert placeholders.count("icebreaker_content") == 1
     assert placeholders.count("trigger_hook") == 1
@@ -568,13 +573,15 @@ async def test_trigger_hook_prefers_firmographic_over_behavioral() -> None:
             "source": "claude_web_triggers", "recency_days": 20,
         },
     ])
+    # Icebreaker now comes from the adapter, not trigger_events.
+    contact["research_data"]["icebreaker_content"] = "Saw their Iroko work this morning. Really sharp."
     components = mk_default_components()
     selector = ResearchSelector()
 
     fills = await selector.select_fills("client-1", contact, components)
 
-    # Icebreaker prefers the behavioral profile-match.
-    assert fills.icebreaker_content == "Posted recently"
+    # Icebreaker sourced from the adapter output.
+    assert fills.icebreaker_content == "Saw their Iroko work this morning. Really sharp."
     # Trigger-hook prefers the firmographic executive_hire.
     assert fills.trigger_hook == "Hired new CRO"
 
@@ -872,6 +879,8 @@ async def test_select_fills_decision_log_reports_13_of_13_surface() -> None:
         ],
     )
     contact["research_data"]["short_company_name"] = "Acme"
+    # IcebreakerAdapter output fills the icebreaker slot (no trigger-events fallback).
+    contact["research_data"]["icebreaker_content"] = "Saw their Iroko work this morning. Really sharp."
     components = mk_default_components()
     logger = FakeLogger()
     selector = ResearchSelector(decision_logger=logger)
@@ -926,28 +935,37 @@ async def test_icebreaker_content_prefers_adapter_output_over_trigger_events() -
     assert ice_src["type"] == "icebreaker"
 
 
-def test_select_icebreaker_content_falls_back_to_trigger_events() -> None:
+def test_select_icebreaker_content_returns_none_when_adapter_absent() -> None:
+    # No trigger-events fallback: when IcebreakerAdapter output is blank/absent,
+    # _select_icebreaker_content returns (None, None) even if trigger_events
+    # are populated. The old fallback silently bypassed voice validation and
+    # banned-word checks, so it was removed — adapter failures are now visible
+    # via fills_missing.
     from systems.scout.outreach.research import _select_icebreaker_content
 
-    contact = {"research_data": {"icebreaker_content": "   "}}  # blank adapter output
-    trigger_events = [
-        {
-            "type": "funding_round", "detail": "Raised Series B",
-            "source": "claude_web_triggers", "match_key": "profile", "recency_days": 10,
+    contact = {
+        "research_data": {
+            "icebreaker_content": "   ",  # blank adapter output
+            "trigger_events": [
+                {
+                    "type": "funding_round", "detail": "Raised Series B",
+                    "source": "claude_web_triggers", "match_key": "profile",
+                    "recency_days": 10,
+                },
+            ],
         },
-    ]
-    detail, src = _select_icebreaker_content(contact, trigger_events)
+    }
+    detail, src = _select_icebreaker_content(contact)
 
-    assert detail == "Raised Series B"
-    assert src is not None
-    assert src["type"] == "funding_round"
+    assert detail is None
+    assert src is None
 
 
 def test_select_icebreaker_content_returns_none_when_both_empty() -> None:
     from systems.scout.outreach.research import _select_icebreaker_content
 
     contact: dict[str, Any] = {"research_data": {}}
-    detail, src = _select_icebreaker_content(contact, [])
+    detail, src = _select_icebreaker_content(contact)
 
     assert detail is None
     assert src is None
@@ -957,7 +975,7 @@ def test_select_icebreaker_content_no_tier_uses_generic_source() -> None:
     from systems.scout.outreach.research import _select_icebreaker_content
 
     contact = {"research_data": {"icebreaker_content": "Adapter line"}}  # no tier
-    detail, src = _select_icebreaker_content(contact, [])
+    detail, src = _select_icebreaker_content(contact)
 
     assert detail == "Adapter line"
     assert src is not None
@@ -968,8 +986,8 @@ def test_select_icebreaker_content_tolerates_non_dict_research_data() -> None:
     from systems.scout.outreach.research import _select_icebreaker_content
 
     contact = {"research_data": "garbage"}
-    detail, src = _select_icebreaker_content(contact, [])
+    detail, src = _select_icebreaker_content(contact)
 
-    # Falls through to the empty trigger_events list -> (None, None).
+    # Non-dict research_data -> (None, None); no trigger-events fallback.
     assert detail is None
     assert src is None
