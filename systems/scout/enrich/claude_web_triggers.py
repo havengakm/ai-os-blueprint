@@ -47,7 +47,11 @@ _NO_SIGNAL_PHRASES = (
 _FENCE_HEAD_RE = re.compile(r"^\s*```(?:json)?\s*", re.IGNORECASE)
 _FENCE_TAIL_RE = re.compile(r"\s*```\s*$")
 
-SONNET_MODEL = "claude-sonnet-4-6"
+# Haiku 4.5 per CLAUDE.md cost rules. This adapter uses web_search so
+# the search-input tokens dominate cost — switching Sonnet→Haiku drops
+# the per-contact cost from ~$0.03 to ~$0.008 (web_search input tokens
+# are billed at the chosen model's rate).
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 800
 
 VALID_EVENT_TYPES = frozenset(
@@ -371,7 +375,7 @@ class ClaudeWebTriggersAdapter:
         # --- Claude call (no try/except — infrastructure errors propagate) ---
         client = await self._ensure_client()
         response = await client.messages.create(
-            model=SONNET_MODEL,
+            model=HAIKU_MODEL,
             max_tokens=MAX_TOKENS,
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],

@@ -37,7 +37,10 @@ from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
-SONNET_MODEL = "claude-sonnet-4-6"
+# Haiku 4.5 used for pipeline/batch ops per CLAUDE.md cost rules.
+# The icebreaker generator runs per-contact at ~$0.0003/call vs Sonnet's
+# $0.003 — critical for hitting the $0.002/contact cost target.
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 # Icebreakers are at most 2 sentences + JSON wrapper. 200 is plenty.
 MAX_TOKENS = 200
 
@@ -610,7 +613,7 @@ async def _call_claude(client: Any, prompt: str) -> str | None:
     adapter_error in the enrich summary.
     """
     response = await client.messages.create(
-        model=SONNET_MODEL,
+        model=HAIKU_MODEL,
         max_tokens=MAX_TOKENS,
         messages=[{"role": "user", "content": prompt}],
     )

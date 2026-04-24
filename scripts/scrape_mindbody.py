@@ -77,12 +77,14 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 )
 PAGE_GAP_SECONDS = 2.5
-# web_search pulls ~10-15k input tokens per call via tool results. The
-# default Anthropic tier-1 limit is 30k input tokens/min, so we must
-# space Claude calls or we hit 429. 35s keeps us under the ceiling with
-# headroom for the directory-scrape latency.
-CLAUDE_GAP_SECONDS = 35.0
-SONNET_MODEL = "claude-sonnet-4-5"
+# web_search pulls ~10-15k input tokens per call via tool results. Even on
+# Haiku 4.5 that's ~$0.010/call — still over the $0.002/contact target.
+# Phase 2 of fix/cost-discipline will drop web_search entirely (Playwright-
+# fetch the site + Haiku extract). For now, Haiku replacement alone gets
+# us from ~$0.05/call Sonnet to ~$0.010/call — 5x savings.
+CLAUDE_GAP_SECONDS = 15.0
+# Haiku 4.5 per CLAUDE.md cost rules.
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 800
 
 CSV_FIELDNAMES = [
@@ -269,19 +271,40 @@ _CLAUDE_SYSTEM = (
 _CLAUDE_USER_TEMPLATE = """\
 Studio name: {studio_name}
 City: {city}
-Country: South Africa
+Country: {country}
+Category filter: {category_filter}
 Mindbody profile: {mindbody_url}
 
 Use the web_search tool (at most 3 searches) to locate:
   1. The studio's own official website (domain).
   2. The named decision-maker: owner, founder, GM, or head coach.
   3. Their public LinkedIn URL if visible.
-  4. Any fresh buying-signal you notice (hiring, new location, recent press).
+  4. Whether this studio fits the category filter above.
+  5. Any fresh buying-signal you notice (hiring, new location, recent press).
 
-Return STRICT JSON exactly matching this shape, no prose, no code fences:
+CATEGORY MATCH RULES (STRICT):
+  - is_match=true ONLY if the business's PRIMARY offering matches the category
+    filter. Secondary, supplementary, side, or hybrid offerings do NOT count.
+  - is_match=false if the primary offering is something else, even if the
+    business also teaches what the filter asks for.
+  - Examples for filter = "pilates or yoga studio":
+      * Dedicated pilates studio  → is_match=true
+      * Dedicated yoga studio     → is_match=true
+      * Yoga + strength hybrid where yoga is core → is_match=true
+      * Ballet company that offers pilates on the side → is_match=false
+      * Body sculpting / lymphatic drainage studio → is_match=false
+      * IV therapy clinic → is_match=false
+      * F45 / CrossFit / general fitness gym → is_match=false
+  - You MUST produce `category_reasoning` describing why is_match is true or
+    false BEFORE you emit is_match. Put the reasoning field first in the JSON.
+
+Return STRICT JSON exactly matching this shape, in this field order, no prose,
+no code fences:
 
 {{
-  "domain": "example.co.za" | null,
+  "category_reasoning": "1 short sentence: is the PRIMARY offering a match?",
+  "is_match": true | false,
+  "domain": "example.com" | null,
   "first_name": "Jane" | null,
   "last_name": "Doe" | null,
   "title": "Founder" | "Owner" | "General Manager" | "Head Coach" | null,
@@ -310,6 +333,45 @@ def _parse_claude_json(raw_text: str) -> dict[str, Any] | None:
         return None
 
 
+# Phrases that indicate Claude is hedging on category match even when it
+# returned is_match=true. Post-hoc override: if ANY of these appear in
+# category_reasoning / notes, force is_match=false.
+_REJECTION_RE = re.compile(
+    r"\b(?:"
+    r"not\s+(?:a|primarily|really|actually|truly|the)\s+(?:pilates|yoga|fitness|studio|gym|f45|crossfit|barre|ballet)"
+    r"|supplementary"
+    r"|secondary\s+(?:offering|focus)"
+    r"|side\s+offering"
+    r"|doesn'?t\s+(?:fit|match|primarily)"
+    r"|isn'?t\s+(?:a|primarily)"
+    r"|is\s+(?:a|an)\s+(?:iv|body sculpting|lymphatic|ballet\s+company|dance|martial\s+arts|boxing|hair|beauty|spa|salon)"
+    r"|primarily\s+(?:iv|body|lymphatic|ballet|dance)"
+    r"|hybrid\s+offering"
+    r"|mixed\s+offering"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def resolve_is_match(
+    raw_is_match: Any,
+    category_reasoning: str,
+    notes: str,
+) -> tuple[bool, str | None]:
+    """Final is_match with safety-net override.
+
+    Returns (is_match, override_reason). override_reason is None when the
+    raw Claude value is respected; otherwise a short string describing
+    which field tripped the override.
+    """
+    is_match = bool(raw_is_match) if raw_is_match is not None else True
+    combined = f"{category_reasoning} || {notes}"
+    rejection_hit = _REJECTION_RE.search(combined or "")
+    if is_match and rejection_hit:
+        return False, f"rejection-phrase:{rejection_hit.group(0)!r}"
+    return is_match, None
+
+
 def _extract_text_blocks(response: Any) -> str:
     """Concatenate all `text`-typed blocks from a Claude response."""
     parts: list[str] = []
@@ -333,12 +395,14 @@ def resolve_studio_with_claude(
     mindbody_url: str,
     city: str,
     client: Any = None,
+    country: str = "South Africa",
+    category_filter: str = "any fitness or wellness studio",
 ) -> dict[str, Any]:
     """One Claude Sonnet call with web_search → resolved fields.
 
     Returns a dict with:
-      domain, first_name, last_name, title, linkedin_url, notes, confidence,
-      raw_text (for debugging)
+      domain, first_name, last_name, title, linkedin_url, is_match, notes,
+      confidence, raw_text (for debugging)
 
     On parse failure, everything is None / empty and notes contains the
     raw_text head for a human to inspect.
@@ -347,11 +411,13 @@ def resolve_studio_with_claude(
     user_message = _CLAUDE_USER_TEMPLATE.format(
         studio_name=studio_name,
         city=city,
+        country=country,
+        category_filter=category_filter,
         mindbody_url=mindbody_url,
     )
 
     response = client.messages.create(
-        model=SONNET_MODEL,
+        model=HAIKU_MODEL,
         max_tokens=MAX_TOKENS,
         system=_CLAUDE_SYSTEM,
         tools=[{
@@ -365,13 +431,23 @@ def resolve_studio_with_claude(
     raw_text = _extract_text_blocks(response)
     parsed = _parse_claude_json(raw_text) or {}
 
+    notes = (parsed.get("notes") or "").strip()
+    category_reasoning = (parsed.get("category_reasoning") or "").strip()
+    is_match, override_reason = resolve_is_match(
+        parsed.get("is_match"), category_reasoning, notes,
+    )
+    if override_reason:
+        notes = (notes + f" [is_match overridden: {override_reason}]").strip()
+
     out = {
         "domain": normalise_domain(parsed.get("domain")),
         "first_name": (parsed.get("first_name") or None),
         "last_name": (parsed.get("last_name") or None),
         "title": (parsed.get("title") or None),
         "linkedin_url": (parsed.get("linkedin_url") or None),
-        "notes": (parsed.get("notes") or "").strip(),
+        "is_match": is_match,
+        "category_reasoning": category_reasoning,
+        "notes": notes,
         "confidence": float(parsed.get("confidence") or 0.0),
         "raw_text": raw_text[:500],
     }
@@ -461,6 +537,8 @@ async def run(
     limit: int,
     output: Path,
     min_studios: int = 5,
+    country: str = "South Africa",
+    category_filter: str = "any fitness or wellness studio",
 ) -> tuple[int, list[dict[str, str]]]:
     """Returns (exit_code, rows)."""
     async with async_playwright() as p:
@@ -483,6 +561,8 @@ async def run(
     client = _ensure_anthropic_client()
     rows: list[dict[str, str]] = []
     attempted = 0
+    consecutive_failures = 0
+    max_consecutive_failures = 5
     for studio in studios:
         if len(rows) >= limit:
             break
@@ -497,17 +577,25 @@ async def run(
                 mindbody_url=studio["mindbody_url"],
                 city=city_name,
                 client=client,
+                country=country,
+                category_filter=category_filter,
             )
+            consecutive_failures = 0
         except Exception as e:  # billed or infra — log + skip
+            consecutive_failures += 1
             logger.warning(
-                "claude call failed studio=%s err=%s",
-                studio["name"], e,
+                "claude call failed (%d consecutive) studio=%s err=%s",
+                consecutive_failures, studio["name"], e,
             )
-            # On 429 / rate-limit, cool down before the next attempt so we
-            # don't waste the remaining studios on the same throttle.
-            if "429" in str(e) or "rate_limit" in str(e).lower():
-                logger.info("rate limit cooldown %ds", int(CLAUDE_GAP_SECONDS))
-                time.sleep(CLAUDE_GAP_SECONDS)
+            if consecutive_failures >= max_consecutive_failures:
+                logger.error(
+                    "bailing after %d consecutive Claude failures",
+                    max_consecutive_failures,
+                )
+                break
+            # Cool down on ANY failure so we don't burn the queue during
+            # a transient API or network blip.
+            time.sleep(CLAUDE_GAP_SECONDS)
             continue
 
         row = build_row(
@@ -522,6 +610,18 @@ async def run(
                 "skipped %s — Claude returned no usable domain",
                 studio["name"],
             )
+            # Rate-limit gap even on skip — we still spent tokens.
+            if len(rows) < limit:
+                time.sleep(CLAUDE_GAP_SECONDS)
+            continue
+
+        if resolved.get("is_match") is False:
+            logger.info(
+                "skipped %s — doesn't match category filter %r",
+                studio["name"], category_filter,
+            )
+            if len(rows) < limit:
+                time.sleep(CLAUDE_GAP_SECONDS)
             continue
 
         missing = validate_row(row)
@@ -551,12 +651,15 @@ async def run(
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
-_CITY_NAME_BY_SLUG = {
-    "cape-town-wc-za": "Cape Town",
-    "johannesburg-gp-za": "Johannesburg",
-    "durban-kzn-za": "Durban",
-    "stellenbosch-wc-za": "Stellenbosch",
-    "pretoria-gp-za": "Pretoria",
+_CITY_META_BY_SLUG: dict[str, dict[str, str]] = {
+    "cape-town-wc-za":   {"name": "Cape Town",    "country": "South Africa"},
+    "johannesburg-gp-za":{"name": "Johannesburg", "country": "South Africa"},
+    "durban-kzn-za":     {"name": "Durban",       "country": "South Africa"},
+    "stellenbosch-wc-za":{"name": "Stellenbosch", "country": "South Africa"},
+    "pretoria-gp-za":    {"name": "Pretoria",     "country": "South Africa"},
+    "austin-tx-us":      {"name": "Austin",       "country": "United States"},
+    "los-angeles-ca-us": {"name": "Los Angeles",  "country": "United States"},
+    "new-york-ny-us":    {"name": "New York",     "country": "United States"},
 }
 
 
@@ -576,6 +679,20 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default="data/test_contacts_fitness_wellness_mvp.csv",
     )
     parser.add_argument("--min-studios", type=int, default=5)
+    parser.add_argument(
+        "--country",
+        default=None,
+        help="Country name used in Claude prompt (overrides slug default).",
+    )
+    parser.add_argument(
+        "--category-filter",
+        default="any fitness or wellness studio",
+        help=(
+            "Plain-language description of which studios to keep. "
+            'e.g. "pilates or yoga studio" — studios that do not match '
+            "are skipped."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -590,9 +707,11 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: ANTHROPIC_API_KEY not set.", file=sys.stderr)
         return 2
 
-    city_name = args.city_name or _CITY_NAME_BY_SLUG.get(
-        args.city_slug, args.city_slug.replace("-", " ").title()
+    meta = _CITY_META_BY_SLUG.get(args.city_slug, {})
+    city_name = args.city_name or meta.get("name") or (
+        args.city_slug.replace("-", " ").title()
     )
+    country = args.country or meta.get("country") or "Unknown"
 
     output = Path(args.output)
     if not output.is_absolute():
@@ -603,6 +722,8 @@ def main(argv: list[str] | None = None) -> int:
         city_name=city_name,
         niche=args.niche,
         limit=args.limit,
+        country=country,
+        category_filter=args.category_filter,
         output=output,
         min_studios=args.min_studios,
     ))
