@@ -1,7 +1,7 @@
 ---
 variant_key: "v1_left_field_question"
 component_type: "bridge"
-niche: "creative_branding"
+niche: "fitness_wellness"
 offer_label: "aios_scout_deployment"
 variant_content: |
   Left-field question: are you taking on more {{niche_specific_term}} right now?

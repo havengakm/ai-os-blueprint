@@ -1,0 +1,13 @@
+---
+variant_key: "v6_thoughts"
+component_type: "subject_line"
+niche: "fitness_wellness"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  thoughts {{first_name}}?
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: "Friend-tone. Invites response without giving away topic."
+  framework_anchor: "friend-tone curiosity"
+ab_epsilon: 0.1

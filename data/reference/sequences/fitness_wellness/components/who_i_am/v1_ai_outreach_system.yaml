@@ -1,0 +1,17 @@
+---
+variant_key: "v1_ai_outreach_system"
+component_type: "who_i_am"
+niche: "fitness_wellness"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  Quick context. I build AI outreach systems for {{niche}}. It finds your ideal {{niche_specific_term}}, writes in your voice, and books potential {{niche_specific_term}} into your classes. No new hires. Runs on autopilot.
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Operator-authored template. Placeholders niche / niche_specific_term /
+    meetings_niche_term come from client_facts so the same body template
+    serves creative_branding, cro_growth_ugc_agency, and any future niche
+    without rewriting copy.
+  framework_anchor: "who-i-am + what-it-does"
+ab_epsilon: 0.1
