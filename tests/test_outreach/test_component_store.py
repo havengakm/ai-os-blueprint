@@ -590,12 +590,12 @@ def test_fake_backend_satisfies_protocol() -> None:
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("component_type", ["who_i_am", "credibility"])
+@pytest.mark.parametrize("component_type", ["who_i_am", "credibility", "bridge"])
 async def test_sync_accepts_new_v2_component_types(
     tmp_path: Path, component_type: str,
 ) -> None:
-    """v2 creative_branding introduces who_i_am + credibility. The YAML
-    validator must accept these as first-class component types."""
+    """v2 introduced who_i_am + credibility; v3 added bridge. The YAML
+    validator must accept all three as first-class component types."""
     _write_variant(
         tmp_path,
         component_type=component_type,

@@ -147,6 +147,7 @@ def mk_variants_by_type(
     *,
     subject_content: str = "Subject: {{trigger_hook}}",
     icebreaker_content: str = "Hi {{first_name}}, noticed {{icebreaker_content}}.",
+    bridge_content: str | None = "Left-field question — are you hiring?",
     pain_hook_content: str | None = "Many agencies hit {{pain_evidence}}.",
     who_i_am_content: str = "I build AI outreach systems.",
     credibility_content: str = "I've worked with 100+ businesses.",
@@ -154,11 +155,12 @@ def mk_variants_by_type(
     cta_content: str = "Worth a 20-minute call?",
     signature_content: str = "—Kirsten",
 ) -> dict[str, list[ComponentVariant]]:
-    """Build the full v2 component pool.
+    """Build the full v3 component pool.
 
-    ``pain_hook_content=None`` omits pain_hook entirely, exercising the
-    optional-component path (the composer must still produce a draft).
-    All other types are required.
+    All 9 types are REQUIRED in v3. ``bridge_content=None`` or
+    ``pain_hook_content=None`` omits that type entirely so tests can
+    exercise the ``no_variants_for:<type>`` skip path without the
+    composer quietly tolerating the missing slot.
     """
     pools: dict[str, list[ComponentVariant]] = {
         "subject_line": [mk_variant(component_type="subject_line", variant_content=subject_content)],
@@ -169,6 +171,10 @@ def mk_variants_by_type(
         "cta": [mk_variant(component_type="cta", variant_content=cta_content)],
         "signature": [mk_variant(component_type="signature", variant_content=signature_content)],
     }
+    if bridge_content is not None:
+        pools["bridge"] = [mk_variant(
+            component_type="bridge", variant_content=bridge_content,
+        )]
     if pain_hook_content is not None:
         pools["pain_hook"] = [mk_variant(
             component_type="pain_hook", variant_content=pain_hook_content,
@@ -261,6 +267,7 @@ async def test_happy_path_fills_renders_persists_logs() -> None:
     assert result.body.endswith("Worth a 20-minute call?\n\n—Kirsten")
     assert result.component_selections == {
         "subject_line": "subject_line_v1", "icebreaker": "icebreaker_v1",
+        "bridge": "bridge_v1",
         "who_i_am": "who_i_am_v1", "credibility": "credibility_v1",
         "pain_hook": "pain_hook_v1", "offer_frame": "offer_frame_v1",
         "cta": "cta_v1", "signature": "signature_v1",
@@ -727,6 +734,7 @@ async def test_component_selections_uses_variant_key_not_uuid() -> None:
 async def test_body_assembly_order_and_separator() -> None:
     storage = FakeStorage(variants_by_type=mk_variants_by_type(
         icebreaker_content="ICE",
+        bridge_content="BRIDGE",
         pain_hook_content="PAIN",
         who_i_am_content="WHOIAM",
         credibility_content="CRED",
@@ -739,39 +747,30 @@ async def test_body_assembly_order_and_separator() -> None:
     result = await composer.compose("client-1", mk_contact())
 
     assert isinstance(result, ComposedDraft)
-    # v2 body order: icebreaker, who_i_am, credibility, pain_hook (optional),
+    # v3 body order: icebreaker, bridge, who_i_am, credibility, pain_hook,
     # offer_frame, cta, signature.
     assert result.body == (
-        "ICE\n\nWHOIAM\n\nCRED\n\nPAIN\n\nOFFER\n\nCTA\n\nSIG"
+        "ICE\n\nBRIDGE\n\nWHOIAM\n\nCRED\n\nPAIN\n\nOFFER\n\nCTA\n\nSIG"
     )
 
 
-async def test_body_assembly_order_drops_pain_hook_when_optional() -> None:
-    """v2 creative_branding has no pain_hook. Composer must render a clean
-    body without it, in the remaining top-to-bottom order."""
+async def test_bridge_required_skip_when_pool_empty() -> None:
+    """Regression guard: v3 promotes bridge to REQUIRED. A missing
+    pool must raise ComposerSkip, not silently drop the slot."""
     storage = FakeStorage(variants_by_type=mk_variants_by_type(
-        icebreaker_content="ICE",
-        pain_hook_content=None,  # optional type omitted
-        who_i_am_content="WHOIAM",
-        credibility_content="CRED",
-        offer_frame_content="OFFER",
-        cta_content="CTA",
-        signature_content="SIG",
+        bridge_content=None,
     ))
     composer = mk_composer(storage)
 
     result = await composer.compose("client-1", mk_contact())
 
-    assert isinstance(result, ComposedDraft)
-    assert result.body == "ICE\n\nWHOIAM\n\nCRED\n\nOFFER\n\nCTA\n\nSIG"
-    # pain_hook absent from selections — it was never in the pool.
-    assert "pain_hook" not in result.component_selections
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:bridge"
 
 
-async def test_composer_does_not_skip_when_pain_hook_pool_empty() -> None:
-    """Regression guard: v1 composer would have returned a ComposerSkip
-    for no_variants_for:pain_hook. v2 makes pain_hook optional, so a
-    missing pool falls through to a successful draft."""
+async def test_pain_hook_required_skip_when_pool_empty() -> None:
+    """v3 moves pain_hook BACK into required. Missing pool must raise
+    ComposerSkip (v2 made this optional; v3 reverses that)."""
     storage = FakeStorage(variants_by_type=mk_variants_by_type(
         pain_hook_content=None,
     ))
@@ -779,8 +778,8 @@ async def test_composer_does_not_skip_when_pain_hook_pool_empty() -> None:
 
     result = await composer.compose("client-1", mk_contact())
 
-    assert isinstance(result, ComposedDraft)
-    assert result.persisted_draft_id == "draft-1"
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:pain_hook"
 
 
 async def test_who_i_am_required_skip_when_pool_empty() -> None:

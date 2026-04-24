@@ -44,7 +44,7 @@ import yaml
 # --------------------------------------------------------------------------- #
 
 VALID_COMPONENT_TYPES: frozenset[str] = frozenset({
-    "subject_line", "icebreaker", "who_i_am", "credibility",
+    "subject_line", "icebreaker", "who_i_am", "credibility", "bridge",
     "pain_hook", "offer_frame", "cta", "signature",
 })
 

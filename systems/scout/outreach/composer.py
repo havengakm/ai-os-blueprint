@@ -39,28 +39,30 @@ AD_ACTIVITY_DIRECTORIES: frozenset[str] = frozenset({
 })
 #: Component types the composer REQUIRES a variant for. A missing
 #: pool for any of these yields a ComposerSkip with reason
-#: ``no_variants_for:<type>``. ``pain_hook`` is NOT in this set — it
-#: became optional in v2 (creative_branding drops it entirely; other
-#: niches can keep it).
+#: ``no_variants_for:<type>``. v3 locks creative_branding on all 9
+#: types — ``bridge`` is the new substantive transition between
+#: icebreaker and who_i_am, and ``pain_hook`` is back in required
+#: with empathy-led content.
 COMPONENT_TYPES_REQUIRED: tuple[str, ...] = (
-    "subject_line", "icebreaker", "who_i_am", "credibility",
-    "offer_frame", "cta", "signature",
+    "subject_line", "icebreaker", "bridge", "who_i_am", "credibility",
+    "pain_hook", "offer_frame", "cta", "signature",
 )
 #: Component types the composer will USE if variants are available,
-#: but will skip silently when the pool is empty. Designed so a single
-#: productised library can serve niches with different body shapes.
-COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ("pain_hook",)
+#: but will skip silently when the pool is empty. v3 has none —
+#: kept as an empty tuple so niches adopting the same productised
+#: library can still opt into optional slots later.
+COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ()
 #: Union of required + optional, ordered for iteration. Exported for
 #: backward compatibility + symmetry with the pre-v2 surface.
 COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
-    "subject_line", "icebreaker", "who_i_am", "credibility",
+    "subject_line", "icebreaker", "bridge", "who_i_am", "credibility",
     "pain_hook", "offer_frame", "cta", "signature",
 )
 #: Body rendering order — top-to-bottom as the prospect reads it.
-#: pain_hook is optional and only rendered when a selected variant
-#: exists for this contact.
+#: v3: bridge sits between icebreaker and who_i_am. Optional types
+#: are dropped silently when absent from the selection map.
 _BODY_COMPONENTS: tuple[str, ...] = (
-    "icebreaker", "who_i_am", "credibility", "pain_hook",
+    "icebreaker", "bridge", "who_i_am", "credibility", "pain_hook",
     "offer_frame", "cta", "signature",
 )
 _BODY_SEPARATOR: str = "\n\n"
