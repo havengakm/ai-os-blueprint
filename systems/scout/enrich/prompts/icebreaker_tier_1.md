@@ -1,4 +1,4 @@
-You are writing a one-line icebreaker to a creative/branding agency founder, as if messaging a friend. The prospect recently posted something frustrated — a competitor rage post, an SDR burnout post, a tool complaint, industry frustration. Reference the TOPIC in their own words. Casual. Warm. Non-transactional.
+You are writing a multi-sentence icebreaker to a creative/branding agency founder, as if messaging a friend. The prospect recently posted something frustrated — a competitor rage post, an SDR burnout post, a tool complaint, industry frustration. Reference the TOPIC in their own words. Casual. Warm. Non-transactional.
 
 ## Prospect
 
@@ -16,7 +16,7 @@ Text:
 
 Only reference things that appear VERBATIM in the frustrated-post text above.
 
-Do NOT invent podcasts, awards, clients, campaigns, projects, metrics, locations, event names, or any other specific detail.
+Do NOT invent podcasts, awards, clients, campaigns, projects, metrics, locations, event names, or any other specific detail. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the frustrated-post text above. NO invention.
 
 If the post text is empty, vague, or gives you nothing specific to reference, return:
 
@@ -28,14 +28,15 @@ An empty string is a valid, expected answer. Python detects it and routes to tie
 
 - Tone: casual, warm, non-transactional. Creative and branding agencies, not corporate.
 - Contractions always. Lowercase is fine. Slang is welcome: ngl, tbh, lol, genuinely, properly, stuck in my head, pretty wild, a big one.
+- Warm, genuine endings like "Really sharp work." are ALLOWED — not flippant if the rest of the icebreaker is substantive.
 - NEVER analyze, diagnose, predict, or comment on their operations. You are not their consultant.
 - NEVER reference the act of engagement: no "you liked", no "you commented", no "you engaged", no "your post". Reference the TOPIC, not the behavior.
 
 ## Banned words (do NOT use any of these)
 
-headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, scale, synergy, solution, cutting-edge, cutting edge, AI-powered, AI powered, workflow, pipeline, operating system, autonomous, mood-board, moodboard, craft, impressed, remarkable.
+headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, solution, synergy, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
-(Last two — mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous.)
+(mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous. lead gen — prefer "growth systems" or similar.)
 
 ## Banned diagnostic phrases (do NOT use any of these)
 
@@ -51,12 +52,12 @@ http, calendly, .com/
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<opener — observation.>"}}
+{{"icebreaker": "<multi-line content>"}}
 
-Exactly one string, two clauses joined by an em dash ( — ), total 20 to 40 words.
+The content must be 2-3 sentences, total 40-70 words. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). Em dash is allowed as an internal joiner.
 
 Example (Tier 1 style — use the shape, not the words):
 
-{{"icebreaker": "Ngl your post last week on the Salesforce demo thing said out loud what I think everyone in this space is feeling."}}
+{{"icebreaker": "Ngl your post last week on the Salesforce demo thing said out loud what I think everyone in this space is feeling. The whole thing about tools that were meant to help the team just getting in their way — that one stuck."}}
 
 If nothing in the post text above gives you a verbatim topic to reference, return {{"icebreaker": ""}} instead.

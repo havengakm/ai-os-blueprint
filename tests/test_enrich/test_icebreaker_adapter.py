@@ -825,3 +825,77 @@ async def test_v2_prompts_contain_truth_gating_rule(_env, tier_setup):
     # The v2 bans appear in the list.
     assert "headcount" in prompt_sent, f"tier {expected_tier}"
     assert "mood-board" in prompt_sent, f"tier {expected_tier}"
+    # v3: the "lead gen" ban must be present in every tier's prompt.
+    assert "lead gen" in prompt_sent, f"tier {expected_tier}"
+    # v3: every tier output spec must announce multi-line 2-3 sentence format.
+    assert "2-3 sentences" in prompt_sent, f"tier {expected_tier}"
+    assert "40-70 words" in prompt_sent, f"tier {expected_tier}"
+
+
+# --------------------------------------------------------------------------- #
+# 15. v3 "lead gen" ban triggers retry                                          #
+# --------------------------------------------------------------------------- #
+
+async def test_v3_lead_gen_ban_triggers_retry(_env):
+    """v3 bans "lead gen" (prefer "growth systems"). First response uses the
+    banned phrase → retry; second is clean → passes."""
+    bad = _ib_json("Saw the Series B — love seeing lead gen get its moment.")
+    good = _ib_json("Saw the Series B announcement — that's a big one.")
+    adapter, fake, _ = _adapter([bad, good])
+
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.reason == "tier_3_generated"
+    assert len(fake.create_calls) == 2  # retry fired
+    assert "lead gen" not in result.icebreaker_content.lower()
+
+
+# --------------------------------------------------------------------------- #
+# 16. v3 Tier 4 multi-line icebreaker passes validation                         #
+# --------------------------------------------------------------------------- #
+
+async def test_v3_tier_4_multiline_icebreaker_passes(_env):
+    """v3 output format allows 2-3 sentences separated by \\n\\n or \\n.
+    The adapter must accept multi-line content and surface it verbatim
+    (40-70 words, "Really sharp work." ending allowed)."""
+    multiline = (
+        "Spent the morning with your Iroko work. "
+        "Two things jumped out: the modular \"organised structure\" icon "
+        "instead of the usual sustainability visuals, and \"Infrastructure-"
+        "grade nature restoration\" sitting underneath it. Really sharp work."
+    )
+    adapter, fake, tracker = _adapter(_ib_json(multiline))
+
+    merged = _merged(
+        citable_details=[
+            {"type": "case_study", "detail": "Iroko infrastructure-grade nature restoration",
+             "source": "case_studies"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.ok is True
+    assert result.tier == 4
+    assert result.reason == "tier_4_generated"
+    assert "Iroko" in result.icebreaker_content
+    assert result.icebreaker_content.endswith("Really sharp work.")
+    assert len(fake.create_calls) == 1  # no retry
+    assert tracker.spend_calls == [("c-A", "A", 1)]

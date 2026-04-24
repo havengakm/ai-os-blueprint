@@ -1,4 +1,4 @@
-You are writing a one-line icebreaker to a creative/branding agency founder, as if messaging a friend. No signals or engagement fired. Fall back to the company website. Pick ONE specific named client OR ONE specific named project from the scraped citable details below and reference it. Casual. Warm. Non-transactional.
+You are writing a multi-sentence icebreaker to a creative/branding agency founder, as if messaging a friend. No signals or engagement fired. Fall back to the company website. Reference TWO specific observations from the scraped citable details below — a specific craft decision, a named client, a named project, a specific on-brand line. Casual. Warm. Non-transactional. End with a short genuine closer.
 
 ## Prospect
 
@@ -6,13 +6,13 @@ Company: {company}
 First name: {first_name}
 Short company name: {short_company_name}
 
-## Citable details from the company website (MUST reference a verbatim item from here)
+## Citable details from the company website (MUST reference verbatim items from here)
 
 {citable_details_bulleted}
 
 ## Truth-gating rule (HARD)
 
-Only reference items that appear VERBATIM in the citable details above. Pick a REAL named client, a REAL named project, or a REAL case-study name pulled from the bullets.
+Only reference items that appear VERBATIM in the citable details above. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the citable details above. NO invention.
 
 Do NOT invent clients, projects, awards, metrics, campaigns, locations, or testimonials. Do NOT infer things that aren't literally in the scraped text.
 
@@ -22,30 +22,25 @@ If the citable details section is empty, says "(none)", or gives you nothing con
 
 An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length. No "your portfolio looks great" filler.
 
-## Two shapes — pick 4a OR 4b based on what the citable details actually contain
+## Shape — anchor hard on this format
 
-4a) Named CLIENT in the citable details:
+{{"icebreaker": "Spent the morning with your <named-client-or-project> work. Two things jumped out: <specific-observation-1>, and <specific-observation-2>. Really sharp work."}}
 
-{{"icebreaker": "Ngl spent a bit of time on your portfolio this morning — the <named-client> work is properly good."}}
-
-4b) Named PROJECT / case study in the citable details:
-
-{{"icebreaker": "Spent time on your <named-project> work this morning and had to reach out."}}
-
-Pick 4a if a specific named client name surfaces. Pick 4b if a specific named project / campaign / case study name surfaces. If both, 4a wins (clients land harder). If neither, return the empty string.
+Pick the best two observations from the citable details — a craft decision + a copy line, or a named client + a named project, or an unusual visual choice + an unusual verbal one. If you can only find ONE substantive observation, use one and keep the structure tight.
 
 ## Voice rules
 
 - Tone: casual, warm, non-transactional. Creative and branding agencies, not corporate.
 - Contractions always. Lowercase is fine. Slang is welcome: ngl, tbh, lol, genuinely, properly, stuck in my head, pretty wild, a big one.
+- Warm, genuine endings like "Really sharp work." are ALLOWED — not flippant if the rest of the icebreaker is substantive.
 - NEVER analyze, diagnose, predict, or comment on their operations. You are not their consultant.
 - NEVER say "great portfolio" or "impressive work" — name a specific item.
 
 ## Banned words (do NOT use any of these)
 
-headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, scale, synergy, solution, cutting-edge, cutting edge, AI-powered, AI powered, workflow, pipeline, operating system, autonomous, mood-board, moodboard, craft, impressed, remarkable.
+headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, solution, synergy, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
-(Last two — mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous.)
+(mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous. lead gen — prefer "growth systems" or similar.)
 
 ## Banned diagnostic phrases (do NOT use any of these)
 
@@ -59,8 +54,12 @@ http, calendly, .com/
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<opener — observation.>"}}
+{{"icebreaker": "<multi-line content>"}}
 
-Exactly one string, two clauses joined by an em dash ( — ) for shape 4a, or a single continuous clause for shape 4b. Total 20 to 40 words.
+The content must be 2-3 sentences, total 40-70 words. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). Em dash is allowed as an internal joiner.
+
+Example (Tier 4 style — mirror this exact shape):
+
+{{"icebreaker": "Spent the morning with your Iroko work. Two things jumped out: the modular \"organised structure\" icon instead of the usual sustainability visuals, and \"Infrastructure-grade nature restoration\" sitting underneath it. Really sharp work."}}
 
 If the citable details don't give you a real named client or project, return {{"icebreaker": ""}} instead.

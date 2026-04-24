@@ -1,4 +1,4 @@
-You are writing a one-line icebreaker to a creative/branding agency founder, as if messaging a friend. A structural event just hit the prospect's company — a major contract win, a new-leadership announcement, or a funding round. Name it plainly. Casual. Warm. Non-transactional.
+You are writing a multi-sentence icebreaker to a creative/branding agency founder, as if messaging a friend. A structural event just hit the prospect's company — a major contract win, a new-leadership announcement, or a funding round. Name it plainly. Casual. Warm. Non-transactional.
 
 ## Prospect
 
@@ -17,9 +17,9 @@ Summary:
 
 Only reference the exact item in the signal summary above — the named client in the win, the named executive in the hire, the named round in the funding event.
 
-Do NOT invent client names, executive names, funding amounts, dates, or implications.
+Do NOT invent client names, executive names, funding amounts, dates, or implications. Every specific claim (named client, project, executive, round) MUST appear verbatim in the signal summary above. NO invention.
 
-Signal type MUST be one of: major_contract_win, new_leadership (executive news), funding_round. If the signal_type above is anything else (hiring spike, generic expansion, office opens), return:
+Signal type MUST be one of: major_contract_win, new_leadership (executive news), funding_round. Hiring signals do NOT qualify here — too generic. If the signal_type above is anything else (hiring spike, generic expansion, office opens), return:
 
 {{"icebreaker": ""}}
 
@@ -33,14 +33,15 @@ An empty string is a valid, expected answer. DO NOT fabricate a reference.
 
 - Tone: casual, warm, non-transactional. Creative and branding agencies, not corporate.
 - Contractions always. Lowercase is fine. Slang is welcome: ngl, tbh, lol, genuinely, properly, stuck in my head, pretty wild, a big one.
+- Warm, genuine endings like "Really sharp work." or "That's a big one." are ALLOWED — not flippant if the rest of the icebreaker is substantive.
 - NEVER analyze, diagnose, predict, or comment on their operations. You are not their consultant. No "that usually means" or "this tells me" voice.
 - Do NOT write the implication. Name the event plainly and stop.
 
 ## Banned words (do NOT use any of these)
 
-headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, scale, synergy, solution, cutting-edge, cutting edge, AI-powered, AI powered, workflow, pipeline, operating system, autonomous, mood-board, moodboard, craft, impressed, remarkable.
+headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, solution, synergy, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
-(Last two — mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous.)
+(mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous. lead gen — prefer "growth systems" or similar.)
 
 ## Banned diagnostic phrases (do NOT use any of these)
 
@@ -54,12 +55,12 @@ http, calendly, .com/
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<opener — observation.>"}}
+{{"icebreaker": "<multi-line content>"}}
 
-Exactly one string, two clauses joined by an em dash ( — ), total 20 to 40 words.
+The content must be 2-3 sentences, total 40-70 words. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). Em dash is allowed as an internal joiner.
 
 Example (Tier 3 style — use the shape, not the words):
 
-{{"icebreaker": "Saw the MiBlok win land on your site this week — that's a big one."}}
+{{"icebreaker": "Saw the MiBlok win — genuinely one of the more interesting rollouts I've seen named this quarter. That's a big one."}}
 
 If the signal_type is hiring, generic expansion, or anything other than major_contract_win / new_leadership / funding_round, return {{"icebreaker": ""}} instead.

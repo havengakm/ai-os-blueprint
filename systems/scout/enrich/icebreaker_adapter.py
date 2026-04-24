@@ -88,7 +88,10 @@ _BANNED_WORDS_RE = re.compile(
     # Excludes "scale" and "pipeline" from the legacy set so "scaling"
     # and "pipeline" both match as stems of the broader ban list below.
     r"scale|scaling|pipeline|headcount|BD|business development|capacity|"
-    r"inbound|outrun|runway|growth metrics|gap|mood[- ]board|craft)\b",
+    r"inbound|outrun|runway|growth metrics|gap|mood[- ]board|craft|"
+    # v3: "lead gen" carries bad industry connotations per Kirsten —
+    # prefer "growth systems" in copy. Matched as a whole phrase.
+    r"lead gen)\b",
     re.IGNORECASE,
 )
 
