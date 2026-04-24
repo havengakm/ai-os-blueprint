@@ -7,6 +7,9 @@
 data/captures/
 data/outputs/
 data/reports/
+# Test CSVs contain real contact details + guessed emails for per-deployment
+# MVP portability tests. Ephemeral — don't track in git.
+data/test_contacts_*.csv
 .env
 
 # ── Python ──
