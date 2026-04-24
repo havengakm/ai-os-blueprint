@@ -1,0 +1,16 @@
+---
+variant_key: "v1_left_field_question"
+component_type: "bridge"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  Left-field question: are you taking on more clients right now?
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Substantive bridge between icebreaker and who_i_am. Transitions from
+    observation about their work to the real purpose of the email.
+    Single-variant for now; bandit has only this one option.
+  framework_anchor: "substantive-transition"
+ab_epsilon: 0.1

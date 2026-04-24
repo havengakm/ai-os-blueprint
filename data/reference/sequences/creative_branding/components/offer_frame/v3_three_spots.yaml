@@ -4,7 +4,7 @@ component_type: "offer_frame"
 niche: "creative_branding"
 offer_label: "aios_scout_deployment"
 variant_content: |
-  I'm looking for 3 {{niche}} to install it for. You wouldn't owe me anything unless it actually books {{meetings_niche_term}}.
+  I'm looking for 3 {{niche}} to install it for. You pay nothing unless it books real {{meetings_niche_term}}.
 status: "draft"
 metadata:
   author: "Kirsten"
