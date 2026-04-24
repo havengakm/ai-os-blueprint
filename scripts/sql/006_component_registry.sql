@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS component_variants (
     client_id           TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     component_type      TEXT NOT NULL CHECK (component_type IN (
         'subject_line', 'icebreaker', 'pain_hook', 'offer_frame', 'cta', 'signature',
-        'who_i_am', 'credibility'
+        'who_i_am', 'credibility', 'bridge'
     )),
     variant_key         TEXT NOT NULL,
     variant_content     TEXT NOT NULL,
