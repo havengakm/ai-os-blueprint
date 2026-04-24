@@ -394,10 +394,10 @@ async def test_decision_log_emitted_with_correct_shape() -> None:
     assert entry["client_id"] == "client-1"
     assert entry["decision_type"] == "research_contact"
     assert entry["decision"].startswith("research_fills:contact-1:")
-    # 5 of 10 filled: the 4 enrich-sourced placeholders + first_name fallback.
+    # 5 of 13 filled: the 4 enrich-sourced placeholders + first_name fallback.
     # No client_facts passed and no short_company_name on the contact -> the
-    # other 5 productised slots are None.
-    assert entry["decision"].endswith(":5of10")
+    # other 8 productised slots are None (including the 3 new niche-level fills).
+    assert entry["decision"].endswith(":5of13")
     assert entry["source"] == "system"
     assert entry["confidence"] is None
 
@@ -412,6 +412,7 @@ async def test_decision_log_emitted_with_correct_shape() -> None:
     assert context["placeholders_empty"] == [
         "short_company_name", "operator_name",
         "offer_promise", "offer_period", "offer_risk_reversal",
+        "niche", "niche_specific_term", "meetings_niche_term",
     ]
     assert isinstance(context["sources_used"], list)
     # 4 enrich sources + 1 first_name audit entry.
@@ -778,6 +779,53 @@ async def test_select_fills_without_client_facts_defaults_to_none() -> None:
     assert fills.offer_promise is None
     assert fills.offer_period is None
     assert fills.offer_risk_reversal is None
+    # v2 niche-level fills default to None when client_facts empty.
+    assert fills.niche is None
+    assert fills.niche_specific_term is None
+    assert fills.meetings_niche_term is None
+
+
+async def test_select_fills_populates_niche_level_fields_from_client_facts() -> None:
+    """v2: niche / niche_specific_term / meetings_niche_term source from
+    client_facts and surface as separate ResearchFills attrs."""
+    contact = mk_contact()
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    fills = await selector.select_fills(
+        "client-1", contact, components,
+        client_facts={
+            "niche": "creative and branding agencies",
+            "niche_specific_term": "clients",
+            "meetings_niche_term": "sales calls",
+        },
+    )
+
+    assert fills.niche == "creative and branding agencies"
+    assert fills.niche_specific_term == "clients"
+    assert fills.meetings_niche_term == "sales calls"
+
+    # Audit trail records every niche-level source as client_facts.
+    sources_by_pl = {s["placeholder"]: s for s in fills.sources_used}
+    for key in ("niche", "niche_specific_term", "meetings_niche_term"):
+        assert sources_by_pl[key]["source"] == "client_facts"
+        assert sources_by_pl[key]["type"] == "client_fact"
+
+
+async def test_select_fills_partial_niche_level_fields() -> None:
+    """Only the keys present in client_facts should fill; others stay None."""
+    contact = mk_contact()
+    components = mk_default_components()
+    selector = ResearchSelector()
+
+    fills = await selector.select_fills(
+        "client-1", contact, components,
+        client_facts={"niche": "creative and branding agencies"},
+    )
+
+    assert fills.niche == "creative and branding agencies"
+    assert fills.niche_specific_term is None
+    assert fills.meetings_niche_term is None
 
 
 async def test_select_fills_with_blank_first_name_uses_there_fallback() -> None:
@@ -809,9 +857,11 @@ async def test_select_fills_partial_client_facts_fills_only_present_keys() -> No
     assert fills.offer_risk_reversal is None
 
 
-async def test_select_fills_decision_log_reports_10_of_10_surface() -> None:
+async def test_select_fills_decision_log_reports_13_of_13_surface() -> None:
     """Regression guard: after extending PLACEHOLDER_FIELDS the decision-log
-    'filled N of total' ratio must reflect the productised surface."""
+    'filled N of total' ratio must reflect the productised surface.
+
+    v2 adds niche, niche_specific_term, meetings_niche_term → total = 13."""
     contact = mk_contact(
         citable_details=[{"type": "case_study", "detail": "fact", "source": "x"}],
         trigger_events=[
@@ -833,17 +883,21 @@ async def test_select_fills_decision_log_reports_10_of_10_surface() -> None:
             "offer_promise": "20 calls",
             "offer_period": "30 days",
             "offer_risk_reversal": "or free",
+            "niche": "creative and branding agencies",
+            "niche_specific_term": "clients",
+            "meetings_niche_term": "sales calls",
         },
     )
 
     entry = logger.entries[0]
-    # 10 placeholders, all 10 filled.
-    assert entry["decision"].endswith(":10of10")
+    # 13 placeholders, all 13 filled.
+    assert entry["decision"].endswith(":13of13")
     assert entry["context"]["placeholders_empty"] == []
     assert set(entry["context"]["placeholders_filled"]) == {
         "icebreaker_content", "trigger_hook", "pain_evidence", "cta_content",
         "first_name", "short_company_name", "operator_name",
         "offer_promise", "offer_period", "offer_risk_reversal",
+        "niche", "niche_specific_term", "meetings_niche_term",
     }
 
 

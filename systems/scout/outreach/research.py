@@ -73,13 +73,25 @@ class ResearchFills:
     to a generic variant. ``sources_used`` has one entry per filled
     placeholder, deduped by ``(placeholder, source)``.
 
-    The productised MVP surface is 10 placeholders total: the four
+    The productised MVP surface is 13 placeholders total: the four
     enrich-sourced slots (icebreaker_content / trigger_hook / pain_evidence /
-    cta_content) plus six deployment-agnostic fills (first_name,
+    cta_content) plus nine deployment-agnostic fills (first_name,
     short_company_name, operator_name, offer_promise, offer_period,
-    offer_risk_reversal). The first two come from the contact row + the
-    IcebreakerAdapter output; the last four come from the per-client
-    ``client_facts`` table (preloaded by the caller).
+    offer_risk_reversal, niche, niche_specific_term, meetings_niche_term).
+    The first two come from the contact row + the IcebreakerAdapter output;
+    the last seven come from the per-client ``client_facts`` table
+    (preloaded by the caller).
+
+    The niche-level fills (niche, niche_specific_term, meetings_niche_term)
+    power the v2 who_i_am + offer_frame component copy so a single template
+    serves every deployment:
+
+      "I build AI outreach systems for {{niche}}. It finds your ideal
+      {{niche_specific_term}} ... and books {{meetings_niche_term}} into
+      your calendar."
+
+    For creative_branding: niche="creative and branding agencies",
+    niche_specific_term="clients", meetings_niche_term="sales calls".
     """
 
     # Existing enrich-sourced fills.
@@ -95,6 +107,12 @@ class ResearchFills:
     offer_promise: str | None
     offer_period: str | None
     offer_risk_reversal: str | None
+
+    # Niche-level fills (v2) — power the shared who_i_am + offer_frame
+    # templates across deployments. Source: client_facts.
+    niche: str | None
+    niche_specific_term: str | None
+    meetings_niche_term: str | None
 
     sources_used: list[dict[str, Any]] = field(default_factory=list)
 
@@ -130,6 +148,7 @@ class ResearchSelector:
         "icebreaker_content", "trigger_hook", "pain_evidence", "cta_content",
         "first_name", "short_company_name", "operator_name",
         "offer_promise", "offer_period", "offer_risk_reversal",
+        "niche", "niche_specific_term", "meetings_niche_term",
     )
 
     def __init__(self, decision_logger: DecisionLoggerProtocol | None = None) -> None:
@@ -204,11 +223,19 @@ class ResearchSelector:
         offer_promise = _select_from_client_facts(facts, "offer_promise")
         offer_period = _select_from_client_facts(facts, "offer_period")
         offer_risk_reversal = _select_from_client_facts(facts, "offer_risk_reversal")
+        # v2 niche-level fills — power the shared who_i_am + offer_frame
+        # templates. Same client_facts source as the offer_* fields.
+        niche = _select_from_client_facts(facts, "niche")
+        niche_specific_term = _select_from_client_facts(facts, "niche_specific_term")
+        meetings_niche_term = _select_from_client_facts(facts, "meetings_niche_term")
         for placeholder, value in (
             ("operator_name", operator_name),
             ("offer_promise", offer_promise),
             ("offer_period", offer_period),
             ("offer_risk_reversal", offer_risk_reversal),
+            ("niche", niche),
+            ("niche_specific_term", niche_specific_term),
+            ("meetings_niche_term", meetings_niche_term),
         ):
             if value is not None:
                 _append_audit(
@@ -230,6 +257,9 @@ class ResearchSelector:
             offer_promise=offer_promise,
             offer_period=offer_period,
             offer_risk_reversal=offer_risk_reversal,
+            niche=niche,
+            niche_specific_term=niche_specific_term,
+            meetings_niche_term=meetings_niche_term,
             sources_used=sources_used,
         )
         await self._emit_decision(client_id, contact, fills, component_selections, dry_run)

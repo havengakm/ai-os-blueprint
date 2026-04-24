@@ -1034,3 +1034,88 @@ async def test_single_variant_pool_skips_bandit() -> None:
 
     result = await composer.compose("client-1", mk_contact())
     assert isinstance(result, ComposedDraft)
+
+
+# --------------------------------------------------------------------------- #
+# v2 niche-level placeholders — {{niche}} / {{niche_specific_term}} /          #
+# {{meetings_niche_term}} routed from client_facts through the composer        #
+# --------------------------------------------------------------------------- #
+
+async def test_niche_level_placeholders_render_from_client_facts() -> None:
+    """The v2 who_i_am + offer_frame templates depend on three niche-level
+    placeholders. All three must route from client_facts through
+    ResearchSelector to the composer's render step."""
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            who_i_am_content=(
+                "I build AI outreach systems for {{niche}}. It finds "
+                "your ideal {{niche_specific_term}} and books "
+                "{{meetings_niche_term}} into your calendar."
+            ),
+            offer_frame_content=(
+                "Looking for 3 {{niche}} to install it for. "
+                "No cost unless it books {{meetings_niche_term}}."
+            ),
+        ),
+        client_facts={
+            "niche": "creative and branding agencies",
+            "niche_specific_term": "clients",
+            "meetings_niche_term": "sales calls",
+        },
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "I build AI outreach systems for creative and branding agencies." in result.body
+    assert "your ideal clients and books sales calls into your calendar" in result.body
+    assert "Looking for 3 creative and branding agencies to install it for" in result.body
+    assert "No cost unless it books sales calls" in result.body
+    # None of the three should surface as missing when all three are seeded.
+    for key in ("niche", "niche_specific_term", "meetings_niche_term"):
+        assert key not in result.fills_missing
+
+
+async def test_niche_level_placeholders_flagged_missing_when_client_facts_empty() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            who_i_am_content="I build systems for {{niche}}.",
+            offer_frame_content="Books {{meetings_niche_term}}.",
+        ),
+        client_facts={},  # nothing seeded
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "niche" in result.fills_missing
+    assert "meetings_niche_term" in result.fills_missing
+    # Body renders with empty strings in place of the missing placeholders.
+    assert "I build systems for ." in result.body
+    assert "Books ." in result.body
+
+
+async def test_niche_specific_term_renders_independently() -> None:
+    """Regression guard: niche_specific_term is its own attribute, not a
+    substring prefix of niche. Using only niche_specific_term must NOT
+    accidentally satisfy a {{niche}} placeholder."""
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            who_i_am_content=(
+                "I help find {{niche_specific_term}} at scale."
+            ),
+            offer_frame_content="For {{niche}} only.",
+        ),
+        client_facts={"niche_specific_term": "clients"},
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "I help find clients at scale." in result.body
+    assert "For  only." in result.body  # niche missing → empty string
+    assert "niche" in result.fills_missing
+    assert "niche_specific_term" not in result.fills_missing

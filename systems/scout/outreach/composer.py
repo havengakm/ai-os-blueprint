@@ -89,6 +89,11 @@ _RESEARCH_PLACEHOLDER_ATTRS: dict[str, str] = {
     "offer_promise": "offer_promise",
     "offer_period": "offer_period",
     "offer_risk_reversal": "offer_risk_reversal",
+    # v2 niche-level fills — source: client_facts. Power the shared
+    # who_i_am + offer_frame templates across deployments.
+    "niche": "niche",
+    "niche_specific_term": "niche_specific_term",
+    "meetings_niche_term": "meetings_niche_term",
 }
 
 
