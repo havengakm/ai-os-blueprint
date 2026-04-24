@@ -899,3 +899,113 @@ async def test_v3_tier_4_multiline_icebreaker_passes(_env):
     assert result.icebreaker_content.endswith("Really sharp work.")
     assert len(fake.create_calls) == 1  # no retry
     assert tracker.spend_calls == [("c-A", "A", 1)]
+
+
+# --------------------------------------------------------------------------- #
+# 17. v3.1 corporate-jargon bans — regression guards for live-run failures     #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("corporate_phrase", [
+    # From the Jonathan/Inkblot Tier 4 live-run failure
+    "signalling formal local ecosystem engagement",
+    "member profile active this month",
+    # From the Madelain/PR Worx Tier 3 live-run failure
+    "pursuing expansion into high-growth markets",
+    "explicitly cited as driver behind the move",
+    "the new MD appointment is cited as a catalyst",
+    # Additional consultant-paraphrase patterns
+    "uniquely positioned for growth",
+    "on a transformation journey",
+    "preparing for market entry abroad",
+    "ready for market expansion",
+    "signaling a new direction",
+])
+async def test_v3_1_corporate_jargon_triggers_retry(_env, corporate_phrase: str):
+    """Regression guard for the Jonathan/Inkblot + Madelain/PR Worx live
+    drafts that leaked consultant-voice jargon past the v3 banned list.
+    Every one of these phrases must fail validation on first attempt."""
+    bad = _ib_json(f"Saw the announcement — {corporate_phrase}.")
+    good = _ib_json("Saw the announcement land last week — that's a big one.")
+    adapter, fake, _ = _adapter([bad, good])
+
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.reason == "tier_3_generated", corporate_phrase
+    assert len(fake.create_calls) == 2, corporate_phrase  # retry fired
+
+
+# --------------------------------------------------------------------------- #
+# 18. v3.1 prompts carry the opening-verb whitelist + BANNED/ALLOWED block     #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("tier_setup", [
+    (
+        {"trigger_events": [
+            {"type": "behavioral_signal", "detail": "so tired of it all", "recency_days": 3},
+        ]},
+        "Saw the rant — that one lands.",
+        1,
+    ),
+    (
+        {"trigger_events": [
+            {"type": "behavioral_signal", "detail": "good read on founder-led sales", "recency_days": 5},
+        ]},
+        "Saw the podcast take — genuinely stuck with me.",
+        2,
+    ),
+    (
+        {"structural_signals": [
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ]},
+        "Saw the Series B announcement — that's a big one.",
+        3,
+    ),
+    (
+        {"citable_details": [
+            {"type": "case_study", "detail": "MiBlok rebrand", "source": "portfolio"},
+        ]},
+        "Spent time on the MiBlok rebrand this morning.",
+        4,
+    ),
+])
+async def test_v3_1_prompts_contain_opener_whitelist_and_examples(_env, tier_setup):
+    """Every v3.1 tier prompt must carry the opening-verb whitelist and
+    the BANNED vs ALLOWED concrete-examples block. Probes the rendered
+    prompt directly."""
+    merged_kwargs, response, expected_tier = tier_setup
+    adapter, fake, _ = _adapter(_ib_json(response))
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=_merged(**merged_kwargs),
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.tier == expected_tier
+    prompt_sent = fake.create_calls[0]["messages"][0]["content"]
+    # Opener whitelist markers
+    assert "Opening verb" in prompt_sent, f"tier {expected_tier}"
+    assert "Spent the morning with" in prompt_sent, f"tier {expected_tier}"
+    # BANNED vs ALLOWED block markers
+    assert "BANNED vs ALLOWED" in prompt_sent, f"tier {expected_tier}"
+    assert "warm observational voice" in prompt_sent, f"tier {expected_tier}"
+    # New v3.1 single-word bans appear in every tier's prompt
+    assert "signalling" in prompt_sent, f"tier {expected_tier}"
+    assert "ecosystem" in prompt_sent, f"tier {expected_tier}"
+    assert "high-growth" in prompt_sent, f"tier {expected_tier}"
+    # The "no analyze" rule block is explicit
+    assert "no analyze" in prompt_sent.lower(), f"tier {expected_tier}"

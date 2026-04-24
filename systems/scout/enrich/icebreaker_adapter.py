@@ -91,7 +91,13 @@ _BANNED_WORDS_RE = re.compile(
     r"inbound|outrun|runway|growth metrics|gap|mood[- ]board|craft|"
     # v3: "lead gen" carries bad industry connotations per Kirsten —
     # prefer "growth systems" in copy. Matched as a whole phrase.
-    r"lead gen)\b",
+    r"lead gen|"
+    # v3.1: corporate/consulting jargon that survived the banned-word list
+    # and leaked into live drafts (Jonathan/Inkblot, Madelain/PR Worx).
+    # Unambiguous single-word bans only; "engagement" / "positioning" /
+    # "landscape" / "space" stay in the prompt text because they have
+    # legitimate narrow uses (engagement rates, brand positioning).
+    r"signalling|signaling|ecosystem|high[- ]growth)\b",
     re.IGNORECASE,
 )
 
@@ -101,6 +107,12 @@ _BANNED_WORDS_RE = re.compile(
 _BANNED_DIAGNOSTIC_PHRASES: tuple[str, ...] = (
     "usually means", "which suggests", "points to", "feels like",
     "the gap between", "this tells me", "that tends to", "which means",
+    # v3.1 additions: consultant paraphrase phrases that leaked into
+    # live drafts. Substrings, not word-bounded, because they span
+    # punctuation ("explicitly cited as driver").
+    "cited as", "driver behind", "member profile active",
+    "uniquely positioned", "transformation journey",
+    "pursuing expansion", "market entry", "market expansion",
 )
 
 # "operations" matches literal bans too. "typically" is a stem of diagnostic
