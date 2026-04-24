@@ -65,6 +65,8 @@ from scripts.scrape_mindbody import (  # noqa: E402
     validate_row,
     write_csv,
 )
+from scripts._owner_extraction import extract_owner_with_haiku  # noqa: E402
+from scripts._website_fetcher import fetch_website_about_text  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +84,11 @@ USER_AGENT = (
 FEED_SELECTOR = 'div[role="feed"]'
 CARD_SELECTOR = 'div[role="feed"] > div > div[jsaction]'
 PAGE_GAP_SECONDS = 2.5
-CLAUDE_GAP_SECONDS = 15.0
-# Haiku 4.5 per CLAUDE.md cost rules. Phase 2 of fix/cost-discipline will
-# drop web_search to hit the $0.002/contact target.
+# Post-Phase-2: Haiku has no web_search, ~2-4k input tokens/call. Drop the
+# large rate-limit gap — Playwright's 15s per-page timeout is now the
+# natural pacing.
+CLAUDE_GAP_SECONDS = 2.0
+# Haiku 4.5 per CLAUDE.md cost rules.
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 800
 
@@ -478,6 +482,23 @@ async def run(
     zip_coords: dict[str, tuple[float, float]] | None = None,
     min_candidates: int = 5,
 ) -> tuple[int, list[dict[str, str]]]:
+    """Scrape then resolve. Pipeline per candidate:
+      1. Use the candidate's `website` field (already captured from the
+         Google Maps card) as the domain seed. Skip candidates without a
+         website — they're low-signal for a cold-email workflow anyway.
+      2. Playwright fetches the studio's About/Team text via
+         _website_fetcher.fetch_website_about_text.
+      3. Haiku 4.5 extracts owner + category match from the scraped
+         text (no web_search tool).
+
+    Browser stays open throughout so Playwright contexts warm-reuse.
+    """
+    client = _ensure_anthropic_client()
+    rows: list[dict[str, str]] = []
+    attempted = 0
+    consecutive_failures = 0
+    max_consecutive_failures = 5
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         try:
@@ -485,95 +506,128 @@ async def run(
                 query=query, zips=zips, browser=browser,
                 zip_coords=zip_coords,
             )
+
+            if len(candidates) < min_candidates:
+                logger.error(
+                    "too few candidates (%d < %d) for query=%r — aborting",
+                    len(candidates), min_candidates, query,
+                )
+                return 2, []
+
+            for candidate in candidates:
+                if len(rows) >= limit:
+                    break
+                attempted += 1
+                logger.info(
+                    "[%d/%d] resolving %s  (%s)",
+                    attempted, limit, candidate["name"],
+                    candidate.get("address", ""),
+                )
+
+                # --- Step 1: domain from card.website (or skip) ---
+                website_hint = (candidate.get("website") or "").strip()
+                if not website_hint:
+                    logger.info(
+                        "skipped %s — no website on Google Maps card",
+                        candidate["name"],
+                    )
+                    continue
+                domain = normalise_domain(website_hint)
+                if not domain:
+                    logger.info(
+                        "skipped %s — website didn't normalise: %r",
+                        candidate["name"], website_hint,
+                    )
+                    continue
+
+                # --- Step 2: fetch About/Team text ---
+                website_text = await fetch_website_about_text(
+                    browser=browser,
+                    domain=domain,
+                    user_agent=USER_AGENT,
+                )
+                if not website_text.strip():
+                    logger.info(
+                        "skipped %s — site empty/unreachable (%s)",
+                        candidate["name"], domain,
+                    )
+                    continue
+
+                # --- Step 3: Haiku extract ---
+                try:
+                    extraction = extract_owner_with_haiku(
+                        client=client,
+                        studio_name=candidate["name"],
+                        website_text=website_text,
+                        category_filter=category_filter,
+                        country=country,
+                        known_domain=domain,
+                    )
+                    consecutive_failures = 0
+                except Exception as e:
+                    consecutive_failures += 1
+                    logger.warning(
+                        "haiku call failed (%d consecutive) location=%s err=%s",
+                        consecutive_failures, candidate["name"], e,
+                    )
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.error(
+                            "bailing after %d consecutive Haiku failures",
+                            max_consecutive_failures,
+                        )
+                        break
+                    time.sleep(CLAUDE_GAP_SECONDS)
+                    continue
+
+                if not extraction.is_match:
+                    logger.info(
+                        "skipped %s — category mismatch (%s)",
+                        candidate["name"],
+                        extraction.category_reasoning or "(no reason)",
+                    )
+                    time.sleep(CLAUDE_GAP_SECONDS)
+                    continue
+
+                resolved = {
+                    "domain": extraction.domain,
+                    "first_name": extraction.first_name,
+                    "last_name": extraction.last_name,
+                    "title": extraction.title,
+                    "linkedin_url": extraction.linkedin_url,
+                    "is_match": extraction.is_match,
+                    "notes": extraction.notes,
+                    "confidence": extraction.confidence,
+                }
+                row = build_row(
+                    candidate=candidate,
+                    resolved=resolved,
+                    country=country,
+                    niche=niche,
+                )
+                if row is None:
+                    logger.info(
+                        "skipped %s — no usable domain after extraction",
+                        candidate["name"],
+                    )
+                    time.sleep(CLAUDE_GAP_SECONDS)
+                    continue
+
+                missing = validate_row(row)
+                if missing:
+                    logger.info(
+                        "skipped %s — missing fields: %s",
+                        candidate["name"], missing,
+                    )
+                    continue
+                rows.append(row)
+                logger.info(
+                    "  OK %s → %s <%s>",
+                    row["company"], row.get("first_name") or "?", row["email"],
+                )
+                if len(rows) < limit:
+                    time.sleep(CLAUDE_GAP_SECONDS)
         finally:
             await browser.close()
-
-    if len(candidates) < min_candidates:
-        logger.error(
-            "too few candidates (%d < %d) for query=%r — aborting",
-            len(candidates), min_candidates, query,
-        )
-        return 2, []
-
-    client = _ensure_anthropic_client()
-    rows: list[dict[str, str]] = []
-    attempted = 0
-    consecutive_failures = 0
-    max_consecutive_failures = 5
-    for candidate in candidates:
-        if len(rows) >= limit:
-            break
-        attempted += 1
-        logger.info(
-            "[%d/%d] resolving %s  (%s)",
-            attempted, limit, candidate["name"], candidate.get("address", ""),
-        )
-        try:
-            resolved = resolve_location_with_claude(
-                candidate=candidate,
-                country=country,
-                category_filter=category_filter,
-                client=client,
-            )
-            consecutive_failures = 0
-        except Exception as e:
-            consecutive_failures += 1
-            logger.warning(
-                "claude call failed (%d consecutive) location=%s err=%s",
-                consecutive_failures, candidate["name"], e,
-            )
-            if consecutive_failures >= max_consecutive_failures:
-                logger.error(
-                    "bailing after %d consecutive Claude failures — "
-                    "transient API or network issue, not worth burning more "
-                    "candidates", max_consecutive_failures,
-                )
-                break
-            # Cool down on ANY failure (connection, 429, 5xx). The
-            # default 35s gap is conservative but cheap vs a burnt queue.
-            time.sleep(CLAUDE_GAP_SECONDS)
-            continue
-
-        if resolved.get("is_match") is False:
-            logger.info(
-                "skipped %s — category mismatch",
-                candidate["name"],
-            )
-            if len(rows) < limit:
-                time.sleep(CLAUDE_GAP_SECONDS)
-            continue
-
-        row = build_row(
-            candidate=candidate,
-            resolved=resolved,
-            country=country,
-            niche=niche,
-        )
-        if row is None:
-            logger.info(
-                "skipped %s — no usable domain",
-                candidate["name"],
-            )
-            if len(rows) < limit:
-                time.sleep(CLAUDE_GAP_SECONDS)
-            continue
-
-        missing = validate_row(row)
-        if missing:
-            logger.info(
-                "skipped %s — missing fields: %s",
-                candidate["name"], missing,
-            )
-            if len(rows) < limit:
-                time.sleep(CLAUDE_GAP_SECONDS)
-            continue
-        rows.append(row)
-        logger.info(
-            "  OK %s → %s <%s>",
-            row["company"], row.get("first_name") or "?", row["email"],
-        )
-        if len(rows) < limit:
-            time.sleep(CLAUDE_GAP_SECONDS)
 
     write_csv(rows, output)
     exit_code = 0 if len(rows) >= limit else (0 if rows else 2)

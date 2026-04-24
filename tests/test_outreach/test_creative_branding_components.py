@@ -83,7 +83,11 @@ def test_subject_line_v8_taking_on_more_clients_present() -> None:
     )
     assert "{{first_name}}" in v8.variant_content
     assert "{{short_company_name}}" in v8.variant_content
-    assert "taking on more clients?" in v8.variant_content
+    # After Plan B's universal-placeholder refactor, the literal "clients"
+    # was replaced with {{niche_specific_term}} so the same template serves
+    # creative_branding ("clients") and fitness_wellness ("members") without
+    # duplicating the variant.
+    assert "taking on more {{niche_specific_term}}?" in v8.variant_content
     assert v8.offer_label == "aios_scout_deployment"
 
 

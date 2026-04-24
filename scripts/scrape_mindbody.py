@@ -63,6 +63,13 @@ except ImportError:
 
 from playwright.async_api import async_playwright  # noqa: E402
 
+from scripts._owner_extraction import (  # noqa: E402
+    HAIKU_MODEL as _EXTRACTION_HAIKU_MODEL,  # re-exported for tests
+    OwnerExtractionResult,
+    extract_owner_with_haiku,
+)
+from scripts._website_fetcher import fetch_website_about_text  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,12 +84,9 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 )
 PAGE_GAP_SECONDS = 2.5
-# web_search pulls ~10-15k input tokens per call via tool results. Even on
-# Haiku 4.5 that's ~$0.010/call — still over the $0.002/contact target.
-# Phase 2 of fix/cost-discipline will drop web_search entirely (Playwright-
-# fetch the site + Haiku extract). For now, Haiku replacement alone gets
-# us from ~$0.05/call Sonnet to ~$0.010/call — 5x savings.
-CLAUDE_GAP_SECONDS = 15.0
+# Post-Phase-2: Haiku has no web_search, ~2-4k input tokens/call.
+# Playwright's 15s per-page timeout is now the natural pacing.
+CLAUDE_GAP_SECONDS = 2.0
 # Haiku 4.5 per CLAUDE.md cost rules.
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 800
@@ -137,21 +141,14 @@ def parse_directory_studios(html: str) -> list[dict[str, str]]:
     return out
 
 
-_SCHEME_RE = re.compile(r"^https?://", re.IGNORECASE)
-_WWW_RE = re.compile(r"^www\.", re.IGNORECASE)
-
-
-def normalise_domain(raw: str | None) -> str | None:
-    """Strip scheme, www, path, and trailing dots; return None on empty."""
-    if not raw:
-        return None
-    s = raw.strip()
-    if not s:
-        return None
-    s = _SCHEME_RE.sub("", s)
-    s = _WWW_RE.sub("", s)
-    s = s.split("/", 1)[0].rstrip(".")
-    return s or None
+# normalise_domain + resolve_is_match now live in scripts._scrape_common so
+# both scrapers and _owner_extraction can share them without a circular
+# import. Re-exported here for backward compatibility with test + caller
+# code that imports from scripts.scrape_mindbody.
+from scripts._scrape_common import (  # noqa: E402
+    normalise_domain,
+    resolve_is_match,
+)
 
 
 def short_name_from_company(company: str) -> str:
@@ -258,6 +255,80 @@ async def scrape_directory(
     return studios
 
 
+# ── Playwright: extract studio's own website from Mindbody profile ───────────
+
+# Hosts that appear on every Mindbody profile but aren't the studio's own site.
+_NON_STUDIO_HOSTS = {
+    "mindbodyonline.com", "www.mindbodyonline.com",
+    "facebook.com", "www.facebook.com",
+    "instagram.com", "www.instagram.com",
+    "twitter.com", "x.com", "www.twitter.com", "www.x.com",
+    "yelp.com", "www.yelp.com",
+    "google.com", "maps.google.com", "www.google.com",
+    "linkedin.com", "www.linkedin.com", "za.linkedin.com",
+    "tiktok.com", "www.tiktok.com",
+    "youtube.com", "www.youtube.com",
+    "apple.com", "apps.apple.com",
+    "play.google.com",
+}
+
+
+def _host_of(url: str) -> str:
+    """Return the hostname in lowercase; empty when url has no scheme."""
+    if not url:
+        return ""
+    m = re.match(r"https?://([^/?#]+)", url, re.IGNORECASE)
+    return m.group(1).lower() if m else ""
+
+
+async def extract_mindbody_profile_website(
+    *,
+    browser: Any,
+    mindbody_url: str,
+    timeout_ms: int = 20_000,
+    user_agent: str = USER_AGENT,
+) -> str | None:
+    """Navigate to a Mindbody location profile; return the studio's own
+    external website URL. None when no plausible link found.
+
+    Heuristic: the profile page has a "Visit website" anchor, but the
+    selector varies across Mindbody templates. We collect all external
+    anchors, filter out social / directory / store-listing hosts, and
+    return the first remaining one. If zero remain, return None.
+    """
+    ctx = await browser.new_context(user_agent=user_agent)
+    try:
+        page = await ctx.new_page()
+        try:
+            resp = await page.goto(
+                mindbody_url, timeout=timeout_ms, wait_until="domcontentloaded",
+            )
+        except Exception as e:
+            logger.debug("mindbody profile nav failed %s: %s", mindbody_url, e)
+            return None
+        if not resp or resp.status >= 400:
+            return None
+
+        anchors = await page.eval_on_selector_all(
+            "a[href^='http']",
+            "els => els.map(a => a.getAttribute('href'))",
+        )
+    finally:
+        await ctx.close()
+
+    for href in anchors or []:
+        host = _host_of(href or "")
+        if not host:
+            continue
+        if host in _NON_STUDIO_HOSTS:
+            continue
+        # Filter sub-paths of the known Mindbody host variants.
+        if host.endswith(".mindbodyonline.com"):
+            continue
+        return href  # keep first match — ordering reflects page layout
+    return None
+
+
 # ── Claude: resolve website + owner ───────────────────────────────────────────
 
 _CLAUDE_SYSTEM = (
@@ -333,43 +404,9 @@ def _parse_claude_json(raw_text: str) -> dict[str, Any] | None:
         return None
 
 
-# Phrases that indicate Claude is hedging on category match even when it
-# returned is_match=true. Post-hoc override: if ANY of these appear in
-# category_reasoning / notes, force is_match=false.
-_REJECTION_RE = re.compile(
-    r"\b(?:"
-    r"not\s+(?:a|primarily|really|actually|truly|the)\s+(?:pilates|yoga|fitness|studio|gym|f45|crossfit|barre|ballet)"
-    r"|supplementary"
-    r"|secondary\s+(?:offering|focus)"
-    r"|side\s+offering"
-    r"|doesn'?t\s+(?:fit|match|primarily)"
-    r"|isn'?t\s+(?:a|primarily)"
-    r"|is\s+(?:a|an)\s+(?:iv|body sculpting|lymphatic|ballet\s+company|dance|martial\s+arts|boxing|hair|beauty|spa|salon)"
-    r"|primarily\s+(?:iv|body|lymphatic|ballet|dance)"
-    r"|hybrid\s+offering"
-    r"|mixed\s+offering"
-    r")\b",
-    re.IGNORECASE,
-)
-
-
-def resolve_is_match(
-    raw_is_match: Any,
-    category_reasoning: str,
-    notes: str,
-) -> tuple[bool, str | None]:
-    """Final is_match with safety-net override.
-
-    Returns (is_match, override_reason). override_reason is None when the
-    raw Claude value is respected; otherwise a short string describing
-    which field tripped the override.
-    """
-    is_match = bool(raw_is_match) if raw_is_match is not None else True
-    combined = f"{category_reasoning} || {notes}"
-    rejection_hit = _REJECTION_RE.search(combined or "")
-    if is_match and rejection_hit:
-        return False, f"rejection-phrase:{rejection_hit.group(0)!r}"
-    return is_match, None
+# resolve_is_match is now re-exported from scripts._scrape_common at the top
+# of this file; the implementation lives there to avoid circular imports
+# with _owner_extraction.py. Historical duplicate definition removed.
 
 
 def _extract_text_blocks(response: Any) -> str:
@@ -540,105 +577,157 @@ async def run(
     country: str = "South Africa",
     category_filter: str = "any fitness or wellness studio",
 ) -> tuple[int, list[dict[str, str]]]:
-    """Returns (exit_code, rows)."""
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        try:
-            studios = await scrape_directory(city_slug, browser=browser)
-        finally:
-            await browser.close()
+    """Returns (exit_code, rows).
 
-    logger.info("directory scrape: %d studios for %s", len(studios), city_slug)
+    Pipeline per studio:
+      1. Playwright navigates the Mindbody profile → extracts the
+         studio's own-website anchor.
+      2. Playwright follows the website → fetches About/Team text
+         (via _website_fetcher.fetch_website_about_text).
+      3. Haiku 4.5 extracts owner + category match from the scraped
+         text (no web_search tool; much cheaper than the prior
+         Sonnet+web_search path).
 
-    if len(studios) < min_studios:
-        logger.error(
-            "too few studios (%d < %d) for city_slug=%s — aborting",
-            len(studios), min_studios, city_slug,
-        )
-        return 2, []
-
-    # Claude web_search runs sequentially with a short gap to stay polite.
+    Browser is kept open through the whole loop so Playwright sessions
+    warm-reuse chromium instead of cold-starting per contact.
+    """
     client = _ensure_anthropic_client()
     rows: list[dict[str, str]] = []
     attempted = 0
     consecutive_failures = 0
     max_consecutive_failures = 5
-    for studio in studios:
-        if len(rows) >= limit:
-            break
-        attempted += 1
-        logger.info(
-            "[%d/%d] resolving %s",
-            attempted, limit, studio["name"],
-        )
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
         try:
-            resolved = resolve_studio_with_claude(
-                studio_name=studio["name"],
-                mindbody_url=studio["mindbody_url"],
-                city=city_name,
-                client=client,
-                country=country,
-                category_filter=category_filter,
+            studios = await scrape_directory(city_slug, browser=browser)
+            logger.info(
+                "directory scrape: %d studios for %s",
+                len(studios), city_slug,
             )
-            consecutive_failures = 0
-        except Exception as e:  # billed or infra — log + skip
-            consecutive_failures += 1
-            logger.warning(
-                "claude call failed (%d consecutive) studio=%s err=%s",
-                consecutive_failures, studio["name"], e,
-            )
-            if consecutive_failures >= max_consecutive_failures:
+            if len(studios) < min_studios:
                 logger.error(
-                    "bailing after %d consecutive Claude failures",
-                    max_consecutive_failures,
+                    "too few studios (%d < %d) for city_slug=%s — aborting",
+                    len(studios), min_studios, city_slug,
                 )
-                break
-            # Cool down on ANY failure so we don't burn the queue during
-            # a transient API or network blip.
-            time.sleep(CLAUDE_GAP_SECONDS)
-            continue
+                return 2, []
 
-        row = build_row(
-            studio_name=studio["name"],
-            mindbody_url=studio["mindbody_url"],
-            resolved=resolved,
-            city=city_name,
-            niche=niche,
-        )
-        if row is None:
-            logger.info(
-                "skipped %s — Claude returned no usable domain",
-                studio["name"],
-            )
-            # Rate-limit gap even on skip — we still spent tokens.
-            if len(rows) < limit:
-                time.sleep(CLAUDE_GAP_SECONDS)
-            continue
+            for studio in studios:
+                if len(rows) >= limit:
+                    break
+                attempted += 1
+                logger.info(
+                    "[%d/%d] resolving %s",
+                    attempted, limit, studio["name"],
+                )
 
-        if resolved.get("is_match") is False:
-            logger.info(
-                "skipped %s — doesn't match category filter %r",
-                studio["name"], category_filter,
-            )
-            if len(rows) < limit:
-                time.sleep(CLAUDE_GAP_SECONDS)
-            continue
+                # --- Step 1: extract the studio's own website URL ---
+                website_url = await extract_mindbody_profile_website(
+                    browser=browser,
+                    mindbody_url=studio["mindbody_url"],
+                )
+                if not website_url:
+                    logger.info(
+                        "skipped %s — no external website link on Mindbody profile",
+                        studio["name"],
+                    )
+                    continue
+                domain = normalise_domain(website_url)
+                if not domain:
+                    logger.info(
+                        "skipped %s — website URL didn't normalise: %r",
+                        studio["name"], website_url,
+                    )
+                    continue
 
-        missing = validate_row(row)
-        if missing:
-            logger.info(
-                "skipped %s — missing required fields: %s",
-                studio["name"], missing,
-            )
-            continue
-        rows.append(row)
-        logger.info(
-            "  OK %s → %s <%s>",
-            row["company"], row.get("first_name") or "?", row["email"],
-        )
-        # Rate-limit gap between Claude calls (tier-1 30k tokens/min).
-        if len(rows) < limit:
-            time.sleep(CLAUDE_GAP_SECONDS)
+                # --- Step 2: fetch the studio's About/Team page text ---
+                website_text = await fetch_website_about_text(
+                    browser=browser,
+                    domain=domain,
+                    user_agent=USER_AGENT,
+                )
+                if not website_text.strip():
+                    logger.info(
+                        "skipped %s — studio site empty/unreachable (%s)",
+                        studio["name"], domain,
+                    )
+                    continue
+
+                # --- Step 3: Haiku extraction (no web_search) ---
+                try:
+                    extraction = extract_owner_with_haiku(
+                        client=client,
+                        studio_name=studio["name"],
+                        website_text=website_text,
+                        category_filter=category_filter,
+                        country=country,
+                        known_domain=domain,
+                    )
+                    consecutive_failures = 0
+                except Exception as e:
+                    consecutive_failures += 1
+                    logger.warning(
+                        "haiku call failed (%d consecutive) studio=%s err=%s",
+                        consecutive_failures, studio["name"], e,
+                    )
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.error(
+                            "bailing after %d consecutive Haiku failures",
+                            max_consecutive_failures,
+                        )
+                        break
+                    time.sleep(CLAUDE_GAP_SECONDS)
+                    continue
+
+                if not extraction.is_match:
+                    logger.info(
+                        "skipped %s — doesn't match category filter (%s)",
+                        studio["name"], extraction.category_reasoning or "(no reason)",
+                    )
+                    time.sleep(CLAUDE_GAP_SECONDS)
+                    continue
+
+                resolved = {
+                    "domain": extraction.domain,
+                    "first_name": extraction.first_name,
+                    "last_name": extraction.last_name,
+                    "title": extraction.title,
+                    "linkedin_url": extraction.linkedin_url,
+                    "is_match": extraction.is_match,
+                    "notes": extraction.notes,
+                    "confidence": extraction.confidence,
+                }
+                row = build_row(
+                    studio_name=studio["name"],
+                    mindbody_url=studio["mindbody_url"],
+                    resolved=resolved,
+                    city=city_name,
+                    niche=niche,
+                )
+                if row is None:
+                    logger.info(
+                        "skipped %s — no usable domain after extraction",
+                        studio["name"],
+                    )
+                    time.sleep(CLAUDE_GAP_SECONDS)
+                    continue
+
+                missing = validate_row(row)
+                if missing:
+                    logger.info(
+                        "skipped %s — missing required fields: %s",
+                        studio["name"], missing,
+                    )
+                    continue
+                rows.append(row)
+                logger.info(
+                    "  OK %s → %s <%s>",
+                    row["company"], row.get("first_name") or "?", row["email"],
+                )
+                if len(rows) < limit:
+                    time.sleep(CLAUDE_GAP_SECONDS)
+        finally:
+            await browser.close()
 
     write_csv(rows, output)
     exit_code = 0 if len(rows) >= limit else (0 if rows else 2)
