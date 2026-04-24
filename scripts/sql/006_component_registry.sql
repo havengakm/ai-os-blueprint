@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS component_variants (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id           TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     component_type      TEXT NOT NULL CHECK (component_type IN (
-        'subject_line', 'icebreaker', 'pain_hook', 'offer_frame', 'cta', 'signature'
+        'subject_line', 'icebreaker', 'pain_hook', 'offer_frame', 'cta', 'signature',
+        'who_i_am', 'credibility'
     )),
     variant_key         TEXT NOT NULL,
     variant_content     TEXT NOT NULL,
