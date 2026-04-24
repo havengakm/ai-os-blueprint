@@ -183,6 +183,30 @@ Every channel's signals feed back into outbound. Nothing leaks.
 
 ---
 
+## Implementation stack — AIOS diverges from n8n
+
+Max's team runs this framework on **n8n** (visual workflow orchestration). AIOS deliberately builds the same allbound framework with a **code-native, agent-driven stack**:
+
+| Capability | AIOS (code-native) | Max (n8n) |
+|---|---|---|
+| Agent orchestration + reasoning | Claude Code + Claude Agent SDK | n8n AI agent nodes |
+| Scheduled jobs | Trigger.dev + Unix cron + APScheduler | n8n schedules |
+| Per-contact research | Claude Code subagents + Playwright | n8n HTTP + AI nodes |
+| Signal workflows | Python daemons + Supabase | n8n workflows |
+| Model access | Anthropic SDK (Sonnet + Haiku per CLAUDE.md rule) | n8n model nodes |
+
+**Why code-native over visual workflow:**
+- Git-tracked, version-controlled, diff-reviewable
+- Testable with pytest before ship
+- Composable — agents can call agents
+- Reasoning capability beyond fixed branch logic
+- No UI-config drift between environments
+- Cost predictability — tokens counted in code, not hidden in n8n nodes
+
+**Candidate tools to evaluate:** Claude Code (agentic CLI), Claude Agent SDK (orchestration), Trigger.dev (developer-first background jobs), Hermes Agent / OpenClaw-equivalent open-source agent frameworks.
+
+**Do not build:** n8n workflows alongside the Python system. The existing `systems/scout/` pipeline + `os/` foundation is the abstraction — extend it, don't shadow it.
+
 ## Where this doc lives
 
-This is the canonical strategic reference for AIOS outreach architecture. When in doubt — does THIS feature move us toward Max's allbound loop? If yes, build it. If no, don't.
+This is the canonical strategic reference for AIOS outreach architecture. When in doubt — does THIS feature move us toward Max's allbound loop, implemented with AIOS's code-native stack? If yes, build it. If no, don't.
