@@ -99,6 +99,33 @@ def test_cta_v3_90sec_video_present() -> None:
     assert "90-sec video" in v3.variant_content
 
 
+def test_who_i_am_v1_ai_outreach_system_present() -> None:
+    """New component type + v1 variant for the revised body."""
+    variants = _discover()
+    by_type = _by_type(variants, "creative_branding")
+    pool = by_type.get("who_i_am", [])
+    assert pool, "who_i_am component type must have at least one variant"
+    keys = {v.variant_key for v in pool}
+    assert "v1_ai_outreach_system" in keys
+    v1 = next(v for v in pool if v.variant_key == "v1_ai_outreach_system")
+    # The three new niche-level placeholders must all render in this body.
+    for placeholder in ("{{niche}}", "{{niche_specific_term}}", "{{meetings_niche_term}}"):
+        assert placeholder in v1.variant_content, (
+            f"who_i_am v1 must reference {placeholder}"
+        )
+
+
+def test_credibility_v1_100_businesses_present() -> None:
+    variants = _discover()
+    by_type = _by_type(variants, "creative_branding")
+    pool = by_type.get("credibility", [])
+    assert pool, "credibility component type must have at least one variant"
+    keys = {v.variant_key for v in pool}
+    assert "v1_100_businesses" in keys
+    v1 = next(v for v in pool if v.variant_key == "v1_100_businesses")
+    assert "100+ service businesses" in v1.variant_content
+
+
 def test_all_creative_branding_variants_use_expected_offer_label() -> None:
     variants = _discover()
     cb = [v for v in variants if v.niche == "creative_branding"]

@@ -147,19 +147,33 @@ def mk_variants_by_type(
     *,
     subject_content: str = "Subject: {{trigger_hook}}",
     icebreaker_content: str = "Hi {{first_name}}, noticed {{icebreaker_content}}.",
-    pain_hook_content: str = "Many agencies hit {{pain_evidence}}.",
+    pain_hook_content: str | None = "Many agencies hit {{pain_evidence}}.",
+    who_i_am_content: str = "I build AI outreach systems.",
+    credibility_content: str = "I've worked with 100+ businesses.",
     offer_frame_content: str = "We help with X at {{company}}.",
     cta_content: str = "Worth a 20-minute call?",
     signature_content: str = "—Kirsten",
 ) -> dict[str, list[ComponentVariant]]:
-    return {
+    """Build the full v2 component pool.
+
+    ``pain_hook_content=None`` omits pain_hook entirely, exercising the
+    optional-component path (the composer must still produce a draft).
+    All other types are required.
+    """
+    pools: dict[str, list[ComponentVariant]] = {
         "subject_line": [mk_variant(component_type="subject_line", variant_content=subject_content)],
         "icebreaker": [mk_variant(component_type="icebreaker", variant_content=icebreaker_content)],
-        "pain_hook": [mk_variant(component_type="pain_hook", variant_content=pain_hook_content)],
+        "who_i_am": [mk_variant(component_type="who_i_am", variant_content=who_i_am_content)],
+        "credibility": [mk_variant(component_type="credibility", variant_content=credibility_content)],
         "offer_frame": [mk_variant(component_type="offer_frame", variant_content=offer_frame_content)],
         "cta": [mk_variant(component_type="cta", variant_content=cta_content)],
         "signature": [mk_variant(component_type="signature", variant_content=signature_content)],
     }
+    if pain_hook_content is not None:
+        pools["pain_hook"] = [mk_variant(
+            component_type="pain_hook", variant_content=pain_hook_content,
+        )]
+    return pools
 
 
 def mk_contact(
@@ -247,6 +261,7 @@ async def test_happy_path_fills_renders_persists_logs() -> None:
     assert result.body.endswith("Worth a 20-minute call?\n\n—Kirsten")
     assert result.component_selections == {
         "subject_line": "subject_line_v1", "icebreaker": "icebreaker_v1",
+        "who_i_am": "who_i_am_v1", "credibility": "credibility_v1",
         "pain_hook": "pain_hook_v1", "offer_frame": "offer_frame_v1",
         "cta": "cta_v1", "signature": "signature_v1",
     }
@@ -713,6 +728,8 @@ async def test_body_assembly_order_and_separator() -> None:
     storage = FakeStorage(variants_by_type=mk_variants_by_type(
         icebreaker_content="ICE",
         pain_hook_content="PAIN",
+        who_i_am_content="WHOIAM",
+        credibility_content="CRED",
         offer_frame_content="OFFER",
         cta_content="CTA",
         signature_content="SIG",
@@ -722,7 +739,74 @@ async def test_body_assembly_order_and_separator() -> None:
     result = await composer.compose("client-1", mk_contact())
 
     assert isinstance(result, ComposedDraft)
-    assert result.body == "ICE\n\nPAIN\n\nOFFER\n\nCTA\n\nSIG"
+    # v2 body order: icebreaker, who_i_am, credibility, pain_hook (optional),
+    # offer_frame, cta, signature.
+    assert result.body == (
+        "ICE\n\nWHOIAM\n\nCRED\n\nPAIN\n\nOFFER\n\nCTA\n\nSIG"
+    )
+
+
+async def test_body_assembly_order_drops_pain_hook_when_optional() -> None:
+    """v2 creative_branding has no pain_hook. Composer must render a clean
+    body without it, in the remaining top-to-bottom order."""
+    storage = FakeStorage(variants_by_type=mk_variants_by_type(
+        icebreaker_content="ICE",
+        pain_hook_content=None,  # optional type omitted
+        who_i_am_content="WHOIAM",
+        credibility_content="CRED",
+        offer_frame_content="OFFER",
+        cta_content="CTA",
+        signature_content="SIG",
+    ))
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert result.body == "ICE\n\nWHOIAM\n\nCRED\n\nOFFER\n\nCTA\n\nSIG"
+    # pain_hook absent from selections — it was never in the pool.
+    assert "pain_hook" not in result.component_selections
+
+
+async def test_composer_does_not_skip_when_pain_hook_pool_empty() -> None:
+    """Regression guard: v1 composer would have returned a ComposerSkip
+    for no_variants_for:pain_hook. v2 makes pain_hook optional, so a
+    missing pool falls through to a successful draft."""
+    storage = FakeStorage(variants_by_type=mk_variants_by_type(
+        pain_hook_content=None,
+    ))
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert result.persisted_draft_id == "draft-1"
+
+
+async def test_who_i_am_required_skip_when_pool_empty() -> None:
+    """who_i_am is REQUIRED in v2 — missing pool must raise ComposerSkip."""
+    variants = mk_variants_by_type()
+    variants["who_i_am"] = []
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:who_i_am"
+
+
+async def test_credibility_required_skip_when_pool_empty() -> None:
+    """credibility is REQUIRED in v2 — missing pool must raise ComposerSkip."""
+    variants = mk_variants_by_type()
+    variants["credibility"] = []
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:credibility"
 
 
 # --------------------------------------------------------------------------- #

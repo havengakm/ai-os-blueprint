@@ -37,12 +37,31 @@ DEFAULT_EPSILON: float = 0.1
 AD_ACTIVITY_DIRECTORIES: frozenset[str] = frozenset({
     "google_ads_library", "linkedin_ads_library", "meta_ads_library",
 })
-COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
-    "subject_line", "icebreaker", "pain_hook",
+#: Component types the composer REQUIRES a variant for. A missing
+#: pool for any of these yields a ComposerSkip with reason
+#: ``no_variants_for:<type>``. ``pain_hook`` is NOT in this set — it
+#: became optional in v2 (creative_branding drops it entirely; other
+#: niches can keep it).
+COMPONENT_TYPES_REQUIRED: tuple[str, ...] = (
+    "subject_line", "icebreaker", "who_i_am", "credibility",
     "offer_frame", "cta", "signature",
 )
+#: Component types the composer will USE if variants are available,
+#: but will skip silently when the pool is empty. Designed so a single
+#: productised library can serve niches with different body shapes.
+COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ("pain_hook",)
+#: Union of required + optional, ordered for iteration. Exported for
+#: backward compatibility + symmetry with the pre-v2 surface.
+COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
+    "subject_line", "icebreaker", "who_i_am", "credibility",
+    "pain_hook", "offer_frame", "cta", "signature",
+)
+#: Body rendering order — top-to-bottom as the prospect reads it.
+#: pain_hook is optional and only rendered when a selected variant
+#: exists for this contact.
 _BODY_COMPONENTS: tuple[str, ...] = (
-    "icebreaker", "pain_hook", "offer_frame", "cta", "signature",
+    "icebreaker", "who_i_am", "credibility", "pain_hook",
+    "offer_frame", "cta", "signature",
 )
 _BODY_SEPARATOR: str = "\n\n"
 # Neutral prior keeps win_rate=None variants in contention vs weak-signal winners.
@@ -232,6 +251,10 @@ class Composer:
         for component_type in COMPONENT_TYPES_ORDERED:
             pool = filtered_by_type.get(component_type) or []
             if not pool:
+                if component_type in COMPONENT_TYPES_OPTIONAL:
+                    # Silently skip — the body renderer drops optional
+                    # types that don't have a selection for this contact.
+                    continue
                 skip = ComposerSkip(
                     contact_id=contact_id,
                     reason=f"no_variants_for:{component_type}",
@@ -276,6 +299,7 @@ class Composer:
                 selections[ct].variant_content, contact, fills, fills_missing,
             )
             for ct in _BODY_COMPONENTS
+            if ct in selections  # optional types (pain_hook) drop out cleanly
         )
         fills_missing = _dedup_preserve_order(fills_missing)
 
