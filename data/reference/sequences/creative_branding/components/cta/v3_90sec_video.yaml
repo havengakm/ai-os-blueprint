@@ -1,0 +1,16 @@
+---
+variant_key: "v3_90sec_video"
+component_type: "cta"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: "Want me to send over a 90-sec video showing how it works?\n"
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Video-ask close. Lower friction than a meeting request, gives them a
+    concrete next step they can say yes to without opening the calendar.
+    Pairs with the revised body (v2 template) that explicitly says "you
+    wouldn't owe me anything unless it actually books meetings".
+  framework_anchor: "low-friction video ask"
+ab_epsilon: 0.1
