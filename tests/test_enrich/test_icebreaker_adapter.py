@@ -167,7 +167,7 @@ async def test_tier_2_neutral_trigger(_env):
 
 async def test_tier_3_structural_signal(_env):
     """No triggers but structural_signals present → Tier 3."""
-    adapter, fake, _ = _adapter(_ib_json("Noticed the Series B announcement, that usually means ops gets messy."))
+    adapter, fake, _ = _adapter(_ib_json("Saw the Series B announcement land last week — that's a big one."))
     merged = _merged(
         structural_signals=[
             {
@@ -190,10 +190,12 @@ async def test_tier_3_structural_signal(_env):
     assert result.tier == 3
     assert result.reason == "tier_3_generated"
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    assert "structural signal just hit" in prompt_sent
-    # Humanized slug check: 'funding_round' → 'funding round' before prompt injection
+    assert "structural event just hit" in prompt_sent
+    # Humanized slug check: 'funding_round' → 'funding round' before prompt injection.
+    # The literal string 'funding_round' appears in the truth-gating rule ("Signal
+    # type MUST be one of: major_contract_win, new_leadership, funding_round"),
+    # so we only assert the humanized form surfaces in the signal-summary section.
     assert "funding round" in prompt_sent
-    assert "funding_round" not in prompt_sent
 
 
 async def test_tier_4_citable_fallback(_env):
@@ -216,7 +218,7 @@ async def test_tier_4_citable_fallback(_env):
     assert result.tier == 4
     assert result.reason == "tier_4_generated"
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    assert "Fall back to website citation" in prompt_sent
+    assert "Fall back to the company website" in prompt_sent
 
 
 async def test_no_source_material(_env):
@@ -619,3 +621,207 @@ def test_icebreaker_result_dataclass_default_construction():
     )
     assert r.ok is True
     assert r.tier == 0
+
+
+# --------------------------------------------------------------------------- #
+# 10. v2 truth-gating — Claude returns "" when source material is thin        #
+# --------------------------------------------------------------------------- #
+
+async def test_truth_gated_empty_string_resolves_to_no_source_material(_env):
+    """Claude returns {"icebreaker": ""} per v2 truth-gating rule → the
+    adapter treats it as no_source_material (tier=0), bills once, does NOT
+    retry. The composer's IcebreakerAdapter fill path then routes to the
+    tier-0 fallback instead of shipping the empty string as copy."""
+    adapter, fake, tracker = _adapter(_ib_json(""))
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.ok is True
+    assert result.tier == 0  # demoted to tier=0 because no content
+    assert result.reason == "no_source_material"
+    assert result.icebreaker_content == ""
+    assert result.cost_cents == 1  # billed once, no retry
+    assert len(fake.create_calls) == 1
+    assert tracker.spend_calls == [("c-A", "A", 1)]
+
+
+# --------------------------------------------------------------------------- #
+# 11. v2 banned words — new creative_branding additions                       #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("banned_phrase", [
+    "love your headcount planning",
+    "happy to talk BD strategy",
+    "impressive business development",
+    "you've got capacity to spare",
+    "your inbound is strong",
+    "need to outrun the market",
+    "the runway question is real",
+    "growth metrics look solid",
+    "the gap is obvious here",
+    "your mood-board vibes",
+    "the craft is undeniable",
+])
+async def test_v2_banned_words_trigger_retry(_env, banned_phrase: str):
+    """New v2 bans from Kirsten: headcount, BD, business development,
+    capacity, inbound, outrun, runway, growth metrics, gap, mood-board,
+    craft. Each must fail validation on first attempt and retry."""
+    bad = _ib_json(f"Saw the Series B — {banned_phrase}.")
+    good = _ib_json("Saw the Series B announcement — that's a big one.")
+    adapter, fake, _ = _adapter([bad, good])
+
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.reason == "tier_3_generated"
+    assert len(fake.create_calls) == 2  # retry fired
+    assert result.icebreaker_content.endswith("that's a big one.")
+
+
+# --------------------------------------------------------------------------- #
+# 12. v2 diagnostic-phrase rejection                                          #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("diagnostic_phrase", [
+    "that usually means a rough quarter",
+    "which suggests a messy transition",
+    "it points to ops strain",
+    "feels like a stretch",
+    "the gap between delivery and sales",
+    "this tells me something is off",
+    "which means more pressure",
+])
+async def test_v2_diagnostic_phrases_trigger_retry(_env, diagnostic_phrase: str):
+    """v2 voice-rule: NEVER write consultant-style diagnosis. The
+    validator treats these substrings as a rule violation and retries."""
+    bad = _ib_json(f"Saw the Series B — {diagnostic_phrase}.")
+    good = _ib_json("Saw the Series B announcement — that's a big one.")
+    adapter, fake, _ = _adapter([bad, good])
+
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.reason == "tier_3_generated"
+    assert len(fake.create_calls) == 2
+
+
+# --------------------------------------------------------------------------- #
+# 13. v2 em-dash is now ALLOWED (clause joiner per new prompt format)         #
+# --------------------------------------------------------------------------- #
+
+async def test_v2_em_dash_passes_validation(_env):
+    """v1 prompts banned em-dash. v2 prompts REQUIRE it as the two-clause
+    joiner, so the validator must let em-dash through on the first pass."""
+    # Contains U+2014 — single shot, no retry.
+    adapter, fake, tracker = _adapter(_ib_json(
+        "Saw the Series B announcement — that's a big one."
+    ))
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.reason == "tier_3_generated"
+    assert "—" in result.icebreaker_content
+    assert len(fake.create_calls) == 1  # NO retry
+    assert tracker.spend_calls == [("c-A", "A", 1)]
+
+
+# --------------------------------------------------------------------------- #
+# 14. v2 prompts mention the core voice rules                                  #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("tier_setup", [
+    # (merged_research_data kwargs, response, expected_tier)
+    (
+        {"trigger_events": [
+            {"type": "behavioral_signal", "detail": "so tired of it all", "recency_days": 3},
+        ]},
+        "Ngl your post last week — that feeling is genuine.",
+        1,
+    ),
+    (
+        {"trigger_events": [
+            {"type": "behavioral_signal", "detail": "good read on founder-led sales", "recency_days": 5},
+        ]},
+        "Saw the podcast take last week — genuinely stuck with me.",
+        2,
+    ),
+    (
+        {"structural_signals": [
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ]},
+        "Saw the Series B announcement — that's a big one.",
+        3,
+    ),
+    (
+        {"citable_details": [
+            {"type": "case_study", "detail": "MiBlok rebrand", "source": "portfolio"},
+        ]},
+        "Spent time on the MiBlok rebrand this morning and had to reach out.",
+        4,
+    ),
+])
+async def test_v2_prompts_contain_truth_gating_rule(_env, tier_setup):
+    """Every v2 prompt (all 4 tiers) must carry the truth-gating rule +
+    the banned-word list. Probes the rendered prompt directly."""
+    merged_kwargs, response, expected_tier = tier_setup
+    adapter, fake, _ = _adapter(_ib_json(response))
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=_merged(**merged_kwargs),
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.tier == expected_tier
+    prompt_sent = fake.create_calls[0]["messages"][0]["content"]
+    assert "Truth-gating rule" in prompt_sent, f"tier {expected_tier}"
+    assert "Banned words" in prompt_sent, f"tier {expected_tier}"
+    # The v2 bans appear in the list.
+    assert "headcount" in prompt_sent, f"tier {expected_tier}"
+    assert "mood-board" in prompt_sent, f"tier {expected_tier}"

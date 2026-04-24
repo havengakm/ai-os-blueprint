@@ -80,15 +80,35 @@ _FRUSTRATION_PATTERN = re.compile(
 # --------------------------------------------------------------------------- #
 
 _BANNED_WORDS_RE = re.compile(
-    r"\b(impressed|remarkable|leverage|solution|optimize|scale|synergy|"
+    # Legacy bans (kept from v1 prompts).
+    r"\b(impressed|remarkable|leverage|solution|optimize|synergy|"
     r"cutting[- ]edge|AI[- ]powered|AI whatever|operating system|autonomous|"
-    r"workflow|pipeline)\b",
+    r"workflow|"
+    # v2 creative_branding bans (Kirsten's revised voice rules).
+    # Excludes "scale" and "pipeline" from the legacy set so "scaling"
+    # and "pipeline" both match as stems of the broader ban list below.
+    r"scale|scaling|pipeline|headcount|BD|business development|capacity|"
+    r"inbound|outrun|runway|growth metrics|gap|mood[- ]board|craft)\b",
     re.IGNORECASE,
 )
 
+# Diagnostic phrases Kirsten explicitly rejected — they read as the writer
+# playing consultant. Checked as substrings (case-insensitive) because they
+# span whitespace and punctuation.
+_BANNED_DIAGNOSTIC_PHRASES: tuple[str, ...] = (
+    "usually means", "which suggests", "points to", "feels like",
+    "the gap between", "this tells me", "that tends to", "which means",
+)
+
+# "operations" matches literal bans too. "typically" is a stem of diagnostic
+# phrases — checked here separately because it's too common as a standalone
+# English word to treat as a regex-blacklist. Operators can add fresh
+# diagnostic phrases without touching regex.
+
 # Separate from the word regex: these are characters / substrings, not
-# whole words. Checked with plain substring search.
-_BANNED_CHARS = ("—",)  # em dash U+2014
+# whole words. Checked with plain substring search. Em dash is intentionally
+# ALLOWED in v2 — the revised prompt format joins clauses with " — ".
+_BANNED_CHARS: tuple[str, ...] = ()
 _BANNED_URL_FRAGMENTS = ("http", "calendly", ".com/")
 
 _ANTI_STALKER_RE = re.compile(
@@ -305,6 +325,26 @@ class IcebreakerAdapter:
                 tier=tier,
                 cost_cents=total_cost_cents,
                 reason="parse_failed",
+            )
+
+        # --- truth-gated skip: Claude returned empty string ---
+        # v2 prompts instruct Claude to return "" when the source material
+        # has no verbatim reference to cite. Treat that as no_source_material
+        # (tier=0) — bill once, no retry, the composer falls back cleanly.
+        if icebreaker == "":
+            await self._record_spend_safely(
+                client_id, tier_budget, total_cost_cents
+            )
+            logger.info(
+                "icebreaker truth_gated_skip contact_id=%s tier=%d cost_cents=%d",
+                contact_id, tier, total_cost_cents,
+            )
+            return IcebreakerResult(
+                ok=True,
+                icebreaker_content="",
+                tier=0,
+                cost_cents=total_cost_cents,
+                reason="no_source_material",
             )
 
         # --- validate first response ---
@@ -580,7 +620,11 @@ def _validate(icebreaker: str, *, tier: int) -> str | None:
     """Return None if the icebreaker passes all checks, else a short reason.
 
     The returned string is used as the retry nudge — something like
-    "banned_word:leverage" or "anti_stalker:you liked".
+    "banned_word:leverage" or "anti_stalker:you liked" or
+    "diagnostic_phrase:usually means".
+
+    Empty string is treated as a SKIP (the adapter routes empty output
+    to tier=0 via the ``no_source_material`` path before calling this).
     """
     if not icebreaker:
         return "empty"
@@ -591,12 +635,16 @@ def _validate(icebreaker: str, *, tier: int) -> str | None:
 
     for ch in _BANNED_CHARS:
         if ch in icebreaker:
-            return "banned_word:em_dash"
+            return f"banned_char:{ch!r}"
 
     lowered = icebreaker.lower()
     for fragment in _BANNED_URL_FRAGMENTS:
         if fragment in lowered:
             return f"banned_word:url_fragment:{fragment}"
+
+    for phrase in _BANNED_DIAGNOSTIC_PHRASES:
+        if phrase in lowered:
+            return f"diagnostic_phrase:{phrase}"
 
     # Anti-stalker ONLY applies to social-engagement tiers.
     if tier in (1, 2):

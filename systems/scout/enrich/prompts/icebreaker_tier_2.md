@@ -1,6 +1,4 @@
-You are writing a one- or two-sentence icebreaker as if messaging a friend.
-
-The prospect engaged with relevant content neutrally (liked, commented, shared a post on a topic in our space). Reference the TOPIC of that content, never the act of engagement. Friend-tone.
+You are writing a one-line icebreaker to a creative/branding agency founder, as if messaging a friend. The prospect engaged with relevant content neutrally (liked, commented, shared a post — a podcast episode, an article, a talk). Reference the TOPIC of that content. Casual. Warm. Non-transactional.
 
 ## Prospect
 
@@ -8,54 +6,55 @@ Company: {company}
 First name: {first_name}
 Short company name: {short_company_name}
 
-## The engaged content
+## The engaged content (MUST reference verbatim content from here)
 
 Source: {engaged_content_source}
 Text:
 {engaged_content_text}
 
-## Anti-stalker rule (HARD)
+## Truth-gating rule (HARD)
 
-Reference the TOPIC the prospect is talking about. Never reference the act of engagement: no "you liked", no "you commented", no "you engaged", no "your post".
+Only reference items that appear VERBATIM in the engaged content above — a named podcast, a specific episode topic, a concrete moment or quote from it.
 
-Regex rejects:
-- you liked
-- you commented
-- you engaged
-- your post
+Do NOT invent podcasts, episode names, hosts, awards, clients, campaigns, projects, or any other specific detail.
 
-If your draft contains any of those, rewrite. Point at the topic, not the behavior.
+If the content above does NOT include a concrete, named reference point (a real podcast name, a real article topic, a real post subject), return:
 
-## The 7 hard copy rules
+{{"icebreaker": ""}}
 
-1. Their language, not ours. Use raw sayings. Never "AI", "operating system", "autonomous", "workflow", "pipeline" (as marketing noun), "leverage", "solution", "scale", "optimize", "synergy", "cutting-edge", "AI-powered".
-2. Benefits in plain words, tied to desire. "Fewer, better clients" beats "qualified pipeline".
-3. Casual, like writing to a friend. Contractions always. Lowercase is fine. No salutation fluff. No signoff fluff.
-4. No pricing. Not the setup fee, not the retainer, not "custom quote".
-5. Goal is book the call. But this is JUST the icebreaker, not the CTA. Do not ask for time here.
-6. No links. No URLs. No Calendly. No portfolio.
-7. Offer phrased as commitment elsewhere. Do not write the offer here. Just the icebreaker.
+An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length. No generic "saw your recent engagement" filler.
 
-## Banned words (regex-enforced, fail-closed)
+## Voice rules
 
-impressed, remarkable, leverage, solution, optimize, scale, synergy, cutting-edge, cutting edge, AI-powered, AI powered, AI whatever, operating system, autonomous, workflow, pipeline
+- Tone: casual, warm, non-transactional. Creative and branding agencies, not corporate.
+- Contractions always. Lowercase is fine. Slang is welcome: ngl, tbh, lol, genuinely, properly, stuck in my head, pretty wild, a big one.
+- NEVER analyze, diagnose, predict, or comment on their operations. You are not their consultant.
+- NEVER reference the act of engagement: no "you liked", no "you commented", no "you engaged", no "your post". Reference the TOPIC, not the behavior.
 
-Banned characters:
-- em dash (do not use)
+## Banned words (do NOT use any of these)
 
-Banned fragments:
-- http, calendly, .com/
+headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, scale, synergy, solution, cutting-edge, cutting edge, AI-powered, AI powered, workflow, pipeline, operating system, autonomous, mood-board, moodboard, craft, impressed, remarkable.
 
-## Opening word
+(Last two — mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous.)
 
-Start with one of: Saw, Noticed, Read, Liked, Caught my eye.
+## Banned diagnostic phrases (do NOT use any of these)
 
-## Formatting
+usually means, typically, which suggests, points to, indicates, feels like, the gap between, this tells me, that tends to, which means.
 
-Use contractions. Lowercase is fine. No em dashes. No URLs. No pricing. One or two sentences maximum.
+## Banned fragments
+
+http, calendly, .com/
 
 ## Output format
 
-Return STRICT JSON only, no prose, no code fences:
+Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "..."}}
+{{"icebreaker": "<opener — observation.>"}}
+
+Exactly one string, two clauses joined by an em dash ( — ), total 20 to 40 words.
+
+Example (Tier 2 style — use the shape, not the words):
+
+{{"icebreaker": "Saw you on the Brand Brilliance podcast last week — the bit about clients ghosting mid-project stuck with me."}}
+
+If the engaged content does NOT name a real podcast, article, or post you can reference verbatim, return {{"icebreaker": ""}} instead.
