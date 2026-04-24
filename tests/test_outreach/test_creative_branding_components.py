@@ -126,6 +126,22 @@ def test_credibility_v1_100_businesses_present() -> None:
     assert "100+ service businesses" in v1.variant_content
 
 
+def test_offer_frame_v3_three_spots_is_the_only_offer_frame() -> None:
+    """v1 (heres_what_id_do) and v2 (promise_period) were operator-rejected
+    and removed. v3_three_spots is the sole creative_branding offer_frame."""
+    variants = _discover()
+    by_type = _by_type(variants, "creative_branding")
+    offer_frames = by_type.get("offer_frame", [])
+    keys = {v.variant_key for v in offer_frames}
+    assert "v3_three_spots" in keys
+    assert "v1_heres_what_id_do" not in keys
+    assert "v2_promise_period" not in keys
+    v3 = next(v for v in offer_frames if v.variant_key == "v3_three_spots")
+    # v3 uses the niche-level placeholders in client_facts.
+    assert "3 {{niche}}" in v3.variant_content
+    assert "{{meetings_niche_term}}" in v3.variant_content
+
+
 def test_all_creative_branding_variants_use_expected_offer_label() -> None:
     variants = _discover()
     cb = [v for v in variants if v.niche == "creative_branding"]
