@@ -6,6 +6,7 @@ Expert framework: AI positioning, cold email, outbound. Migrated from earlier fl
 
 - `ai-positioning.md`: how to position AI services without the generic "AI" pitch
 - `cold-email.md`: angle patterns, subject-line structure, sequence rules
+- `email-templates.md`: 3 reference templates from Maker School (referral angle, system demo, lead-gen offer)
 
 ## Skills that read from here
 - `skills/outbound/generate-outreach-angles.md`

@@ -1,6 +1,6 @@
 ---
 name: discover-trigify-leads
-description: "Run a Trigify discovery pass for an AIOS client. Pulls post engagers from configured monitors, qualifies by engagement threshold, produces RawCompanyContact rows, optionally pipes through PullOrchestrator. Default: daily cron via Scout daemon; operator ad-hoc OK too. Requires configure-trigify-monitors to have run first (client_config.trigify_search_ids populated). Canonical AIOS skill at skills/operations/discover-trigify-leads.md."
+description: "Run a Trigify discovery pass for an AIOS client. Pulls post engagers from configured monitors, qualifies by engagement threshold, produces RawCompanyContact rows, optionally pipes through PullOrchestrator. Default: daily cron via Scout daemon; operator ad-hoc OK too. Requires configure-trigify-monitors to have run first (client_config.trigify_search_ids populated). Canonical AIOS skill at skills/playbooks/discover-trigify-leads.md."
 argument-hint: "<client-id> [--search-subset=intent|competitor|thought_leader|brand] [--max-companies=100] [--dry-run]"
 allowed-tools: "Bash(uv run python scripts/run_trigify_discovery.py:*) Read(data/reports/**)"
 ---

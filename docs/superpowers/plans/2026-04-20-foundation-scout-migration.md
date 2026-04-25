@@ -46,7 +46,7 @@
 - Migration source: `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/base-camp-agents/`
 - Design spec: [docs/superpowers/specs/2026-04-20-aios-clymb-deployment-design.md](../specs/2026-04-20-aios-clymb-deployment-design.md)
 - BaseSystem contract: [systems/base.py](../../../systems/base.py)
-- Foundation modules: [os/foundation/](../../../os/foundation/)
+- Foundation modules: [aios/foundation/](../../../aios/foundation/)
 
 ---
 
@@ -134,7 +134,7 @@ ai-os-blueprint/
 
 **Unchanged (referenced but not touched):**
 
-- `systems/base.py`, `os/foundation/*.py`, `os/memory/store.py`, `os/registry.py` — the contract Scout conforms to
+- `systems/base.py`, `aios/foundation/*.py`, `aios/memory/store.py`, `aios/registry.py` — the contract Scout conforms to
 - `scripts/sql/001_foundation.sql` — already exists, run during Supabase setup
 
 ---

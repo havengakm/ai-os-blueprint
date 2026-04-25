@@ -118,7 +118,7 @@ rules/            : GLOBAL GUARDRAILS: writing standards every skill enforces
 skills/           : CAPABILITIES: atomic single-purpose skills (one input → one output), 15 categories
 departments/      : TEAMS: manifests that activate subsets of skills per business function
 agents/           : PERSONAS: named workers (Scout, Beacon, Optimizer) that run systems on a schedule
-os/               : THE BRAIN: foundation, memory, agent, scheduler
+aios/             : THE BRAIN: foundation, memory, daemon, scheduler
 systems/          : THE LIMBS: scout, beacon, ads, content, etc.
 scripts/          : UTILITIES: migrations, loaders, backfill
 api/              : ENDPOINTS: webhooks, pipeline triggers
@@ -142,6 +142,20 @@ At the start of every session, read the memory layer in this order:
 3. The most recent file in `memory/sessions/` to see where we left off.
 
 This layer sits alongside this file and harness auto-memory without duplicating them. See `memory/README.md` for how they relate.
+
+### Session end (memory layer)
+
+At the end of every working session (before the user logs off, after a commit, or when major work concludes), write or append to `memory/sessions/YYYY-MM-DD.md` with:
+
+1. **Summary**: 1 to 3 sentences on what got done and why.
+2. **Decisions Made**: numbered list, each with one-line rationale.
+3. **Files Updated**: bullet list of paths with one-phrase description.
+4. **Action Items for Next Session**: checkbox list of follow-ups.
+5. **Counts**: any objective metrics worth recording (files changed, tests passing, commits, etc.).
+
+If the date file already exists for today, APPEND a new section delimited by `---` rather than overwriting. Today's date is the only file you write to.
+
+Also update `memory/INDEX.md` if any open loop closed or a new significant decision was made. Skip the session-end write only if the session was purely conversational with zero artifact changes.
 
 ---
 

@@ -52,13 +52,19 @@ autonomy:                                     # per-action autonomy levels (sugg
   archive_contact:              autonomous    # reversible via operator override
 
 skills:                                       # skills/ procedures Scout is authorised to invoke
-  - skills/operations/run-nightly-pipeline.md          # daily stage sweep
-  - skills/operations/diagnose-stuck-contact.md        # investigate contacts stalled in a status
-  - skills/onboarding/seed-knowledge-base.md           # load Sapp/Saraev/Hormozi etc at client onboarding
-  - skills/onboarding/configure-trigify-monitors.md    # set up per-client Trigify searches
-  - skills/authoring/compose-draft.md                  # one-contact draft composition (used by composer stage)
-  - skills/authoring/write-component-variant.md        # operator-facing skill for adding new template variants
-  - skills/analysis/explain-scoring-decision.md        # operator-facing: "why did this contact score X?"
+  # Populated playbooks (multi-step orchestrations with code + human checkpoints)
+  - skills/playbooks/configure-trigify-monitors.md     # set up per-client Trigify searches (one-off provisioning)
+  - skills/playbooks/discover-trigify-leads.md         # daily Trigify discovery pass (cron via daemon)
+
+  # Planned playbooks (Plan 1 Task 16.6, Task 17, Plan 2, Plan 7) — not yet authored
+  # - skills/playbooks/run-nightly-pipeline.md         # daily stage sweep
+  # - skills/playbooks/diagnose-stuck-contact.md       # investigate contacts stalled in a status
+  # - skills/playbooks/seed-knowledge-base.md          # load Sapp/Saraev/Hormozi etc at client onboarding
+  # - skills/playbooks/explain-scoring-decision.md     # operator-facing: "why did this contact score X?"
+
+  # Planned atomic capabilities — not yet authored
+  # - skills/copywriting/write-component-variant.md    # operator-facing: add a new template variant
+  # - skills/composites/compose-draft.md               # one-contact draft composition (used by composer stage)
 
 foundation_calls:                             # per feedback_autonomous_agent_goal + systems/base.py
   load_foundation: true                       # every stage calls self.load_foundation() first

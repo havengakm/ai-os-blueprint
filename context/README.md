@@ -18,7 +18,7 @@ If you're ever unsure which folder a file belongs in, ask:
 
 ## Per-company silo
 
-Each company's AIOS is fully siloed: its own `context/`, its own `data/`. The AIOS foundation (`skills/`, `rules/`, `departments/`, `agents/`, `systems/`, `os/`, `scripts/`, `api/`, `config/` structure, `.claude/commands/`) is the shared template every deployment inherits. `context/` + `data/` content NEVER copies across companies.
+Each company's AIOS is fully siloed: its own `context/`, its own `data/`. The AIOS foundation (`skills/`, `rules/`, `departments/`, `agents/`, `systems/`, `aios/`, `scripts/`, `api/`, `config/` structure, `.claude/commands/`) is the shared template every deployment inherits. `context/` + `data/` content NEVER copies across companies.
 
 This deployment is Kirsten's (Clymb). A client deployment would have:
 - the same `context/` folder structure (brand/, integrations.md)

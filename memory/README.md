@@ -21,14 +21,14 @@ The AIOS has several memory-shaped surfaces. They serve different audiences and 
 | `docs/superpowers/decisions/` | On demand | Operators + historical reviewers | Formal, dated decision docs with full rationale |
 | `docs/superpowers/plans/` | On demand | Operators implementing | Step-by-step implementation plans |
 | `docs/superpowers/specs/` | On demand | Operators designing | Brainstorming-phase design specs |
-| `os/foundation/decision_logger.py` (runtime DB) | Agent runtime | Scout, Beacon, Optimizer agents | Per-action autonomous-agent decisions with outcomes |
+| `aios/foundation/decision_logger.py` (runtime DB) | Agent runtime | Scout, Beacon, Optimizer agents | Per-action autonomous-agent decisions with outcomes |
 
 Rule of thumb:
 - Personal-to-Kirsten feedback or preference that should persist across ALL projects: harness memory (`~/.claude/projects/.../memory/`).
 - Project-wide principle or hard rule that should load every session: `CLAUDE.md`.
 - Formal decision with full rationale worth re-reading later: `docs/superpowers/decisions/`.
 - Daily work log, running decision index, open loops: `memory/` (here).
-- Agent runtime decisions with outcomes: `decision_log` table via `os/foundation/decision_logger.py`.
+- Agent runtime decisions with outcomes: `decision_log` table via `aios/foundation/decision_logger.py`.
 
 ## Session-start instruction
 
@@ -42,7 +42,9 @@ This instruction is also surfaced in `CLAUDE.md` so it loads automatically.
 ## Update rules
 
 - Update `INDEX.md` whenever a significant decision is made or an open loop closes.
-- Create a new session file at the start of each working day. At the end of the session, ask Claude to summarise what was done.
+- Create a new session file at the start of each working day.
+- At the end of every Claude-assisted session, the `Session end` rule in `CLAUDE.md` plus the project Stop hook in `.claude/settings.json` together prompt Claude to write/append the session log automatically.
+- For solo-work days (no Claude), copy `_TEMPLATE.md` to `YYYY-MM-DD.md`, fill it in, commit. Five minutes max.
 - Move stale detail out of `MEMORY.md` into `topics/` when a section grows beyond one screen.
 - Keep `MEMORY.md` under 200 lines and `INDEX.md` under 100 lines. If either grows past that, split.
 

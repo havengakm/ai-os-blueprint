@@ -50,7 +50,7 @@ systems/scout/
 
 ### To complete migration:
 1. Copy pipeline scripts from base-camp-agents/scripts/ into systems/scout/pipeline/
-2. Update imports to use os/foundation modules (DecisionLogger, PatternMatcher, etc.)
+2. Update imports to use aios/foundation modules (DecisionLogger, PatternMatcher, etc.)
 3. Wire handlers in skill.py to call pipeline scripts
 4. Create systems/scout/sql/ with Scout-specific migrations (contacts, drafts, templates, etc.)
 5. Test end-to-end with foundation integration

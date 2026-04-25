@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "F=\"memory/sessions/$(date +%Y-%m-%d).md\"; if [ -f \"$F\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$F\" 2>/dev/null || echo 0) )) -lt 300 ]; then exit 0; fi; printf '{\"decision\":\"block\",\"reason\":\"Before stopping: write or append to %s per the CLAUDE.md Session end rule (Summary, Decisions Made, Files Updated, Action Items, Counts). Skip only if this session was purely conversational with zero artifact changes.\"}' \"$F\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
