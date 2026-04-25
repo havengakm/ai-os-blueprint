@@ -6,6 +6,11 @@ Scannable summary of what's active and what's pending. Update when a significant
 
 | Date | Decision | Rationale | Status |
 |---|---|---|---|
+| 2026-04-25 | Trigify skills relocated to `skills/playbooks/` | Multi-step orchestrations with code + human-in-the-loop fit the playbook tier; legacy `skills/onboarding/` and `skills/operations/` superseded | Active |
+| 2026-04-25 | Legacy skill folders removed (`onboarding/`, `authoring/`, `analysis/`) | All were README-only stubs from before the three-tier model; deleted to avoid drift | Active |
+| 2026-04-25 | Stale `os/` references replaced with `aios/` across 9 docs | Directory was renamed during Plan 1 (item 63 in follow-ups) but docs lagged | Active |
+| 2026-04-25 | Plan1 worktree archived | `plan1-foundation-scout` branch fully merged; worktree was a stale 492MB checkout | Active |
+| 2026-04-25 | Test CSVs moved to `data/captures/test_contacts/` | Loose `data/test_contacts_*.csv` at root were ephemeral test data; gitignored | Active |
 | 2026-04-22 | Three-tier skill model (capability / composite / playbook) | Atomic-only left a real gap for multi-skill chains; adapted from Gooseworks public catalog | Active |
 | 2026-04-22 | `skills/playbooks/` sits under `skills/`, not under `data/reference/sops/` | Everything agent-invokable lives in one tree; `data/reference/sops/` stays for human-facing docs | Active |
 | 2026-04-22 | Four departments split out of Operations | Admin, Finance, Tax, Legal are distinct functions with distinct autonomy rules | Active |
@@ -26,20 +31,31 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 | Populate Hormozi KB files | Pending | Write `data/knowledge/experts/hormozi/offers.md` when the first Offer & Positioning skill needs it | Kirsten |
 | Populate Brunson KB files | Pending | Write `data/knowledge/experts/brunson/funnels.md` when the first GTM skill needs it | Kirsten |
 | Split `data/knowledge/company/` further | Pending | Decide whether `business-plan.md`, `strategy.md`, `metrics.md`, `current-data.md` stay here or move to `data/plans/`, `data/outputs/`, `data/captures/` | Kirsten |
-| Clarify `context/voice.md` audience | Resolved 2026-04-22 | Moved to `data/knowledge/personal/voice.md` per Kirsten's confirmation (operator voice) | Done |
 | Second composite skill | Pending | Write when a second real multi-skill workflow demands it | Claude |
-| First playbook skill | Pending | Likely `launch-new-niche.md` or `onboard-new-client.md` when the underlying composites exist | Claude |
-| Dev-time `.claude/skills/audit-new-skill.md` | Pending | Consider adding a helper that validates frontmatter + guardrail references on new skills | Claude |
+| First populated playbook | In progress | Two playbooks now populated (Trigify monitors + discovery); next candidates are `launch-new-niche.md` and `onboard-new-client.md` | Claude |
+| Dev-time `.claude/skills/audit-new-skill.md` | Pending | Helper that validates frontmatter + guardrail references on new skills | Claude |
 | Client deployment provisioning script | Pending | Needed when the first client AIOS is spun up; bootstraps empty `context/` + `data/knowledge/personal/` + `company/`, copies `experts/` as baseline | Claude |
-| Plan 1 Task 17 (diagnose-stuck-contact) | Pending | Part of Scout plan; not yet authored | Kirsten |
-| Plan 2 (Beacon send scheduler) | Not started | Blocks autonomous send | Kirsten |
+| Plan 2 (Beacon send scheduler) | Not started | Blocks autonomous send. Evaluate Instantly-as-vendor first per `feedback_cold_email_stack_reference` | Kirsten |
+| Plan 1.5 (cost discipline + LinkedIn outbound) | In progress | On `fix/cost-discipline-haiku-waterfall` branch; 14 commits ahead of main | Kirsten |
 | Populate 14 remaining capability categories | Ongoing | Write atomic skills as systems need them, not pre-emptively | Claude + Kirsten |
-| `agents/scout.md` references to legacy skill paths | Pending | Still points at `skills/operations/run-nightly-pipeline.md` etc; relocate to `skills/playbooks/` or `data/reference/sops/` when those are authored | Claude |
-| Evaluate Instantly as vendor before building send engine | Pending | Hans / Max webinar 2026-04-21 pattern; revisit at Plan 2 kick-off | Kirsten |
+| Merge order: cleanup branch + cost-discipline | Pending | Decide whether to merge cleanup into cost-discipline first, or both into main separately | Kirsten |
+| Archive `00_ARCHIVE/base-camp-agents/` more aggressively | Pending | 2 valuable docs ported (icebreaker, Saraev templates); some niche files (functional-medicine, email-template-variations) may still be worth pulling if a relevant deployment spawns | Kirsten |
+| Reconcile new harness memories with project state | Pending | LinkedIn analysis learnings + v2 storytelling body template + Plan 1.5 cost optimizations all add open loops not yet captured here | Claude |
+
+### Plan 1.5 specific (from new harness memories)
+
+| Topic | Status | Next Action | Reference |
+|---|---|---|---|
+| LinkedIn outbound playbook | Planned | 7d Tier 1/2 freshness, 48h SLA, Touch 2+3 ship with Plan 2 send | `feedback_linkedin_analysis_learnings` |
+| LinkedIn content parallel to outbound | Planned | Future module | `feedback_linkedin_analysis_learnings` |
+| Loom as future LinkedIn medium | Future | Pattern noted, not built | `feedback_linkedin_analysis_learnings` |
+| 10x enrich cost reduction (Haiku swap + signal-gated Deep Research) | In progress | Phase 1 + Phase 2 commits landed on `fix/cost-discipline-haiku-waterfall` | `feedback_plan15_cost_optimizations` |
+| v2 storytelling body template | Staged | Needs new `body_template` component type for template-level bandit A/B; copy locked verbatim | `feedback_v2_body_template_storytelling` |
 
 ## Active Plans
 
-- Plan 1 (Foundation + Scout migration): in progress. See `docs/superpowers/plans/2026-04-20-foundation-scout-migration.md`.
+- Plan 1 (Foundation + Scout migration): COMPLETE. Branch `plan1-foundation-scout` merged into main 2026-04-23, branch deleted 2026-04-25.
+- Plan 1.5 (cost discipline + LinkedIn outbound): in progress on `fix/cost-discipline-haiku-waterfall`.
 - Plan 2 (Beacon): not started.
 - Plan 7 (Optimizer): not started.
 
@@ -54,6 +70,7 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 | Claude Opus for any workload | Yes | Cost; Haiku batch, Sonnet complex |
 | Folder-per-skill with `SKILL.md` + `skill.meta.json` (Gooseworks style) | Deferred | Premature; revisit at ~50 populated skills |
 | JSON schema validation for skills (Gooseworks style) | Deferred | Premature; revisit at ~50 populated skills or first client provisioning |
+| n8n workflows alongside Python system | Yes | `aios/` foundation is the abstraction; do not shadow it (per `data/reference/frameworks/allbound-system.md`) |
 
 ## Pointers
 

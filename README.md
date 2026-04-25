@@ -38,7 +38,7 @@ ai-os-blueprint/
 │   ├── outputs/                              Reports, analyses, briefs
 │   └── reference/                            SOPs, specs, process docs
 │
-├── os/                                    ── THE BRAIN
+├── aios/                                  ── THE BRAIN
 │   ├── foundation/                           Decision engine, pattern matcher,
 │   │                                         autonomy gates, knowledge retrieval
 │   ├── memory/                               Unified retrieval (MemoryStore)
@@ -58,7 +58,7 @@ ai-os-blueprint/
 - **context/** is private per instance. Committed in template, gitignored in client forks.
 - **data/knowledge/** has expert frameworks shared via template.
 - **data/reference/** has universal SOPs.
-- **os/** is identical across all instances.
+- **aios/** is identical across all instances.
 - **systems/** are self-contained. Each extends BaseSystem and connects to the foundation.
 
 ## Deployment

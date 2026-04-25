@@ -21,14 +21,14 @@ The AIOS has several memory-shaped surfaces. They serve different audiences and 
 | `docs/superpowers/decisions/` | On demand | Operators + historical reviewers | Formal, dated decision docs with full rationale |
 | `docs/superpowers/plans/` | On demand | Operators implementing | Step-by-step implementation plans |
 | `docs/superpowers/specs/` | On demand | Operators designing | Brainstorming-phase design specs |
-| `os/foundation/decision_logger.py` (runtime DB) | Agent runtime | Scout, Beacon, Optimizer agents | Per-action autonomous-agent decisions with outcomes |
+| `aios/foundation/decision_logger.py` (runtime DB) | Agent runtime | Scout, Beacon, Optimizer agents | Per-action autonomous-agent decisions with outcomes |
 
 Rule of thumb:
 - Personal-to-Kirsten feedback or preference that should persist across ALL projects: harness memory (`~/.claude/projects/.../memory/`).
 - Project-wide principle or hard rule that should load every session: `CLAUDE.md`.
 - Formal decision with full rationale worth re-reading later: `docs/superpowers/decisions/`.
 - Daily work log, running decision index, open loops: `memory/` (here).
-- Agent runtime decisions with outcomes: `decision_log` table via `os/foundation/decision_logger.py`.
+- Agent runtime decisions with outcomes: `decision_log` table via `aios/foundation/decision_logger.py`.
 
 ## Session-start instruction
 

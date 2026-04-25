@@ -1,6 +1,6 @@
 ---
 name: configure-trigify-monitors
-description: Provision Trigify social-listening monitors for an AIOS client. Reads per-client YAML at context/{client-id}/sourcing/trigify_monitors.yaml, dry-runs the Trigify API, prompts for confirmation, provisions monitors. Persists search IDs to client_config.trigify_search_ids. Run ONCE at client onboarding, or when adding new competitors / thought leaders. Do NOT run on every pipeline cycle — monitors persist. Canonical AIOS skill at skills/onboarding/configure-trigify-monitors.md (this file delegates).
+description: Provision Trigify social-listening monitors for an AIOS client. Reads per-client YAML at context/{client-id}/sourcing/trigify_monitors.yaml, dry-runs the Trigify API, prompts for confirmation, provisions monitors. Persists search IDs to client_config.trigify_search_ids. Run ONCE at client onboarding, or when adding new competitors / thought leaders. Do NOT run on every pipeline cycle — monitors persist. Canonical AIOS skill at skills/playbooks/configure-trigify-monitors.md (this file delegates).
 argument-hint: "<client-id> [--dry-run] [--no-confirm]"
 allowed-tools: "Bash(uv run python scripts/configure_trigify_monitors.py:*) Read(context/**) Read(data/reference/sops/trigify-monitor-authoring.md)"
 ---

@@ -240,7 +240,7 @@ class TrigifyMonitorCreator:
         if not key:
             raise EnvironmentError(
                 "TRIGIFY_API_KEY is not set. Add it to .env (see "
-                "skills/onboarding/configure-trigify-monitors.md preconditions)."
+                "skills/playbooks/configure-trigify-monitors.md preconditions)."
             )
         return key
 

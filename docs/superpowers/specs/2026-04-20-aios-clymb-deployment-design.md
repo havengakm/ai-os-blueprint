@@ -175,7 +175,7 @@ All architectural choices, table schemas, infrastructure setups, SOPs, web app r
 **Gap assessment for Clymb pilot:**
 - Layer 1 — mostly ready. Clymb context complete. Fractional + Consulting ICPs need adding.
 - Layer 2 — knowledge embeddings not yet loaded. Performance tables (`campaigns`, `outcomes`) not created. **Expert knowledge library expansion pending** (see below).
-- Layer 3 — code exists (`os/foundation/`) but outcomes writeback not yet wired. pattern_matcher untested on real data.
+- Layer 3 — code exists (`aios/foundation/`) but outcomes writeback not yet wired. pattern_matcher untested on real data.
 - Layer 4 — Scout is a stub. Needs full migration from `base-camp-agents/`.
 
 ### Expert knowledge library (Layer 2 expansion)
@@ -1476,5 +1476,5 @@ Before any feature ships, answer yes to all:
 - `data/reference/client-deployment-sop.md` — existing deployment SOP (to be updated)
 - `data/reference/outbound-system-spec.md` — existing Scout spec
 - `systems/base.py` — BaseSystem contract
-- `os/foundation/*.py` — decision loop modules
+- `aios/foundation/*.py` — decision loop modules
 - `/home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/base-camp-agents/` — migration source

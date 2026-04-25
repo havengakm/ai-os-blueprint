@@ -55,7 +55,7 @@ Compose one cold email that goes in slot 1 of the sequence. The first line does 
 
 5. **Validate** via `skills/meta/validate-writing.md` with `context=cold_email`. On fail, rewrite. Max 3 attempts before escalation.
 
-6. **Log the composition** via `os/foundation/decision_logger.py` with tags: `stage=compose`, `angle_name`, `first_line_source_fact`, `segment`. This is how the Optimizer learns which components win.
+6. **Log the composition** via `aios/foundation/decision_logger.py` with tags: `stage=compose`, `angle_name`, `first_line_source_fact`, `segment`. This is how the Optimizer learns which components win.
 
 ## Output
 

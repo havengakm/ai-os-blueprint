@@ -390,7 +390,7 @@ class TrigifyDiscoverySource:
         if not key:
             raise EnvironmentError(
                 "TRIGIFY_API_KEY is not set. Add it to .env (see "
-                "skills/operations/discover-trigify-leads.md preconditions)."
+                "skills/playbooks/discover-trigify-leads.md preconditions)."
             )
         return key
 

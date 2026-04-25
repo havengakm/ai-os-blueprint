@@ -20,10 +20,10 @@ This is the direction AIOS is built for. Every architectural decision should be 
 
 Max's 3-person team:
 
-1. **Master list builder** (growth / revenue ops person) — builds **evergreen** signal-based lists, NOT manual prospecting. Automated signal-based searches running continuously.
+1. **Master list builder** (growth / revenue ops agent) — builds **evergreen** signal-based lists, NOT manual prospecting. Automated signal-based searches running continuously.
 2. **Account Executive (AE)** — closes deals, self-sources warm leads.
-3. **AI SDR** (built in n8n) — handles inbound replies, nurtures leads, books warmer prospects coming into the site.
-4. **Content generator** — ghostwriter for the entire team, takes real themes from sales calls and turns them into posts.
+3. **AI SDR** (built in claude code) — handles inbound replies, nurtures leads, books warmer prospects coming into the site.
+4. **Content generator** — ghostwriter agent for the entire team, takes real themes from sales calls and turns them into posts.
 
 **For AIOS:** our agent architecture should mirror this: Scout (list builder), Beacon (AI SDR for replies), Optimizer (content loop analyst), Operator (the human AE).
 
@@ -205,7 +205,7 @@ Max's team runs this framework on **n8n** (visual workflow orchestration). AIOS 
 
 **Candidate tools to evaluate:** Claude Code (agentic CLI), Claude Agent SDK (orchestration), Trigger.dev (developer-first background jobs), Hermes Agent / OpenClaw-equivalent open-source agent frameworks.
 
-**Do not build:** n8n workflows alongside the Python system. The existing `systems/scout/` pipeline + `os/` foundation is the abstraction — extend it, don't shadow it.
+**Do not build:** n8n workflows alongside the Python system. The existing `systems/scout/` pipeline + `aios/` foundation is the abstraction; extend it, don't shadow it.
 
 ## Where this doc lives
 

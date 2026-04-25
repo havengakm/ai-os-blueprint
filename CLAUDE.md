@@ -118,7 +118,7 @@ rules/            : GLOBAL GUARDRAILS: writing standards every skill enforces
 skills/           : CAPABILITIES: atomic single-purpose skills (one input → one output), 15 categories
 departments/      : TEAMS: manifests that activate subsets of skills per business function
 agents/           : PERSONAS: named workers (Scout, Beacon, Optimizer) that run systems on a schedule
-os/               : THE BRAIN: foundation, memory, agent, scheduler
+aios/             : THE BRAIN: foundation, memory, daemon, scheduler
 systems/          : THE LIMBS: scout, beacon, ads, content, etc.
 scripts/          : UTILITIES: migrations, loaders, backfill
 api/              : ENDPOINTS: webhooks, pipeline triggers
