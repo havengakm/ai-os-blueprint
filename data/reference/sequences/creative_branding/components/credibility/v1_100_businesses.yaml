@@ -1,0 +1,17 @@
+---
+variant_key: "v1_100_businesses"
+component_type: "credibility"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  At my last agency I built growth systems for 100+ service businesses across 10+ countries. This is the AI version.
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Single sentence of track record. No metrics, no case-study references,
+    no client names — the specificity stays in the icebreaker slot and
+    the offer_frame. This line exists to answer "why should I care who
+    you are" without bragging.
+  framework_anchor: "track-record anchor"
+ab_epsilon: 0.1

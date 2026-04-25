@@ -9,7 +9,9 @@ from systems.scout.outreach.component_store import (
 )
 from systems.scout.outreach.composer import (
     AD_ACTIVITY_DIRECTORIES,
+    COMPONENT_TYPES_OPTIONAL,
     COMPONENT_TYPES_ORDERED,
+    COMPONENT_TYPES_REQUIRED,
     Composer,
     ComposedDraft,
     ComposerSkip,
@@ -24,7 +26,9 @@ from systems.scout.outreach.research import (
 
 __all__ = [
     "AD_ACTIVITY_DIRECTORIES",
+    "COMPONENT_TYPES_OPTIONAL",
     "COMPONENT_TYPES_ORDERED",
+    "COMPONENT_TYPES_REQUIRED",
     "ComponentStore",
     "ComponentStoreBackend",
     "ComponentVariant",

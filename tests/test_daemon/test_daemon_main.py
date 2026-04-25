@@ -112,3 +112,27 @@ async def test_run_nightly_cycle_no_active_clients_is_noop():
     ) as mock_cycle:
         await run_nightly_cycle(registry, factory)
     mock_cycle.assert_not_called()
+
+
+def test_build_scout_for_client_wires_icebreaker_adapter():
+    """Regression: the daemon's scout builder MUST inject an IcebreakerAdapter
+    into the EnrichStage. Without it the adapter is never invoked in live
+    runs and every contact lands with icebreaker_tier=None.
+    """
+    from aios.daemon.main import _build_scout_for_client
+    from systems.scout.enrich.icebreaker_adapter import IcebreakerAdapter
+
+    registry = MagicMock()
+    factory = MagicMock()
+    client_config: dict = {"active_directories": []}
+
+    scout = _build_scout_for_client(registry, factory, client_config)
+
+    # ScoutSystem stores stage factories — instantiate the enrich stage the
+    # way the real cycle would, then inspect the wired adapter.
+    enrich_stage = scout._enrich_factory()
+    assert enrich_stage._icebreaker_adapter is not None, (
+        "IcebreakerAdapter not wired into EnrichStage — icebreakers will "
+        "never fire in live runs (bug observed in fix/enrich-compose-pipeline-bugs)"
+    )
+    assert isinstance(enrich_stage._icebreaker_adapter, IcebreakerAdapter)

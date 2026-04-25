@@ -583,3 +583,32 @@ def test_fake_backend_satisfies_protocol() -> None:
     assert hasattr(backend, "fetch_existing")
     assert hasattr(backend, "insert_variants")
     assert hasattr(backend, "update_variants")
+
+
+# --------------------------------------------------------------------------- #
+# 13. v2 component types — who_i_am + credibility accepted                     #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("component_type", ["who_i_am", "credibility", "bridge"])
+async def test_sync_accepts_new_v2_component_types(
+    tmp_path: Path, component_type: str,
+) -> None:
+    """v2 introduced who_i_am + credibility; v3 added bridge. The YAML
+    validator must accept all three as first-class component types."""
+    _write_variant(
+        tmp_path,
+        component_type=component_type,
+        variant_key="v1_sample",
+        content="sample body line.",
+    )
+
+    backend = FakeBackend()
+    store = ComponentStore(backend=backend, sequences_root=tmp_path)
+    summary = await store.sync(client_id="c1")
+
+    assert summary.loaded == 1
+    assert summary.inserted == 1
+    assert summary.errors == []
+    _, variants = backend.insert_calls[0]
+    assert variants[0].component_type == component_type

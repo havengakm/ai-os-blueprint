@@ -1,0 +1,16 @@
+---
+variant_key: "v1_operator_only"
+component_type: "signature"
+niche: "fitness_wellness"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  {{operator_name}}
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    First-name only. No title, no company, no phone, no URL. Placeholder
+    resolves from client_facts.operator_name so the same template serves
+    any deployment.
+  framework_anchor: "first-name only"
+ab_epsilon: 0.1

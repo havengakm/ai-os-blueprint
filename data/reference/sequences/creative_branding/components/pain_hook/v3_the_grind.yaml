@@ -1,0 +1,17 @@
+---
+variant_key: "v3_the_grind"
+component_type: "pain_hook"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  You know the grind. Pitching for new work while trying to deliver exceptional work for current clients. Something always slips.
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Empathy-led pain hook. Shared-truth framing ("you know the grind") vs
+    presumptuous "most agencies" generalization (rejected in v2 review).
+    Non-judgmental — names the universal feast/famine dynamic without
+    diagnosing the prospect.
+  framework_anchor: "empathy-acknowledgment"
+ab_epsilon: 0.1

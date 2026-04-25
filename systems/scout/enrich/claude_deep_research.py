@@ -27,12 +27,21 @@ from systems.scout.enrich.base import EnrichResult
 
 logger = logging.getLogger(__name__)
 
-SONNET_MODEL = "claude-sonnet-4-6"
+# Haiku 4.5 per CLAUDE.md cost rules. Deep Research runs per-contact
+# at ~$0.003-0.005 on Haiku vs ~$0.03-0.04 on Sonnet — the single biggest
+# cost item in the enrich stage.
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 # Bumped from 800 -> 1200 to accommodate the structural_signals array (Task C).
 # Validator caps structural_signals at 8 entries, so cost stays bounded.
 MAX_TOKENS = 1200
-CONTENT_CHAR_LIMIT = 20_000
-MAX_PAGES = 8
+# Trimmed from 20_000 -> 12_000. With Haiku at $0.80/M input we still
+# pay for every token, and most studio sites fit inside 12k char after
+# HTML stripping. Budget: 12_000 chars ≈ 3_000 tokens × $0.80/M ≈ $0.0024.
+CONTENT_CHAR_LIMIT = 12_000
+# Trimmed from 8 -> 5 pages. Most signal + identity lives on home +
+# about + team + services; 5 is plenty and saves ~3 page-fetches × ~4k
+# chars = ~12k tokens per contact.
+MAX_PAGES = 5
 FETCH_GAP_SECONDS = 1.0
 
 VALID_PAIN_CATEGORIES = frozenset(
@@ -518,7 +527,7 @@ class ClaudeDeepResearchAdapter:
         # --- Claude call (no try/except — infrastructure errors propagate) ---
         client = await self._ensure_anthropic_client()
         response = await client.messages.create(
-            model=SONNET_MODEL,
+            model=HAIKU_MODEL,
             max_tokens=MAX_TOKENS,
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],

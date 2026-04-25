@@ -57,6 +57,7 @@ def _build_scout_for_client(
     zero-adapter orchestrators (safe defaults for API-triggered runs).
     The daemon needs real adapters for each client's active_directories.
     """
+    from systems.scout.enrich.icebreaker_adapter import IcebreakerAdapter
     from systems.scout.outreach.composer import Composer
     from systems.scout.outreach.research import ResearchSelector
     from systems.scout.pipeline.enrich import EnrichStage
@@ -81,6 +82,9 @@ def _build_scout_for_client(
         enrich_stage_factory=lambda: EnrichStage(
             orchestrator=factory.build_enrich_orchestrator(client_config),
             storage=registry.enrich_backend,
+            icebreaker_adapter=IcebreakerAdapter(
+                budget_tracker=registry.budget_tracker,
+            ),
         ),
         composer_factory=lambda: Composer(
             storage=registry.composer_backend,

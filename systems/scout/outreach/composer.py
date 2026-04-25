@@ -37,12 +37,34 @@ DEFAULT_EPSILON: float = 0.1
 AD_ACTIVITY_DIRECTORIES: frozenset[str] = frozenset({
     "google_ads_library", "linkedin_ads_library", "meta_ads_library",
 })
-COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
-    "subject_line", "icebreaker", "pain_hook",
-    "offer_frame", "cta", "signature",
+#: Component types the composer REQUIRES a variant for. A missing
+#: pool for any of these yields a ComposerSkip with reason
+#: ``no_variants_for:<type>``. v3 locks creative_branding on all 9
+#: types — ``bridge`` is the new substantive transition between
+#: icebreaker and who_i_am, and ``pain_hook`` is back in required
+#: with empathy-led content.
+COMPONENT_TYPES_REQUIRED: tuple[str, ...] = (
+    "subject_line", "icebreaker", "bridge", "who_i_am", "pain_hook",
+    "credibility", "offer_frame", "cta", "signature",
 )
+#: Component types the composer will USE if variants are available,
+#: but will skip silently when the pool is empty. v3 has none —
+#: kept as an empty tuple so niches adopting the same productised
+#: library can still opt into optional slots later.
+COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ()
+#: Union of required + optional, ordered for iteration. Exported for
+#: backward compatibility + symmetry with the pre-v2 surface.
+COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
+    "subject_line", "icebreaker", "bridge", "who_i_am", "pain_hook",
+    "credibility", "offer_frame", "cta", "signature",
+)
+#: Body rendering order — top-to-bottom as the prospect reads it.
+#: v3: bridge sits between icebreaker and who_i_am; pain_hook precedes
+#: credibility so empathy sets up the proof. Optional types are dropped
+#: silently when absent from the selection map.
 _BODY_COMPONENTS: tuple[str, ...] = (
-    "icebreaker", "pain_hook", "offer_frame", "cta", "signature",
+    "icebreaker", "bridge", "who_i_am", "pain_hook", "credibility",
+    "offer_frame", "cta", "signature",
 )
 _BODY_SEPARATOR: str = "\n\n"
 # Neutral prior keeps win_rate=None variants in contention vs weak-signal winners.
@@ -70,6 +92,11 @@ _RESEARCH_PLACEHOLDER_ATTRS: dict[str, str] = {
     "offer_promise": "offer_promise",
     "offer_period": "offer_period",
     "offer_risk_reversal": "offer_risk_reversal",
+    # v2 niche-level fills — source: client_facts. Power the shared
+    # who_i_am + offer_frame templates across deployments.
+    "niche": "niche",
+    "niche_specific_term": "niche_specific_term",
+    "meetings_niche_term": "meetings_niche_term",
 }
 
 
@@ -232,6 +259,10 @@ class Composer:
         for component_type in COMPONENT_TYPES_ORDERED:
             pool = filtered_by_type.get(component_type) or []
             if not pool:
+                if component_type in COMPONENT_TYPES_OPTIONAL:
+                    # Silently skip — the body renderer drops optional
+                    # types that don't have a selection for this contact.
+                    continue
                 skip = ComposerSkip(
                     contact_id=contact_id,
                     reason=f"no_variants_for:{component_type}",
@@ -276,6 +307,7 @@ class Composer:
                 selections[ct].variant_content, contact, fills, fills_missing,
             )
             for ct in _BODY_COMPONENTS
+            if ct in selections  # optional types (pain_hook) drop out cleanly
         )
         fills_missing = _dedup_preserve_order(fills_missing)
 

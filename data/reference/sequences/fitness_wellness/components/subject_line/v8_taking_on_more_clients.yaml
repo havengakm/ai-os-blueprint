@@ -1,0 +1,16 @@
+---
+variant_key: "v8_taking_on_more_clients"
+component_type: "subject_line"
+niche: "fitness_wellness"
+offer_label: "aios_scout_deployment"
+variant_content: "{{first_name}}, q: is {{short_company_name}} taking on more {{niche_specific_term}}?\n"
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Port of the base-camp-archive classic from 2025 into creative_branding.
+    The "q:" prefix + direct-question framing reads as a peer asking, not a
+    pitch. Pairs naturally with the revised body (who_i_am + credibility +
+    offer_frame v3).
+  framework_anchor: "direct-question peer curiosity"
+ab_epsilon: 0.1

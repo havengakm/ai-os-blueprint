@@ -147,19 +147,39 @@ def mk_variants_by_type(
     *,
     subject_content: str = "Subject: {{trigger_hook}}",
     icebreaker_content: str = "Hi {{first_name}}, noticed {{icebreaker_content}}.",
-    pain_hook_content: str = "Many agencies hit {{pain_evidence}}.",
+    bridge_content: str | None = "Left-field question — are you hiring?",
+    pain_hook_content: str | None = "Many agencies hit {{pain_evidence}}.",
+    who_i_am_content: str = "I build AI outreach systems.",
+    credibility_content: str = "I've worked with 100+ businesses.",
     offer_frame_content: str = "We help with X at {{company}}.",
     cta_content: str = "Worth a 20-minute call?",
     signature_content: str = "—Kirsten",
 ) -> dict[str, list[ComponentVariant]]:
-    return {
+    """Build the full v3 component pool.
+
+    All 9 types are REQUIRED in v3. ``bridge_content=None`` or
+    ``pain_hook_content=None`` omits that type entirely so tests can
+    exercise the ``no_variants_for:<type>`` skip path without the
+    composer quietly tolerating the missing slot.
+    """
+    pools: dict[str, list[ComponentVariant]] = {
         "subject_line": [mk_variant(component_type="subject_line", variant_content=subject_content)],
         "icebreaker": [mk_variant(component_type="icebreaker", variant_content=icebreaker_content)],
-        "pain_hook": [mk_variant(component_type="pain_hook", variant_content=pain_hook_content)],
+        "who_i_am": [mk_variant(component_type="who_i_am", variant_content=who_i_am_content)],
+        "credibility": [mk_variant(component_type="credibility", variant_content=credibility_content)],
         "offer_frame": [mk_variant(component_type="offer_frame", variant_content=offer_frame_content)],
         "cta": [mk_variant(component_type="cta", variant_content=cta_content)],
         "signature": [mk_variant(component_type="signature", variant_content=signature_content)],
     }
+    if bridge_content is not None:
+        pools["bridge"] = [mk_variant(
+            component_type="bridge", variant_content=bridge_content,
+        )]
+    if pain_hook_content is not None:
+        pools["pain_hook"] = [mk_variant(
+            component_type="pain_hook", variant_content=pain_hook_content,
+        )]
+    return pools
 
 
 def mk_contact(
@@ -233,6 +253,9 @@ async def test_happy_path_fills_renders_persists_logs() -> None:
             },
         ],
     )
+    # IcebreakerAdapter-written content — required since research.py no longer
+    # falls back to raw trigger_events for the icebreaker placeholder.
+    contact["research_data"]["icebreaker_content"] = "Raised Series B last month"
     storage = FakeStorage(variants_by_type=mk_variants_by_type())
     composer = mk_composer(storage)
 
@@ -247,6 +270,8 @@ async def test_happy_path_fills_renders_persists_logs() -> None:
     assert result.body.endswith("Worth a 20-minute call?\n\n—Kirsten")
     assert result.component_selections == {
         "subject_line": "subject_line_v1", "icebreaker": "icebreaker_v1",
+        "bridge": "bridge_v1",
+        "who_i_am": "who_i_am_v1", "credibility": "credibility_v1",
         "pain_hook": "pain_hook_v1", "offer_frame": "offer_frame_v1",
         "cta": "cta_v1", "signature": "signature_v1",
     }
@@ -712,7 +737,10 @@ async def test_component_selections_uses_variant_key_not_uuid() -> None:
 async def test_body_assembly_order_and_separator() -> None:
     storage = FakeStorage(variants_by_type=mk_variants_by_type(
         icebreaker_content="ICE",
+        bridge_content="BRIDGE",
         pain_hook_content="PAIN",
+        who_i_am_content="WHOIAM",
+        credibility_content="CRED",
         offer_frame_content="OFFER",
         cta_content="CTA",
         signature_content="SIG",
@@ -722,7 +750,66 @@ async def test_body_assembly_order_and_separator() -> None:
     result = await composer.compose("client-1", mk_contact())
 
     assert isinstance(result, ComposedDraft)
-    assert result.body == "ICE\n\nPAIN\n\nOFFER\n\nCTA\n\nSIG"
+    # v3 body order: icebreaker, bridge, who_i_am, pain_hook, credibility,
+    # offer_frame, cta, signature. Pain precedes credibility so empathy
+    # sets up the proof.
+    assert result.body == (
+        "ICE\n\nBRIDGE\n\nWHOIAM\n\nPAIN\n\nCRED\n\nOFFER\n\nCTA\n\nSIG"
+    )
+
+
+async def test_bridge_required_skip_when_pool_empty() -> None:
+    """Regression guard: v3 promotes bridge to REQUIRED. A missing
+    pool must raise ComposerSkip, not silently drop the slot."""
+    storage = FakeStorage(variants_by_type=mk_variants_by_type(
+        bridge_content=None,
+    ))
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:bridge"
+
+
+async def test_pain_hook_required_skip_when_pool_empty() -> None:
+    """v3 moves pain_hook BACK into required. Missing pool must raise
+    ComposerSkip (v2 made this optional; v3 reverses that)."""
+    storage = FakeStorage(variants_by_type=mk_variants_by_type(
+        pain_hook_content=None,
+    ))
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:pain_hook"
+
+
+async def test_who_i_am_required_skip_when_pool_empty() -> None:
+    """who_i_am is REQUIRED in v2 — missing pool must raise ComposerSkip."""
+    variants = mk_variants_by_type()
+    variants["who_i_am"] = []
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:who_i_am"
+
+
+async def test_credibility_required_skip_when_pool_empty() -> None:
+    """credibility is REQUIRED in v2 — missing pool must raise ComposerSkip."""
+    variants = mk_variants_by_type()
+    variants["credibility"] = []
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposerSkip)
+    assert result.reason == "no_variants_for:credibility"
 
 
 # --------------------------------------------------------------------------- #
@@ -950,3 +1037,88 @@ async def test_single_variant_pool_skips_bandit() -> None:
 
     result = await composer.compose("client-1", mk_contact())
     assert isinstance(result, ComposedDraft)
+
+
+# --------------------------------------------------------------------------- #
+# v2 niche-level placeholders — {{niche}} / {{niche_specific_term}} /          #
+# {{meetings_niche_term}} routed from client_facts through the composer        #
+# --------------------------------------------------------------------------- #
+
+async def test_niche_level_placeholders_render_from_client_facts() -> None:
+    """The v2 who_i_am + offer_frame templates depend on three niche-level
+    placeholders. All three must route from client_facts through
+    ResearchSelector to the composer's render step."""
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            who_i_am_content=(
+                "I build AI outreach systems for {{niche}}. It finds "
+                "your ideal {{niche_specific_term}} and books "
+                "{{meetings_niche_term}} into your calendar."
+            ),
+            offer_frame_content=(
+                "Looking for 3 {{niche}} to install it for. "
+                "No cost unless it books {{meetings_niche_term}}."
+            ),
+        ),
+        client_facts={
+            "niche": "creative and branding agencies",
+            "niche_specific_term": "clients",
+            "meetings_niche_term": "sales calls",
+        },
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "I build AI outreach systems for creative and branding agencies." in result.body
+    assert "your ideal clients and books sales calls into your calendar" in result.body
+    assert "Looking for 3 creative and branding agencies to install it for" in result.body
+    assert "No cost unless it books sales calls" in result.body
+    # None of the three should surface as missing when all three are seeded.
+    for key in ("niche", "niche_specific_term", "meetings_niche_term"):
+        assert key not in result.fills_missing
+
+
+async def test_niche_level_placeholders_flagged_missing_when_client_facts_empty() -> None:
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            who_i_am_content="I build systems for {{niche}}.",
+            offer_frame_content="Books {{meetings_niche_term}}.",
+        ),
+        client_facts={},  # nothing seeded
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "niche" in result.fills_missing
+    assert "meetings_niche_term" in result.fills_missing
+    # Body renders with empty strings in place of the missing placeholders.
+    assert "I build systems for ." in result.body
+    assert "Books ." in result.body
+
+
+async def test_niche_specific_term_renders_independently() -> None:
+    """Regression guard: niche_specific_term is its own attribute, not a
+    substring prefix of niche. Using only niche_specific_term must NOT
+    accidentally satisfy a {{niche}} placeholder."""
+    storage = FakeStorage(
+        variants_by_type=mk_variants_by_type(
+            who_i_am_content=(
+                "I help find {{niche_specific_term}} at scale."
+            ),
+            offer_frame_content="For {{niche}} only.",
+        ),
+        client_facts={"niche_specific_term": "clients"},
+    )
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "I help find clients at scale." in result.body
+    assert "For  only." in result.body  # niche missing → empty string
+    assert "niche" in result.fills_missing
+    assert "niche_specific_term" not in result.fills_missing
