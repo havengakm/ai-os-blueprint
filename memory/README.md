@@ -42,7 +42,9 @@ This instruction is also surfaced in `CLAUDE.md` so it loads automatically.
 ## Update rules
 
 - Update `INDEX.md` whenever a significant decision is made or an open loop closes.
-- Create a new session file at the start of each working day. At the end of the session, ask Claude to summarise what was done.
+- Create a new session file at the start of each working day.
+- At the end of every Claude-assisted session, the `Session end` rule in `CLAUDE.md` plus the project Stop hook in `.claude/settings.json` together prompt Claude to write/append the session log automatically.
+- For solo-work days (no Claude), copy `_TEMPLATE.md` to `YYYY-MM-DD.md`, fill it in, commit. Five minutes max.
 - Move stale detail out of `MEMORY.md` into `topics/` when a section grows beyond one screen.
 - Keep `MEMORY.md` under 200 lines and `INDEX.md` under 100 lines. If either grows past that, split.
 
