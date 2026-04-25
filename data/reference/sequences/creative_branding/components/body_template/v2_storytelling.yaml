@@ -1,0 +1,39 @@
+---
+variant_key: "v2_storytelling"
+component_type: "body_template"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  PLACEHOLDER: replace this content verbatim with Kirsten's hand-written
+  first-person narrative variant. The shape weaves the inner-component
+  renders into a single first-person story rather than the modular
+  paragraph structure of v1_modular.
+
+  Available placeholders (substituted by the composer from inner-component
+  renders):
+    {{icebreaker_content}}
+    {{bridge_content}}
+    {{pain_hook_content}}
+    {{credibility_content}}
+    {{offer_frame_content}}
+    {{cta_content}}
+    {{signature_content}}
+
+  Plus standard research fills: {{first_name}}, {{company}},
+  {{short_company_name}}, {{operator_name}}, {{niche}},
+  {{niche_specific_term}}, etc.
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Plan 1.5 Task 1.5.8. v2_storytelling is staged with placeholder copy.
+    Operator (Kirsten) drops her verbatim first-person narrative copy
+    into variant_content before flipping status to 'approved'. Bandit
+    will not select v2 while it is in 'draft'; only v1_modular runs in
+    production until Kirsten approves.
+
+    See harness memory feedback_v2_body_template_storytelling: copy is
+    locked verbatim and must not be paraphrased by an AI. Author edits
+    only.
+  framework_anchor: "first-person narrative (Kirsten hand-authored)"
+ab_epsilon: 0.1

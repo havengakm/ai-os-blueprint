@@ -154,3 +154,45 @@ def test_all_creative_branding_variants_use_expected_offer_label() -> None:
         f"all creative_branding variants must share one offer_label; "
         f"found {offer_labels}"
     )
+
+
+def test_body_template_v1_modular_present_and_approved() -> None:
+    """Plan 1.5 Task 1.5.8: v1_modular makes the legacy modular body shape
+    explicit as a body_template variant. Must load, be approved, and
+    contain placeholders for every inner body component."""
+    variants = _discover()
+    by_type = _by_type(variants, "creative_branding")
+    body_templates = by_type.get("body_template", [])
+    keys = {v.variant_key for v in body_templates}
+    assert "v1_modular" in keys
+
+    v1 = next(v for v in body_templates if v.variant_key == "v1_modular")
+    assert v1.status == "approved"
+    for placeholder in (
+        "{{icebreaker_content}}",
+        "{{bridge_content}}",
+        "{{pain_hook_content}}",
+        "{{credibility_content}}",
+        "{{offer_frame_content}}",
+        "{{cta_content}}",
+        "{{signature_content}}",
+    ):
+        assert placeholder in v1.variant_content, (
+            f"v1_modular must reference {placeholder} so the composer's "
+            f"body_template substitution covers every inner component."
+        )
+
+
+def test_body_template_v2_storytelling_present_and_draft() -> None:
+    """Plan 1.5 Task 1.5.8: v2_storytelling is staged for Kirsten's
+    verbatim copy. Bandit must not pick it until status flips to
+    'approved' (composer.fetch_approved_variants filters on status)."""
+    variants = _discover()
+    by_type = _by_type(variants, "creative_branding")
+    body_templates = by_type.get("body_template", [])
+    keys = {v.variant_key for v in body_templates}
+    assert "v2_storytelling" in keys
+
+    v2 = next(v for v in body_templates if v.variant_key == "v2_storytelling")
+    # Locked behind status='draft' until operator authors the verbatim copy.
+    assert v2.status == "draft"

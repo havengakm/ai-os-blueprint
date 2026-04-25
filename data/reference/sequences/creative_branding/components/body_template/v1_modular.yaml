@@ -1,0 +1,34 @@
+---
+variant_key: "v1_modular"
+component_type: "body_template"
+niche: "creative_branding"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  {{icebreaker_content}}
+
+  {{bridge_content}}
+
+  {{pain_hook_content}}
+
+  {{credibility_content}}
+
+  {{offer_frame_content}}
+
+  {{cta_content}}
+
+  {{signature_content}}
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Plan 1.5 Task 1.5.8. v1_modular makes the legacy modular body shape
+    explicit as a body_template variant. Inner components (icebreaker,
+    bridge, pain_hook, credibility, offer_frame, cta, signature) are
+    rendered first by the composer and substituted into the placeholders
+    here.
+
+    Bandit allocator picks between v1_modular and v2_storytelling per
+    contact (once v2 is approved). v1 is the safety net: matches what
+    the composer used to produce before Plan 1.5 Task 1.5.7.
+  framework_anchor: "modular concat (legacy default)"
+ab_epsilon: 0.1
