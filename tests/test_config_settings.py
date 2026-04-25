@@ -59,3 +59,20 @@ def test_settings_lead_stack_keys_override(monkeypatch):
     s = get_settings()
 
     assert s.lusha_api_key == "l-key"
+
+
+def test_settings_loads_without_cron_secret(monkeypatch):
+    """Plan 1.5 Task 1.5.4 (follow-ups-plan1.md item 4): cron_secret is
+    optional with empty default. Daemon-only deployments don't need it
+    set; only the HTTP cron-trigger middleware reads it."""
+    monkeypatch.setenv("CLIENT_ID", "test-client")
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+    # CRON_SECRET deliberately unset.
+
+    from config.settings import get_settings
+    get_settings.cache_clear()
+    s = get_settings()  # must not raise ValidationError
+
+    assert s.cron_secret == ""
