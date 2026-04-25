@@ -153,24 +153,81 @@ def check_env() -> list[str]:
 
 
 def check_schema(supabase: Any) -> list[CheckResult]:
-    """For each critical table: SELECT 1 LIMIT 1 → pass or fail."""
+    """For each critical table, verify both:
+
+      1. It exists in information_schema.tables (via the
+         preflight_existing_tables view from migration 013).
+      2. It is reachable via a PostgREST SELECT.
+
+    Cross-checking against information_schema guards against PostgREST
+    returning 200 from a permission cache state even when the table is
+    actually absent from the schema. See follow-ups-plan1.md item 1.
+    """
+    # Step 1: pull the authoritative list of public-schema table names.
+    try:
+        view_resp = (
+            supabase.table("preflight_existing_tables")
+            .select("table_name")
+            .execute()
+        )
+        existing_tables = {
+            r.get("table_name") for r in (view_resp.data or [])
+        }
+    except Exception:
+        # View itself errored (e.g. permission denied). Treat as empty:
+        # every required table will be flagged with the migration-013
+        # fix message below.
+        existing_tables = set()
+
     results: list[CheckResult] = []
     for table in SCHEMA_TABLES:
+        in_information_schema = table in existing_tables
+
+        # Step 2: PostgREST connectivity check.
+        select_ok = False
+        select_error: str | None = None
         try:
             supabase.table(table).select("*").limit(1).execute()
+            select_ok = True
+        except Exception as exc:
+            select_error = str(exc)
+
+        if in_information_schema and select_ok:
             results.append(CheckResult(
                 name=f"schema:{table}",
                 passed=True,
-                detail=f"table {table!r} reachable",
+                detail=(
+                    f"table {table!r} present in information_schema "
+                    "and reachable"
+                ),
             ))
-        except Exception as exc:
+        elif not in_information_schema:
             results.append(CheckResult(
                 name=f"schema:{table}",
                 passed=False,
-                detail=f"table {table!r} unreachable: {exc}",
+                detail=(
+                    f"table {table!r} missing from information_schema.tables "
+                    f"(PostgREST cache may report it reachable; not "
+                    f"authoritative)"
+                ),
                 fix=(
-                    f"Apply migrations 001-006 to the Supabase project. "
-                    f"Missing table: {table}."
+                    f"Apply migration 013 (creates preflight_existing_tables "
+                    f"view). If 013 is applied and {table} is still missing, "
+                    f"apply migrations 001-006 to seed the schema."
+                ),
+            ))
+        else:
+            results.append(CheckResult(
+                name=f"schema:{table}",
+                passed=False,
+                detail=(
+                    f"table {table!r} present in information_schema but "
+                    f"PostgREST query failed: {select_error}"
+                ),
+                fix=(
+                    f"Table exists in the database but PostgREST cannot "
+                    f"read it. Check service-role grants and RLS policies "
+                    f"on {table}."
                 ),
             ))
     return results
