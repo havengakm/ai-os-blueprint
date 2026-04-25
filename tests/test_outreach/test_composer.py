@@ -1122,3 +1122,101 @@ async def test_niche_specific_term_renders_independently() -> None:
     assert "For  only." in result.body  # niche missing → empty string
     assert "niche" in result.fills_missing
     assert "niche_specific_term" not in result.fills_missing
+
+
+# --------------------------------------------------------------------------- #
+# Body template (Plan 1.5 Task 1.5.7) — variant-level outer-frame substitution #
+# --------------------------------------------------------------------------- #
+
+async def test_body_template_substitutes_inner_component_renders() -> None:
+    """When a body_template variant is in the pool, the composer renders each
+    inner body component first, then substitutes those renders into the
+    body_template's {{<component_type>_content}} placeholders. Replaces the
+    legacy modular concat path."""
+    variants = mk_variants_by_type(
+        icebreaker_content="ICE for {{first_name}}.",
+        bridge_content="BRIDGE line.",
+        pain_hook_content="PAIN line.",
+        credibility_content="CRED line.",
+        offer_frame_content="OFFER line.",
+        cta_content="CTA line.",
+        signature_content="SIG line.",
+    )
+    variants["body_template"] = [mk_variant(
+        component_type="body_template",
+        variant_key="v1_modular",
+        variant_content=(
+            "OPENER: {{icebreaker_content}} | "
+            "MIDDLE: {{bridge_content}} {{pain_hook_content}} "
+            "{{credibility_content}} {{offer_frame_content}} | "
+            "ASK: {{cta_content}} | "
+            "SIGN: {{signature_content}}"
+        ),
+    )]
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage, epsilon=0.0)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert result.body == (
+        "OPENER: ICE for Jane. | "
+        "MIDDLE: BRIDGE line. PAIN line. CRED line. OFFER line. | "
+        "ASK: CTA line. | "
+        "SIGN: SIG line."
+    )
+    # body_template selection captured.
+    assert result.component_selections.get("body_template") == "v1_modular"
+
+
+async def test_no_body_template_falls_back_to_modular_concat() -> None:
+    """When the body_template pool is absent (no variant of that type in the
+    storage map), the composer falls back to the legacy modular path:
+    inner components joined with `\\n\\n`. Regression check on the existing
+    behaviour."""
+    variants = mk_variants_by_type()
+    # Deliberately omit body_template.
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage, epsilon=0.0)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    # Modular path joins with two newlines between segments.
+    assert "\n\n" in result.body
+    # body_template was NOT selected.
+    assert "body_template" not in result.component_selections
+
+
+async def test_body_template_pool_explicitly_empty_falls_back_to_modular() -> None:
+    """body_template is OPTIONAL: an explicitly-empty pool must not raise
+    no_variants_for. Composer silently skips and uses the modular path."""
+    variants = mk_variants_by_type()
+    variants["body_template"] = []  # explicit empty pool
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage, epsilon=0.0)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "body_template" not in result.component_selections
+    assert "\n\n" in result.body  # modular separator
+
+
+async def test_body_template_unknown_inner_placeholder_lands_in_fills_missing() -> None:
+    """body_template can reference any placeholder. If it references one that
+    is neither an inner-component render nor a research fill, that name is
+    captured in fills_missing so the operator sees the gap."""
+    variants = mk_variants_by_type()
+    variants["body_template"] = [mk_variant(
+        component_type="body_template",
+        variant_key="v_with_typo",
+        variant_content="{{icebreaker_content}} and {{nonexistent_thing}}",
+    )]
+    storage = FakeStorage(variants_by_type=variants)
+    composer = mk_composer(storage, epsilon=0.0)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert "nonexistent_thing" in result.fills_missing

@@ -48,15 +48,17 @@ COMPONENT_TYPES_REQUIRED: tuple[str, ...] = (
     "credibility", "offer_frame", "cta", "signature",
 )
 #: Component types the composer will USE if variants are available,
-#: but will skip silently when the pool is empty. v3 has none —
-#: kept as an empty tuple so niches adopting the same productised
-#: library can still opt into optional slots later.
-COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ()
+#: but will skip silently when the pool is empty.
+#: - body_template (Plan 1.5 Task 1.5.7): outer-frame variant. When
+#:   selected, the composer renders inner body components first then
+#:   substitutes them into the template's placeholders. When the pool
+#:   is empty, the composer falls back to the legacy modular concat.
+COMPONENT_TYPES_OPTIONAL: tuple[str, ...] = ("body_template",)
 #: Union of required + optional, ordered for iteration. Exported for
 #: backward compatibility + symmetry with the pre-v2 surface.
 COMPONENT_TYPES_ORDERED: tuple[str, ...] = (
     "subject_line", "icebreaker", "bridge", "who_i_am", "pain_hook",
-    "credibility", "offer_frame", "cta", "signature",
+    "credibility", "offer_frame", "cta", "signature", "body_template",
 )
 #: Body rendering order — top-to-bottom as the prospect reads it.
 #: v3: bridge sits between icebreaker and who_i_am; pain_hook precedes
@@ -302,13 +304,35 @@ class Composer:
             selections["subject_line"].variant_content,
             contact, fills, fills_missing,
         )
-        body = _BODY_SEPARATOR.join(
-            self._render_template(
-                selections[ct].variant_content, contact, fills, fills_missing,
+        if "body_template" in selections:
+            # Body template path (Plan 1.5 Task 1.5.7). Render each inner
+            # body component first using research fills, then substitute the
+            # rendered text into the body_template's placeholders. Enables
+            # template-level bandit A/B (modular vs storytelling) without
+            # rewriting the inner components.
+            inner_renders: dict[str, str] = {
+                f"{ct}_content": self._render_template(
+                    selections[ct].variant_content,
+                    contact, fills, fills_missing,
+                )
+                for ct in _BODY_COMPONENTS
+                if ct in selections
+            }
+            body = self._render_template(
+                selections["body_template"].variant_content,
+                contact, fills, fills_missing, extras=inner_renders,
             )
-            for ct in _BODY_COMPONENTS
-            if ct in selections  # optional types (pain_hook) drop out cleanly
-        )
+        else:
+            # Modular fallback: legacy behaviour preserved. Inner body
+            # components are concatenated with the body separator.
+            body = _BODY_SEPARATOR.join(
+                self._render_template(
+                    selections[ct].variant_content,
+                    contact, fills, fills_missing,
+                )
+                for ct in _BODY_COMPONENTS
+                if ct in selections  # optional types (pain_hook) drop out cleanly
+            )
         fills_missing = _dedup_preserve_order(fills_missing)
 
         component_selections = {t: v.variant_key for t, v in selections.items()}
@@ -389,17 +413,31 @@ class Composer:
         contact: dict[str, Any],
         fills: ResearchFills,
         fills_missing: list[str],
+        extras: dict[str, str] | None = None,
     ) -> str:
         """Replace ``{{placeholder}}`` tokens. Unknown/empty placeholders
-        render as empty string AND append the name to ``fills_missing``."""
+        render as empty string AND append the name to ``fills_missing``.
+
+        ``extras`` (Plan 1.5 Task 1.5.7) is an optional dict that takes
+        precedence over the standard resolution chain. Used by the
+        body_template path to substitute pre-rendered inner-component
+        text (``icebreaker_content``, ``bridge_content``, etc.) into the
+        outer body_template variant's placeholders.
+        """
         research_data = contact.get("research_data") or {}
         ad_activity_value = _render_ad_activity_observation(
             research_data.get("ad_activity") if isinstance(research_data, dict) else None,
         )
         first_name_value = _coalesce_first_name(contact.get("first_name"))
         company_value = _stringify(contact.get("company"))
+        extras = extras or {}
 
         def resolve(name: str) -> str:
+            # Extras (body_template inner renders) take precedence so the
+            # outer template can refer to inner-component text by the same
+            # placeholder name as the corresponding research fill.
+            if name in extras:
+                return extras[name]
             if name == "first_name":
                 return first_name_value
             if name == "company":
