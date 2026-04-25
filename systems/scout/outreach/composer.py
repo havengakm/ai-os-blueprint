@@ -325,13 +325,20 @@ class Composer:
         else:
             # Modular fallback: legacy behaviour preserved. Inner body
             # components are concatenated with the body separator.
-            body = _BODY_SEPARATOR.join(
+            #
+            # Drop empty / whitespace-only renders so an unfilled component
+            # (e.g. v1_passthrough icebreaker without enrichment-generated
+            # content) doesn't leave a leading blank-line stub in the body.
+            rendered_sections = [
                 self._render_template(
                     selections[ct].variant_content,
                     contact, fills, fills_missing,
                 )
                 for ct in _BODY_COMPONENTS
                 if ct in selections  # optional types (pain_hook) drop out cleanly
+            ]
+            body = _BODY_SEPARATOR.join(
+                section for section in rendered_sections if section.strip()
             )
         fills_missing = _dedup_preserve_order(fills_missing)
 

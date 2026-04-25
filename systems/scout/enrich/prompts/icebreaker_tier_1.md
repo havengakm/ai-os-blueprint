@@ -84,12 +84,12 @@ Strict JSON, no prose, no code fences:
 
 {{"icebreaker": "<multi-line content>"}}
 
-Preferred: 2 sentences, total 20-60 words. If the source material only gives ONE verifiable fact, 1 sentence is acceptable — DO NOT fabricate a second fact to pad length. The second sentence (when present) is a warm HUMAN reaction to the first, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). Em dash is allowed as an internal joiner.
+Preferred: 2 sentences, total 20-60 words. If the source material only gives ONE verifiable fact, 1 sentence is acceptable — DO NOT fabricate a second fact to pad length. The second sentence (when present) is a warm HUMAN reaction to the first, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). DO NOT use em dashes (—). Use a comma, period, or "and"/"but" to join clauses.
 
 (The format spec still announces 2-3 sentences / 40-70 words as the historical target; the looser bound above takes precedence when only one fact is available.)
 
 Example (Tier 1 style — use the shape, not the words):
 
-{{"icebreaker": "Ngl your post last week on the Salesforce demo thing said out loud what I think everyone in this space is feeling. The whole thing about tools that were meant to help the team just getting in their way — that one stuck."}}
+{{"icebreaker": "Ngl your post last week on the Salesforce demo thing said out loud what I think everyone in this space is feeling. The whole thing about tools that were meant to help the team just getting in their way, that one stuck."}}
 
 If nothing in the post text above gives you a verbatim topic to reference, return {{"icebreaker": ""}} instead.

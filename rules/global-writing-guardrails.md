@@ -91,7 +91,7 @@ If yes to any, rewrite.
 
 For cold outreach:
 
-- Under 75 words
+- Aim for ~75 words. Short and punchy is the goal. Going over is acceptable when the body needs the room (rich icebreaker, multi-component template). If you're past ~150 words, trim.
 - One clear idea
 - One clear ask
 - No long setup

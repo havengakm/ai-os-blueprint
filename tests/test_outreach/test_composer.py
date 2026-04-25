@@ -758,6 +758,47 @@ async def test_body_assembly_order_and_separator() -> None:
     )
 
 
+async def test_empty_rendered_components_skipped_from_body() -> None:
+    """When an inner component renders to empty string (e.g. v1_passthrough
+    icebreaker with no enrichment-generated icebreaker_content available),
+    the composer must drop it from the body join — otherwise the rendered
+    body opens with leading blank lines.
+
+    Regression: 2026-04-25 Inkblot draft rendered with three blank lines at
+    the top because v1_passthrough icebreaker produced empty for a contact
+    whose IcebreakerAdapter returned no_source_material. The body was
+    joined as ``"" + "\\n\\n" + bridge + "\\n\\n" + ...``, leaving leading
+    whitespace before the bridge.
+    """
+    storage = FakeStorage(variants_by_type=mk_variants_by_type(
+        icebreaker_content="",  # passthrough with no source -> empty render
+        bridge_content="BRIDGE",
+        pain_hook_content="PAIN",
+        who_i_am_content="WHOIAM",
+        credibility_content="CRED",
+        offer_frame_content="OFFER",
+        cta_content="CTA",
+        signature_content="SIG",
+    ))
+    composer = mk_composer(storage)
+
+    result = await composer.compose("client-1", mk_contact())
+
+    assert isinstance(result, ComposedDraft)
+    assert not result.body.startswith("\n"), (
+        f"body leads with newline (empty icebreaker not skipped): "
+        f"{result.body[:80]!r}"
+    )
+    assert "\n\n\n" not in result.body, (
+        f"body has triple newlines (empty component left a blank section): "
+        f"{result.body!r}"
+    )
+    # Expected join: bridge -> who_i_am -> pain -> cred -> offer -> cta -> sig
+    assert result.body == (
+        "BRIDGE\n\nWHOIAM\n\nPAIN\n\nCRED\n\nOFFER\n\nCTA\n\nSIG"
+    )
+
+
 async def test_bridge_required_skip_when_pool_empty() -> None:
     """Regression guard: v3 promotes bridge to REQUIRED. A missing
     pool must raise ComposerSkip, not silently drop the slot."""

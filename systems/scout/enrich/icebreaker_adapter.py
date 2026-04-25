@@ -124,9 +124,12 @@ _BANNED_DIAGNOSTIC_PHRASES: tuple[str, ...] = (
 # diagnostic phrases without touching regex.
 
 # Separate from the word regex: these are characters / substrings, not
-# whole words. Checked with plain substring search. Em dash is intentionally
-# ALLOWED in v2 — the revised prompt format joins clauses with " — ".
-_BANNED_CHARS: tuple[str, ...] = ()
+# whole words. Checked with plain substring search. Em dash is BANNED per
+# rules/global-writing-guardrails.md section 2 (operator decision 2026-04-25
+# after PR Worx live draft rendered with "South African PR — that's").
+# v2 prompts previously allowed em dash as a clause joiner; that exemption
+# is removed and the prompts now instruct Claude to use commas / periods.
+_BANNED_CHARS: tuple[str, ...] = ("—",)  # em dash
 _BANNED_URL_FRAGMENTS = ("http", "calendly", ".com/")
 
 _ANTI_STALKER_RE = re.compile(

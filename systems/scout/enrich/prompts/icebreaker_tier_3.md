@@ -86,12 +86,12 @@ Strict JSON, no prose, no code fences:
 
 {{"icebreaker": "<multi-line content>"}}
 
-Preferred: 2 sentences, total 20-60 words. If the signal_summary only gives ONE verifiable fact, 1 sentence is acceptable — DO NOT fabricate a second fact (a fake implication, a made-up executive quote) to pad length. The second sentence (when present) is a warm HUMAN reaction to the event, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). Em dash is allowed as an internal joiner.
+Preferred: 2 sentences, total 20-60 words. If the signal_summary only gives ONE verifiable fact, 1 sentence is acceptable — DO NOT fabricate a second fact (a fake implication, a made-up executive quote) to pad length. The second sentence (when present) is a warm HUMAN reaction to the event, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). DO NOT use em dashes (—). Use a comma, period, or "and"/"but" to join clauses.
 
 (The format spec still announces 2-3 sentences / 40-70 words as the historical target; the looser bound above takes precedence when only one fact is available.)
 
 Example (Tier 3 style — use the shape, not the words):
 
-{{"icebreaker": "Saw the MiBlok win — genuinely one of the more interesting rollouts I've seen named this quarter. That's a big one."}}
+{{"icebreaker": "Saw the MiBlok win. Genuinely one of the more interesting rollouts I've seen named this quarter. That's a big one."}}
 
 If the signal_type is hiring, generic expansion, or anything other than major_contract_win / new_leadership / funding_round, return {{"icebreaker": ""}} instead.
