@@ -594,8 +594,17 @@ async def run(
     client = _ensure_anthropic_client()
     rows: list[dict[str, str]] = []
     attempted = 0
-    consecutive_failures = 0
-    max_consecutive_failures = 5
+    # Plan 1.5 scraper Fix 5: count drops at every gate so the operator
+    # can see WHERE the scrape lost candidates, not just how many returned.
+    drops: dict[str, int] = {
+        "no_website": 0,
+        "url_normalise": 0,
+        "site_unreachable": 0,
+        "haiku_failed": 0,
+        "category_mismatch": 0,
+        "no_domain_after": 0,
+        "missing_fields": 0,
+    }
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -627,6 +636,7 @@ async def run(
                     mindbody_url=studio["mindbody_url"],
                 )
                 if not website_url:
+                    drops["no_website"] += 1
                     logger.info(
                         "skipped %s — no external website link on Mindbody profile",
                         studio["name"],
@@ -634,6 +644,7 @@ async def run(
                     continue
                 domain = normalise_domain(website_url)
                 if not domain:
+                    drops["url_normalise"] += 1
                     logger.info(
                         "skipped %s — website URL didn't normalise: %r",
                         studio["name"], website_url,
@@ -647,6 +658,7 @@ async def run(
                     user_agent=USER_AGENT,
                 )
                 if not website_text.strip():
+                    drops["site_unreachable"] += 1
                     logger.info(
                         "skipped %s — studio site empty/unreachable (%s)",
                         studio["name"], domain,
@@ -654,6 +666,9 @@ async def run(
                     continue
 
                 # --- Step 3: Haiku extraction (no web_search) ---
+                # Plan 1.5 scraper Fix 4: dropped the 5-consecutive-failure
+                # kill switch. Single Haiku failures are logged + skipped;
+                # the loop never aborts the whole batch on transient errors.
                 try:
                     extraction = extract_owner_with_haiku(
                         client=client,
@@ -663,23 +678,17 @@ async def run(
                         country=country,
                         known_domain=domain,
                     )
-                    consecutive_failures = 0
                 except Exception as e:
-                    consecutive_failures += 1
+                    drops["haiku_failed"] += 1
                     logger.warning(
-                        "haiku call failed (%d consecutive) studio=%s err=%s",
-                        consecutive_failures, studio["name"], e,
+                        "haiku call failed studio=%s err=%s — skipping",
+                        studio["name"], e,
                     )
-                    if consecutive_failures >= max_consecutive_failures:
-                        logger.error(
-                            "bailing after %d consecutive Haiku failures",
-                            max_consecutive_failures,
-                        )
-                        break
                     time.sleep(CLAUDE_GAP_SECONDS)
                     continue
 
                 if not extraction.is_match:
+                    drops["category_mismatch"] += 1
                     logger.info(
                         "skipped %s — doesn't match category filter (%s)",
                         studio["name"], extraction.category_reasoning or "(no reason)",
@@ -705,6 +714,7 @@ async def run(
                     niche=niche,
                 )
                 if row is None:
+                    drops["no_domain_after"] += 1
                     logger.info(
                         "skipped %s — no usable domain after extraction",
                         studio["name"],
@@ -714,6 +724,7 @@ async def run(
 
                 missing = validate_row(row)
                 if missing:
+                    drops["missing_fields"] += 1
                     logger.info(
                         "skipped %s — missing required fields: %s",
                         studio["name"], missing,
@@ -729,6 +740,13 @@ async def run(
         finally:
             await browser.close()
 
+    # Plan 1.5 scraper Fix 5: drop summary so operator sees WHERE the loss
+    # happened, not just the final return count.
+    logger.info(
+        "scrape complete: attempted=%d returned=%d drops=%s",
+        attempted, len(rows),
+        ", ".join(f"{k}={v}" for k, v in drops.items() if v > 0) or "(none)",
+    )
     write_csv(rows, output)
     exit_code = 0 if len(rows) >= limit else (0 if rows else 2)
     logger.info(
