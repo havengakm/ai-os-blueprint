@@ -46,6 +46,10 @@ import yaml
 VALID_COMPONENT_TYPES: frozenset[str] = frozenset({
     "subject_line", "icebreaker", "who_i_am", "credibility", "bridge",
     "pain_hook", "offer_frame", "cta", "signature",
+    # v4 (Plan 1.5 Task 1.5.6): body_template is the outer-frame component
+    # type. Composer substitutes inner-component renders into its
+    # placeholders. See scripts/sql/014_body_template_component_type.sql.
+    "body_template",
 })
 
 VALID_STATUSES: frozenset[str] = frozenset({

@@ -612,3 +612,30 @@ async def test_sync_accepts_new_v2_component_types(
     assert summary.errors == []
     _, variants = backend.insert_calls[0]
     assert variants[0].component_type == component_type
+
+
+# --------------------------------------------------------------------------- #
+# 14. v4 component type — body_template accepted                                #
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.asyncio
+async def test_sync_accepts_body_template_component_type(tmp_path: Path) -> None:
+    """Plan 1.5 Task 1.5.6: v4 adds body_template as the outer-frame
+    component type. The composer substitutes inner-component renders into
+    its placeholders. YAML validator must accept it as first-class."""
+    _write_variant(
+        tmp_path,
+        component_type="body_template",
+        variant_key="v1_modular",
+        content="{{icebreaker_content}} {{bridge_content}} {{cta_content}}",
+    )
+
+    backend = FakeBackend()
+    store = ComponentStore(backend=backend, sequences_root=tmp_path)
+    summary = await store.sync(client_id="c1")
+
+    assert summary.loaded == 1
+    assert summary.inserted == 1
+    assert summary.errors == []
+    _, variants = backend.insert_calls[0]
+    assert variants[0].component_type == "body_template"
