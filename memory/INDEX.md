@@ -6,6 +6,10 @@ Scannable summary of what's active and what's pending. Update when a significant
 
 | Date | Decision | Rationale | Status |
 |---|---|---|---|
+| 2026-04-25 | Plan 1.5 Phase A complete (Tasks 1.5.1 - 1.5.4) | Four follow-ups-plan1.md rough edges fixed: preflight info_schema cross-check, seed scripts auto-load .env, test suite isolation from .env, cron_secret optional default. Test suite 925 → 927 passing. 7 pre-existing .env-leakage failures resolved. | Active |
+| 2026-04-25 | Plan 1.5 plan doc formalised | 12 numbered tasks across Phases A-E; body template = new `body_template` component type at variant level; fitness_wellness acceptance = 1 rendered draft end-to-end. See `docs/superpowers/plans/2026-04-25-plan-1.5-cost-and-acceptance.md`. | Active |
+| 2026-04-25 | Phase 0 merged to main | Both `fix/cost-discipline-haiku-waterfall` (24 commits) and `chore/folder-cleanup-pre-plan15` (2 commits) merged via separate `--no-ff` commits (`4ed108d`, `b1c060f`). Plan 1.5 remaining work on `feat/plan-1.5-completion`. | Active |
+| 2026-04-25 | Memory-maintenance gap closed | Three layers: CLAUDE.md Session end rule + .claude/settings.json Stop hook + memory/sessions/_TEMPLATE.md. Triggered by 3-day session-log gap (Apr 22 → Apr 25). | Active |
 | 2026-04-25 | Trigify skills relocated to `skills/playbooks/` | Multi-step orchestrations with code + human-in-the-loop fit the playbook tier; legacy `skills/onboarding/` and `skills/operations/` superseded | Active |
 | 2026-04-25 | Legacy skill folders removed (`onboarding/`, `authoring/`, `analysis/`) | All were README-only stubs from before the three-tier model; deleted to avoid drift | Active |
 | 2026-04-25 | Stale `os/` references replaced with `aios/` across 9 docs | Directory was renamed during Plan 1 (item 63 in follow-ups) but docs lagged | Active |
@@ -36,7 +40,7 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 | Dev-time `.claude/skills/audit-new-skill.md` | Pending | Helper that validates frontmatter + guardrail references on new skills | Claude |
 | Client deployment provisioning script | Pending | Needed when the first client AIOS is spun up; bootstraps empty `context/` + `data/knowledge/personal/` + `company/`, copies `experts/` as baseline | Claude |
 | Plan 2 (Beacon send scheduler) | Not started | Blocks autonomous send. Evaluate Instantly-as-vendor first per `feedback_cold_email_stack_reference` | Kirsten |
-| Plan 1.5 (cost discipline + LinkedIn outbound) | In progress | On `fix/cost-discipline-haiku-waterfall` branch; 14 commits ahead of main | Kirsten |
+| Plan 1.5 (cost + acceptance + body template) | In progress | Phase 0 merged to main; Phase A shipped on `feat/plan-1.5-completion`; Phases B-E remaining | Kirsten + Claude |
 | Populate 14 remaining capability categories | Ongoing | Write atomic skills as systems need them, not pre-emptively | Claude + Kirsten |
 | Merge order: cleanup branch + cost-discipline | Pending | Decide whether to merge cleanup into cost-discipline first, or both into main separately | Kirsten |
 | Archive `00_ARCHIVE/base-camp-agents/` more aggressively | Pending | 2 valuable docs ported (icebreaker, Saraev templates); some niche files (functional-medicine, email-template-variations) may still be worth pulling if a relevant deployment spawns | Kirsten |
@@ -55,7 +59,7 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 ## Active Plans
 
 - Plan 1 (Foundation + Scout migration): COMPLETE. Branch `plan1-foundation-scout` merged into main 2026-04-23, branch deleted 2026-04-25.
-- Plan 1.5 (cost discipline + LinkedIn outbound): in progress on `fix/cost-discipline-haiku-waterfall`.
+- Plan 1.5 (cost discipline + acceptance + body template): in progress. Phase 0 (cost discipline + folder cleanup) merged to main. Phase A (rough edges) shipped on `feat/plan-1.5-completion`. Phases B/C/D/E remaining. See `docs/superpowers/plans/2026-04-25-plan-1.5-cost-and-acceptance.md`.
 - Plan 2 (Beacon): not started.
 - Plan 7 (Optimizer): not started.
 
