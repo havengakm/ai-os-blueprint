@@ -1,6 +1,29 @@
 """Scrape Mindbody fitness-studio directory → pre-resolved contacts CSV.
 
-Two-stage pipeline:
+⚠ PARKED 2026-04-25. Currently writes 0 rows on every run.
+
+Mindbody studio profile pages do not contain external website links at
+all (operator-confirmed by manual inspection 2026-04-25). The
+`extract_mindbody_profile_website` step was architecturally wrong from
+day one and drops 100% of discovered studios at the no_website gate.
+
+Discovery (the directory listing → studio names + Mindbody profile URLs)
+still works fine — that half is salvageable.
+
+Resumption architecture (when an agency-client deployment needs gym
+sourcing): split into three independent stages. Mindbody becomes
+discovery-only (name + city + Mindbody profile URL); a new
+`scripts/_website_resolver.py` does Google Search knowledge-panel
+lookups per `(name, city)` to add the website column; the existing
+fetch-website-about-text + Haiku owner extract pipeline runs unchanged
+on the resolved CSV. See `memory/INDEX.md` Open Loops for full notes.
+
+Reason for parking: gyms are not Clymb's ICP (operator decision
+2026-04-25). The capability is reusable for future agency clients
+(e.g. Loud Rumor) but should not block Clymb's own pipeline shipment.
+Plan 1.5 acceptance pivots to creative_branding (the approved niche).
+
+Two-stage pipeline (current, broken):
 
 1. Playwright-scrape the Mindbody `/explore/fitness/studios-{city}` directory
    to collect studio name + Mindbody profile URL for a given city.

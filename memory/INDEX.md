@@ -6,6 +6,7 @@ Scannable summary of what's active and what's pending. Update when a significant
 
 | Date | Decision | Rationale | Status |
 |---|---|---|---|
+| 2026-04-25 | Plan 1.5 acceptance pivots to creative_branding; fitness_wellness niche parked | Operator confirmed gyms aren't Clymb's ICP — fitness_wellness was a temporary test niche. Mindbody + Google Maps scrapers parked broken (each writes 0 rows; root causes documented in file headers). Capability is reusable IP for future agency-client deployments (Loud Rumor etc). Task 1.5.10 onwards runs against creative_branding (approved variants). See `feedback_target_market_not_gyms` harness memory + Open Loops. | Active |
 | 2026-04-25 | Plan 1.5 Phase A complete (Tasks 1.5.1 - 1.5.4) | Four follow-ups-plan1.md rough edges fixed: preflight info_schema cross-check, seed scripts auto-load .env, test suite isolation from .env, cron_secret optional default. Test suite 925 → 927 passing. 7 pre-existing .env-leakage failures resolved. | Active |
 | 2026-04-25 | Plan 1.5 plan doc formalised | 12 numbered tasks across Phases A-E; body template = new `body_template` component type at variant level; fitness_wellness acceptance = 1 rendered draft end-to-end. See `docs/superpowers/plans/2026-04-25-plan-1.5-cost-and-acceptance.md`. | Active |
 | 2026-04-25 | Phase 0 merged to main | Both `fix/cost-discipline-haiku-waterfall` (24 commits) and `chore/folder-cleanup-pre-plan15` (2 commits) merged via separate `--no-ff` commits (`4ed108d`, `b1c060f`). Plan 1.5 remaining work on `feat/plan-1.5-completion`. | Active |
@@ -45,6 +46,7 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 | Merge order: cleanup branch + cost-discipline | Pending | Decide whether to merge cleanup into cost-discipline first, or both into main separately | Kirsten |
 | Archive `00_ARCHIVE/base-camp-agents/` more aggressively | Pending | 2 valuable docs ported (icebreaker, Saraev templates); some niche files (functional-medicine, email-template-variations) may still be worth pulling if a relevant deployment spawns | Kirsten |
 | Reconcile new harness memories with project state | Pending | LinkedIn analysis learnings + v2 storytelling body template + Plan 1.5 cost optimizations all add open loops not yet captured here | Claude |
+| Mindbody + Google Maps scraper rewrite (parked) | Parked | Both scrapers write 0 rows; discovery half works, website-extraction half is broken-by-design (Mindbody profiles have no website links; Google Maps list cards don't expose them either). Three-stage architecture for resumption: (1) keep discovery — Mindbody/Google Maps output `(name, address, city)` only; (2) build new shared `scripts/_website_resolver.py` that does Google Search knowledge-panel lookups per `(name, city)`; (3) existing enrichment runs unchanged on resolved CSVs. Revive when an agency-client deployment (e.g. Loud Rumor) is being spun up. File header docstrings carry resumption notes. | Kirsten |
 
 ### Plan 1.5 specific (from new harness memories)
 

@@ -1,6 +1,29 @@
 """Scrape Google Maps for a brand/category across a list of postal codes.
 
-Two-stage pipeline (mirrors scrape_mindbody.py):
+⚠ PARKED 2026-04-25. Currently writes 0 rows on every run.
+
+The list-card website extractor (`a[aria-label^="Website"]` selector)
+hits zero on every modern Google Maps result card. The website link is
+either absent from list cards entirely or behind a different selector;
+without DOM inspection we can't tell which. Either way: 100% drop at
+the no_website gate.
+
+Discovery (list of `(name, address, gmaps_url)` per ZIP) still works —
+that half is salvageable.
+
+Resumption architecture (when an agency-client deployment needs local-
+business sourcing): split into three independent stages. Google Maps
+becomes discovery-only; a new `scripts/_website_resolver.py` does
+Google Search knowledge-panel lookups per `(name, city)` to add the
+website column (per the operator's screenshot 2026-04-25 confirming the
+knowledge panel reliably surfaces a Website button); the existing
+enrichment pipeline runs unchanged. See `memory/INDEX.md` Open Loops.
+
+Reason for parking: gyms / local-business sourcing isn't Clymb's ICP
+(operator decision 2026-04-25). The capability is reusable for future
+agency-client deployments. Plan 1.5 acceptance pivots to creative_branding.
+
+Two-stage pipeline (current, broken):
 
 1. Playwright visits `google.com/maps/search/{query}+near+{zip}` for each
    postal code. Extracts each visible result card's name / address / website
