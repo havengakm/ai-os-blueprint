@@ -6,6 +6,8 @@ Scannable summary of what's active and what's pending. Update when a significant
 
 | Date | Decision | Rationale | Status |
 |---|---|---|---|
+| 2026-04-26 | Roadmap alignment check: Plan 2/3/4 scope revised; Cost Optimiser added as continuous concern | Operator + Claude reviewed the broader AIOS pipeline. Five clarifications: (1) voice agent demoted from rejected to backlog (low-ticket booking only, never high-ticket closing); (2) Plan 2 starts with Instantly-vs-Smartlead ESP eval (Smartlead leans because of better API + warming domains); (3) LinkedIn promoted from Plan 3 to Plan 2 as a modular per-client component; (4) Reply classification + Optimizer-pulled-forward + Productisation script added to active roadmap; (5) Cost Optimiser scope added to Plan 2 (signal-gated DR + per-contact cost rollup + 5c hard ceiling), Plan 4 (weekly cost + adapter ROI + vendor swap recs), Foundation (operator dashboard) — closes the gap from today's $0.01-0.03/contact toward the $0.002 target. Captured in 4 new harness memories. | Active |
+| 2026-04-25 | Plan 1.5 Path B: em-dash banned + composer skips empty components + 75-word rule relaxed to target | After Task 1.5.10 inspection of yesterday's drafts surfaced three quality issues, operator picked Path B (fix everything before merge). TDD discipline applied: composer empty-component skip + IcebreakerAdapter `_BANNED_CHARS = ("—",)` + 4 prompt files updated + ~10 test fixtures swept. 75-word rule relaxed: aim for ~75 words, going over OK when content is load-bearing, ~150+ is a smell. Re-rendered both creative_branding contacts end-to-end, both produce clean validator-passing drafts at 1c/each (no retries). Commits `cebd2e8` (parking) + `e1e2dd0` (Path B). Tasks 1.5.10 + 1.5.11 acceptance: PASS. | Active |
 | 2026-04-25 | Plan 1.5 acceptance pivots to creative_branding; fitness_wellness niche parked | Operator confirmed gyms aren't Clymb's ICP — fitness_wellness was a temporary test niche. Mindbody + Google Maps scrapers parked broken (each writes 0 rows; root causes documented in file headers). Capability is reusable IP for future agency-client deployments (Loud Rumor etc). Task 1.5.10 onwards runs against creative_branding (approved variants). See `feedback_target_market_not_gyms` harness memory + Open Loops. | Active |
 | 2026-04-25 | Plan 1.5 Phase A complete (Tasks 1.5.1 - 1.5.4) | Four follow-ups-plan1.md rough edges fixed: preflight info_schema cross-check, seed scripts auto-load .env, test suite isolation from .env, cron_secret optional default. Test suite 925 → 927 passing. 7 pre-existing .env-leakage failures resolved. | Active |
 | 2026-04-25 | Plan 1.5 plan doc formalised | 12 numbered tasks across Phases A-E; body template = new `body_template` component type at variant level; fitness_wellness acceptance = 1 rendered draft end-to-end. See `docs/superpowers/plans/2026-04-25-plan-1.5-cost-and-acceptance.md`. | Active |
@@ -40,7 +42,8 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 | First populated playbook | In progress | Two playbooks now populated (Trigify monitors + discovery); next candidates are `launch-new-niche.md` and `onboard-new-client.md` | Claude |
 | Dev-time `.claude/skills/audit-new-skill.md` | Pending | Helper that validates frontmatter + guardrail references on new skills | Claude |
 | Client deployment provisioning script | Pending | Needed when the first client AIOS is spun up; bootstraps empty `context/` + `data/knowledge/personal/` + `company/`, copies `experts/` as baseline | Claude |
-| Plan 2 (Beacon send scheduler) | Not started | Blocks autonomous send. Evaluate Instantly-as-vendor first per `feedback_cold_email_stack_reference` | Kirsten |
+| Plan 2 (revised — Beacon + Reply + LinkedIn module + ESP eval + Productisation + signal-gated DR + per-contact cost rollup + 5c ceiling) | Not started | Starts with Instantly-vs-Smartlead eval; LinkedIn modular per-client; signal-gated DR + per-contact cost rollup + 5c hard ceiling close the gap toward $0.002/contact target. Per `feedback_esp_evaluation_pending`, `feedback_linkedin_modular_plan2`, `feedback_cost_optimiser_continuous_concern` | Kirsten + Claude |
+| Plan 4 (Optimizer pulled forward from Plan 7 — cost-aware) | Not started | Weekly cost-per-lead/reply/meeting + adapter ROI + vendor-swap recs gated by quality-parity evidence; closes the learning feedback loop. Per `feedback_cost_optimiser_continuous_concern` | Kirsten + Claude |
 | Plan 1.5 (cost + acceptance + body template) | In progress | Phase 0 merged to main; Phase A shipped on `feat/plan-1.5-completion`; Phases B-E remaining | Kirsten + Claude |
 | Populate 14 remaining capability categories | Ongoing | Write atomic skills as systems need them, not pre-emptively | Claude + Kirsten |
 | Merge order: cleanup branch + cost-discipline | Pending | Decide whether to merge cleanup into cost-discipline first, or both into main separately | Kirsten |
@@ -61,15 +64,18 @@ Formal decision docs for higher-stakes items live in `docs/superpowers/decisions
 ## Active Plans
 
 - Plan 1 (Foundation + Scout migration): COMPLETE. Branch `plan1-foundation-scout` merged into main 2026-04-23, branch deleted 2026-04-25.
-- Plan 1.5 (cost discipline + acceptance + body template): in progress. Phase 0 (cost discipline + folder cleanup) merged to main. Phase A (rough edges) shipped on `feat/plan-1.5-completion`. Phases B/C/D/E remaining. See `docs/superpowers/plans/2026-04-25-plan-1.5-cost-and-acceptance.md`.
-- Plan 2 (Beacon): not started.
-- Plan 7 (Optimizer): not started.
+- Plan 1.5 (cost discipline + acceptance + body template + Path B): tasks 1.5.1-1.5.11 done; Task 1.5.12 (PR + merge + tag) in progress. PR pushed against main, awaiting operator review.
+- **Plan 2 (revised — Beacon + Reply + LinkedIn module + ESP eval + Productisation + signal-gated DR + per-contact cost rollup + 5c ceiling)**: not started. Per-decision rows above and harness memories `feedback_esp_evaluation_pending`, `feedback_linkedin_modular_plan2`, `feedback_cost_optimiser_continuous_concern`.
+- **Plan 3 (revised — Surround-sound: SMS + WhatsApp + voicemail-drop + letters + cross-channel state + 90d cool-off)**: not started. Voice booking agent stays in backlog per `feedback_voice_agent_backlog_not_rejected`.
+- **Plan 4 (Optimizer — pulled forward from old Plan 7)**: not started. Cost-aware: weekly cost-per-lead/reply/meeting + adapter ROI + vendor-swap recs gated by quality-parity evidence. Per `feedback_cost_optimiser_continuous_concern`.
+- ~~Plan 7 (Optimizer)~~: superseded — pulled forward to Plan 4.
 
 ## Frozen Items / Explicitly Rejected
 
 | Item | Rejected | Reason |
 |---|---|---|
-| AI voice agent | Yes | High-ticket calls stay human |
+| AI voice agent for high-ticket closing | Yes | High-ticket calls stay human (per `feedback_voice_agent_backlog_not_rejected`) |
+| AI voice booking agent (low-ticket / outbound) | Backlog | Demoted from rejected 2026-04-26; may be added later for warm-lead booking only, never closing |
 | Manus AI as research executor | Yes | Productisation + cost; Claude API replaces |
 | Clay as enrichment vendor | Yes | Cognism / Hunter only on escalation |
 | Telegram as client-facing UX | Yes | Operator-only; web app or Slack for clients |
