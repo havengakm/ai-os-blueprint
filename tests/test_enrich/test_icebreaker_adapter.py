@@ -167,7 +167,7 @@ async def test_tier_2_neutral_trigger(_env):
 
 async def test_tier_3_structural_signal(_env):
     """No triggers but structural_signals present → Tier 3."""
-    adapter, fake, _ = _adapter(_ib_json("Saw the Series B announcement land last week — that's a big one."))
+    adapter, fake, _ = _adapter(_ib_json("Saw the Series B announcement land last week. That's a big one."))
     merged = _merged(
         structural_signals=[
             {
@@ -677,8 +677,8 @@ async def test_v2_banned_words_trigger_retry(_env, banned_phrase: str):
     """New v2 bans from Kirsten: headcount, BD, business development,
     capacity, inbound, outrun, runway, growth metrics, gap, mood-board,
     craft. Each must fail validation on first attempt and retry."""
-    bad = _ib_json(f"Saw the Series B — {banned_phrase}.")
-    good = _ib_json("Saw the Series B announcement — that's a big one.")
+    bad = _ib_json(f"Saw the Series B. {banned_phrase}.")
+    good = _ib_json("Saw the Series B announcement, that's a big one.")
     adapter, fake, _ = _adapter([bad, good])
 
     merged = _merged(
@@ -716,8 +716,8 @@ async def test_v2_banned_words_trigger_retry(_env, banned_phrase: str):
 async def test_v2_diagnostic_phrases_trigger_retry(_env, diagnostic_phrase: str):
     """v2 voice-rule: NEVER write consultant-style diagnosis. The
     validator treats these substrings as a rule violation and retries."""
-    bad = _ib_json(f"Saw the Series B — {diagnostic_phrase}.")
-    good = _ib_json("Saw the Series B announcement — that's a big one.")
+    bad = _ib_json(f"Saw the Series B. {diagnostic_phrase}.")
+    good = _ib_json("Saw the Series B announcement, that's a big one.")
     adapter, fake, _ = _adapter([bad, good])
 
     merged = _merged(
@@ -739,16 +739,25 @@ async def test_v2_diagnostic_phrases_trigger_retry(_env, diagnostic_phrase: str)
 
 
 # --------------------------------------------------------------------------- #
-# 13. v2 em-dash is now ALLOWED (clause joiner per new prompt format)         #
+# 13. Em-dash is BANNED — global writing guardrail rule 2.1                   #
 # --------------------------------------------------------------------------- #
 
-async def test_v2_em_dash_passes_validation(_env):
-    """v1 prompts banned em-dash. v2 prompts REQUIRE it as the two-clause
-    joiner, so the validator must let em-dash through on the first pass."""
-    # Contains U+2014 — single shot, no retry.
-    adapter, fake, tracker = _adapter(_ib_json(
-        "Saw the Series B announcement — that's a big one."
-    ))
+async def test_em_dash_triggers_banned_char_retry(_env):
+    """Em-dash is banned per ``rules/global-writing-guardrails.md`` (no em
+    dashes). The validator must treat em-dash as a banned-character violation,
+    forcing one retry. If the retry returns a clean version (using a comma
+    or period instead), the call succeeds with cost = 2c.
+
+    Reverses the prior v2 behaviour where em-dash was allowed as a clause
+    joiner — operator decision 2026-04-25 after the PR Worx live draft
+    rendered with ``"South African PR — that's"``.
+    """
+    # Use a U+2014 EM DASH explicitly so this test isn't affected by future
+    # global string sweeps that remove em-dashes from other test fixtures.
+    em_dash = "—"
+    bad = _ib_json(f"Saw the Series B announcement {em_dash} that's a big one.")
+    good = _ib_json("Saw the Series B announcement, that's a big one.")
+    adapter, fake, tracker = _adapter([bad, good])
     merged = _merged(
         structural_signals=[
             {"category": "financial_growth", "type": "funding_round",
@@ -764,9 +773,39 @@ async def test_v2_em_dash_passes_validation(_env):
     )
 
     assert result.reason == "tier_3_generated"
-    assert "—" in result.icebreaker_content
-    assert len(fake.create_calls) == 1  # NO retry
-    assert tracker.spend_calls == [("c-A", "A", 1)]
+    assert em_dash not in result.icebreaker_content
+    assert len(fake.create_calls) == 2  # retry happened
+    assert tracker.spend_calls == [("c-A", "A", 2)]
+
+
+async def test_em_dash_retry_exhausted_when_both_attempts_use_em_dash(_env):
+    """When both attempts return an em-dash, the adapter records a
+    ``banned_word_retry_exhausted`` skip (cost 2c) and returns empty
+    icebreaker_content. The downstream composer's empty-component skip
+    drops the section cleanly so the prospect never sees a stub."""
+    # Explicit U+2014 codepoints to survive any future global sweep.
+    em_dash = "—"
+    bad_a = _ib_json(f"Saw the Series B {em_dash} that's a big one.")
+    bad_b = _ib_json(f"Saw the Series B announcement {em_dash} congrats.")
+    adapter, fake, tracker = _adapter([bad_a, bad_b])
+    merged = _merged(
+        structural_signals=[
+            {"category": "financial_growth", "type": "funding_round",
+             "evidence_url": "u", "summary": "Series B"},
+        ],
+    )
+
+    result = await adapter.generate(
+        contact=_CONTACT,
+        merged_research_data=merged,
+        client_id="c-A",
+        tier_budget="A",
+    )
+
+    assert result.reason == "banned_word_retry_exhausted"
+    assert result.icebreaker_content == ""
+    assert len(fake.create_calls) == 2
+    assert tracker.spend_calls == [("c-A", "A", 2)]
 
 
 # --------------------------------------------------------------------------- #
@@ -779,14 +818,14 @@ async def test_v2_em_dash_passes_validation(_env):
         {"trigger_events": [
             {"type": "behavioral_signal", "detail": "so tired of it all", "recency_days": 3},
         ]},
-        "Ngl your post last week — that feeling is genuine.",
+        "Ngl your post last week, that feeling is genuine.",
         1,
     ),
     (
         {"trigger_events": [
             {"type": "behavioral_signal", "detail": "good read on founder-led sales", "recency_days": 5},
         ]},
-        "Saw the podcast take last week — genuinely stuck with me.",
+        "Saw the podcast take last week. Genuinely stuck with me.",
         2,
     ),
     (
@@ -794,7 +833,7 @@ async def test_v2_em_dash_passes_validation(_env):
             {"category": "financial_growth", "type": "funding_round",
              "evidence_url": "u", "summary": "Series B"},
         ]},
-        "Saw the Series B announcement — that's a big one.",
+        "Saw the Series B announcement, that's a big one.",
         3,
     ),
     (
@@ -839,8 +878,8 @@ async def test_v2_prompts_contain_truth_gating_rule(_env, tier_setup):
 async def test_v3_lead_gen_ban_triggers_retry(_env):
     """v3 bans "lead gen" (prefer "growth systems"). First response uses the
     banned phrase → retry; second is clean → passes."""
-    bad = _ib_json("Saw the Series B — love seeing lead gen get its moment.")
-    good = _ib_json("Saw the Series B announcement — that's a big one.")
+    bad = _ib_json("Saw the Series B announcement land. Love seeing lead gen get its moment.")
+    good = _ib_json("Saw the Series B announcement, that's a big one.")
     adapter, fake, _ = _adapter([bad, good])
 
     merged = _merged(
@@ -924,8 +963,8 @@ async def test_v3_1_corporate_jargon_triggers_retry(_env, corporate_phrase: str)
     """Regression guard for the Jonathan/Inkblot + Madelain/PR Worx live
     drafts that leaked consultant-voice jargon past the v3 banned list.
     Every one of these phrases must fail validation on first attempt."""
-    bad = _ib_json(f"Saw the announcement — {corporate_phrase}.")
-    good = _ib_json("Saw the announcement land last week — that's a big one.")
+    bad = _ib_json(f"Saw the announcement. {corporate_phrase}.")
+    good = _ib_json("Saw the announcement land last week. That's a big one.")
     adapter, fake, _ = _adapter([bad, good])
 
     merged = _merged(
@@ -955,14 +994,14 @@ async def test_v3_1_corporate_jargon_triggers_retry(_env, corporate_phrase: str)
         {"trigger_events": [
             {"type": "behavioral_signal", "detail": "so tired of it all", "recency_days": 3},
         ]},
-        "Saw the rant — that one lands.",
+        "Saw the rant. That one lands.",
         1,
     ),
     (
         {"trigger_events": [
             {"type": "behavioral_signal", "detail": "good read on founder-led sales", "recency_days": 5},
         ]},
-        "Saw the podcast take — genuinely stuck with me.",
+        "Saw the podcast take. Genuinely stuck with me.",
         2,
     ),
     (
@@ -970,7 +1009,7 @@ async def test_v3_1_corporate_jargon_triggers_retry(_env, corporate_phrase: str)
             {"category": "financial_growth", "type": "funding_round",
              "evidence_url": "u", "summary": "Series B"},
         ]},
-        "Saw the Series B announcement — that's a big one.",
+        "Saw the Series B announcement, that's a big one.",
         3,
     ),
     (

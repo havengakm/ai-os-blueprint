@@ -62,9 +62,15 @@ def _full_seed(client_id: str = CLIENT_ID) -> dict[str, list[dict[str, Any]]]:
         }
         for i in range(MIN_CONTACTS_FOR_MEANINGFUL_RUN + 2)
     ]
+    # information_schema view (migration 013) — populated with every
+    # required table so the schema cross-check passes by default.
+    information_schema_rows = [
+        {"table_name": t} for t in SCHEMA_TABLES
+    ]
     return {
-        # Schema probe targets (empty is fine - SELECT on missing tables
-        # returns [], which the preflight considers reachable).
+        # Schema probe targets. SELECT on missing tables returns [] in the
+        # fake, but check_schema also cross-checks against the
+        # preflight_existing_tables view below.
         "clients": [{"id": client_id, "status": "active"}],
         "client_config": [{"client_id": client_id}],
         "contacts": contact_rows,
@@ -75,6 +81,7 @@ def _full_seed(client_id: str = CLIENT_ID) -> dict[str, list[dict[str, Any]]]:
         "knowledge_base": [{"id": "kb1"}],
         "autonomy_rules": autonomy_rows,
         "component_variants": component_rows,
+        "preflight_existing_tables": information_schema_rows,
     }
 
 
@@ -109,8 +116,62 @@ def test_check_schema_all_tables_reachable_when_seeded() -> None:
 def test_check_schema_empty_tables_still_reachable() -> None:
     # A table with no rows still counts as "reachable" - SELECT returns [].
     sb = FakeSupabaseClient(tables={t: [] for t in SCHEMA_TABLES})
+    # Seed the information_schema view with all tables so check_schema cross-
+    # check passes too (this test is about empty tables, not missing schema).
+    sb._tables["preflight_existing_tables"] = [
+        {"table_name": t} for t in SCHEMA_TABLES
+    ]
     results = check_schema(sb)
     assert all(r.passed for r in results)
+
+
+def test_check_schema_detects_postgrest_false_positive() -> None:
+    """check_schema must cross-check against information_schema, not just rely
+    on PostgREST returning 200. Reproduces follow-up item 1: PostgREST permission
+    cache reports tables reachable when information_schema disagrees."""
+    seed = _full_seed()
+    # PostgREST sees all tables as reachable (every required table is in seed),
+    # but information_schema reports business_context + autonomy_rules MISSING.
+    seed["preflight_existing_tables"] = [
+        {"table_name": t} for t in SCHEMA_TABLES
+        if t not in ("business_context", "autonomy_rules")
+    ]
+    sb = FakeSupabaseClient(tables=seed)
+    results = check_schema(sb)
+    by_name = {r.name: r for r in results}
+
+    # Both must be flagged as failing despite SELECT working.
+    assert not by_name["schema:business_context"].passed
+    assert "information_schema" in by_name["schema:business_context"].detail.lower()
+    assert not by_name["schema:autonomy_rules"].passed
+    assert "information_schema" in by_name["schema:autonomy_rules"].detail.lower()
+
+    # Tables in both PostgREST and information_schema should pass.
+    for t in SCHEMA_TABLES:
+        if t in ("business_context", "autonomy_rules"):
+            continue
+        assert by_name[f"schema:{t}"].passed, (
+            f"{t} should pass: present in both PostgREST and information_schema"
+        )
+
+
+def test_check_schema_fix_message_points_at_migration_when_view_missing() -> None:
+    """If the preflight_existing_tables view query returns nothing for ALL
+    required tables, the fix message should suggest applying migration 013."""
+    seed = _full_seed()
+    # View returns empty: every required table appears MISSING from
+    # information_schema.
+    seed["preflight_existing_tables"] = []
+    sb = FakeSupabaseClient(tables=seed)
+    results = check_schema(sb)
+
+    # Every check fails because nothing is in information_schema.
+    assert all(not r.passed for r in results)
+    # At least one fix mentions the migration that creates the view.
+    assert any(
+        "013" in (r.fix or "") or "preflight_existing_tables" in (r.fix or "")
+        for r in results
+    )
 
 
 # ── check_client_exists ──────────────────────────────────────────────────────

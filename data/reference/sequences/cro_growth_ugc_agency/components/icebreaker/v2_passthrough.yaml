@@ -1,0 +1,23 @@
+---
+variant_key: "v2_passthrough"
+component_type: "icebreaker"
+niche: "cro_growth_ugc_agency"
+offer_label: "pipeline_audit"
+variant_content: |
+  {{icebreaker_content}}
+status: "approved"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Generic non-ad-activity icebreaker for cro_growth_ugc_agency. Plan 1.5
+    Task 1.5.5 (follow-ups-plan1.md item 6). Sibling of v1_ad_activity_observation
+    that does NOT reference {{ad_activity_observation}}, so the composer's
+    _filter_ad_activity_variants does not drop it when client_config.active_directories
+    lacks an ad-library entry. Actual sentence is filled per-contact by the
+    IcebreakerAdapter (systems/scout/enrich/icebreaker_adapter.py) using one of
+    4 tier-specific Sonnet prompts based on signal availability.
+
+    Bandit allocator picks between v1 and v2 per contact. v1 wins when
+    ad-activity signals are available; v2 wins on the no-ad-library path.
+  framework_anchor: "real-talk signal passthrough"
+ab_epsilon: 0.1

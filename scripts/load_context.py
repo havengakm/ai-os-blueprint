@@ -21,6 +21,14 @@ Usage:
 """
 from __future__ import annotations
 
+# Auto-load .env so the script works from a fresh shell without `source .env`
+# or direnv. Plan 1.5 Task 1.5.2 (follow-ups-plan1.md item 2).
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import argparse
 import asyncio
 import logging

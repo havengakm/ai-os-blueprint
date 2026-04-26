@@ -85,7 +85,7 @@ Strict JSON, no prose, no code fences:
 
 {{"icebreaker": "<multi-line content>"}}
 
-Preferred: 2 sentences, total 20-60 words. If the citable details give only ONE strong observation, 1 sentence is acceptable — DO NOT fabricate a second observation to pad length. The second sentence (when present) is a warm HUMAN reaction to the first, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). Em dash is allowed as an internal joiner.
+Preferred: 2 sentences, total 20-60 words. If the citable details give only ONE strong observation, 1 sentence is acceptable — DO NOT fabricate a second observation to pad length. The second sentence (when present) is a warm HUMAN reaction to the first, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). DO NOT use em dashes (—). Use a comma, period, or "and"/"but" to join clauses.
 
 (The format spec still announces 2-3 sentences / 40-70 words as the historical target; the looser bound above takes precedence when only one observation is available.)
 

@@ -56,7 +56,12 @@ class Settings(BaseSettings):
     calendly_webhook_secret: str = ""
 
     # --- Internal ---
-    cron_secret: str
+    # cron_secret is optional with empty default. Daemon-only deployments
+    # don't need it set; only the HTTP cron-trigger middleware reads it
+    # (api/middleware/verify_signatures.py::require_cron_secret), which
+    # rejects every request when the secret is empty. Plan 1.5 Task 1.5.4
+    # (follow-ups-plan1.md item 4).
+    cron_secret: str = ""
     api_public_url: str = "http://localhost:8000"
     log_level: str = "INFO"
     environment: str = "development"

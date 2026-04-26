@@ -1,6 +1,29 @@
 """Scrape Google Maps for a brand/category across a list of postal codes.
 
-Two-stage pipeline (mirrors scrape_mindbody.py):
+⚠ PARKED 2026-04-25. Currently writes 0 rows on every run.
+
+The list-card website extractor (`a[aria-label^="Website"]` selector)
+hits zero on every modern Google Maps result card. The website link is
+either absent from list cards entirely or behind a different selector;
+without DOM inspection we can't tell which. Either way: 100% drop at
+the no_website gate.
+
+Discovery (list of `(name, address, gmaps_url)` per ZIP) still works —
+that half is salvageable.
+
+Resumption architecture (when an agency-client deployment needs local-
+business sourcing): split into three independent stages. Google Maps
+becomes discovery-only; a new `scripts/_website_resolver.py` does
+Google Search knowledge-panel lookups per `(name, city)` to add the
+website column (per the operator's screenshot 2026-04-25 confirming the
+knowledge panel reliably surfaces a Website button); the existing
+enrichment pipeline runs unchanged. See `memory/INDEX.md` Open Loops.
+
+Reason for parking: gyms / local-business sourcing isn't Clymb's ICP
+(operator decision 2026-04-25). The capability is reusable for future
+agency-client deployments. Plan 1.5 acceptance pivots to creative_branding.
+
+Two-stage pipeline (current, broken):
 
 1. Playwright visits `google.com/maps/search/{query}+near+{zip}` for each
    postal code. Extracts each visible result card's name / address / website
@@ -496,8 +519,17 @@ async def run(
     client = _ensure_anthropic_client()
     rows: list[dict[str, str]] = []
     attempted = 0
-    consecutive_failures = 0
-    max_consecutive_failures = 5
+    # Plan 1.5 scraper Fix 5: count drops at every gate so the operator
+    # can see WHERE the scrape lost candidates.
+    drops: dict[str, int] = {
+        "no_website": 0,
+        "url_normalise": 0,
+        "site_unreachable": 0,
+        "haiku_failed": 0,
+        "category_mismatch": 0,
+        "no_domain_after": 0,
+        "missing_fields": 0,
+    }
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -507,12 +539,16 @@ async def run(
                 zip_coords=zip_coords,
             )
 
+            # Plan 1.5 scraper Fix 3: under-target candidate count is a
+            # warning, not an abort. Returns whatever was found instead of
+            # producing an empty CSV. Operator can decide to re-run with a
+            # broader query if needed.
             if len(candidates) < min_candidates:
-                logger.error(
-                    "too few candidates (%d < %d) for query=%r — aborting",
+                logger.warning(
+                    "candidate scrape under target: %d < %d for query=%r — "
+                    "proceeding with what was found",
                     len(candidates), min_candidates, query,
                 )
-                return 2, []
 
             for candidate in candidates:
                 if len(rows) >= limit:
@@ -527,6 +563,7 @@ async def run(
                 # --- Step 1: domain from card.website (or skip) ---
                 website_hint = (candidate.get("website") or "").strip()
                 if not website_hint:
+                    drops["no_website"] += 1
                     logger.info(
                         "skipped %s — no website on Google Maps card",
                         candidate["name"],
@@ -534,6 +571,7 @@ async def run(
                     continue
                 domain = normalise_domain(website_hint)
                 if not domain:
+                    drops["url_normalise"] += 1
                     logger.info(
                         "skipped %s — website didn't normalise: %r",
                         candidate["name"], website_hint,
@@ -547,6 +585,7 @@ async def run(
                     user_agent=USER_AGENT,
                 )
                 if not website_text.strip():
+                    drops["site_unreachable"] += 1
                     logger.info(
                         "skipped %s — site empty/unreachable (%s)",
                         candidate["name"], domain,
@@ -554,6 +593,9 @@ async def run(
                     continue
 
                 # --- Step 3: Haiku extract ---
+                # Plan 1.5 scraper Fix 4: dropped the 5-consecutive-failure
+                # kill switch. Single Haiku failures log + skip; loop never
+                # aborts on transient errors.
                 try:
                     extraction = extract_owner_with_haiku(
                         client=client,
@@ -563,23 +605,17 @@ async def run(
                         country=country,
                         known_domain=domain,
                     )
-                    consecutive_failures = 0
                 except Exception as e:
-                    consecutive_failures += 1
+                    drops["haiku_failed"] += 1
                     logger.warning(
-                        "haiku call failed (%d consecutive) location=%s err=%s",
-                        consecutive_failures, candidate["name"], e,
+                        "haiku call failed location=%s err=%s — skipping",
+                        candidate["name"], e,
                     )
-                    if consecutive_failures >= max_consecutive_failures:
-                        logger.error(
-                            "bailing after %d consecutive Haiku failures",
-                            max_consecutive_failures,
-                        )
-                        break
                     time.sleep(CLAUDE_GAP_SECONDS)
                     continue
 
                 if not extraction.is_match:
+                    drops["category_mismatch"] += 1
                     logger.info(
                         "skipped %s — category mismatch (%s)",
                         candidate["name"],
@@ -605,6 +641,7 @@ async def run(
                     niche=niche,
                 )
                 if row is None:
+                    drops["no_domain_after"] += 1
                     logger.info(
                         "skipped %s — no usable domain after extraction",
                         candidate["name"],
@@ -614,6 +651,7 @@ async def run(
 
                 missing = validate_row(row)
                 if missing:
+                    drops["missing_fields"] += 1
                     logger.info(
                         "skipped %s — missing fields: %s",
                         candidate["name"], missing,
@@ -629,6 +667,13 @@ async def run(
         finally:
             await browser.close()
 
+    # Plan 1.5 scraper Fix 5: drop summary so operator sees WHERE the loss
+    # happened, not just the final return count.
+    logger.info(
+        "scrape complete: attempted=%d returned=%d drops=%s",
+        attempted, len(rows),
+        ", ".join(f"{k}={v}" for k, v in drops.items() if v > 0) or "(none)",
+    )
     write_csv(rows, output)
     exit_code = 0 if len(rows) >= limit else (0 if rows else 2)
     logger.info(

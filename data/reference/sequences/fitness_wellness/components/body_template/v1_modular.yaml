@@ -1,0 +1,37 @@
+---
+variant_key: "v1_modular"
+component_type: "body_template"
+niche: "fitness_wellness"
+offer_label: "aios_scout_deployment"
+variant_content: |
+  {{icebreaker_content}}
+
+  {{bridge_content}}
+
+  {{pain_hook_content}}
+
+  {{credibility_content}}
+
+  {{offer_frame_content}}
+
+  {{cta_content}}
+
+  {{signature_content}}
+status: "draft"
+metadata:
+  author: "Kirsten"
+  notes: |
+    Plan 1.5 Task 1.5.9. fitness_wellness body_template baseline. Identical
+    shape to the creative_branding v1_modular (Plan 1.5 Task 1.5.8).
+    Inner-component placeholders are filled by per-component renders
+    (icebreaker, bridge, pain_hook, credibility, offer_frame, cta,
+    signature). Niche-specific text comes from client_facts via the
+    universal-placeholder pattern ({{niche}}, {{niche_specific_term}},
+    {{meetings_niche_term}}).
+
+    Status held at 'draft' until operator approves the full fitness_wellness
+    inventory for Plan 1.5 acceptance run (Task 1.5.10). Composer's
+    fetch_approved_variants filters out draft, so this variant is not
+    selected until approval.
+  framework_anchor: "modular concat (legacy default)"
+ab_epsilon: 0.1
