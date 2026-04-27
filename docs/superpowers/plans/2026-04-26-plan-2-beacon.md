@@ -298,9 +298,11 @@ Per `feedback_surround_sound_architecture`: contacts who don't reply within a se
 Round-tracking via `contacts.sequence_round` (already exists; just used).
 
 **Acceptance**:
-- [ ] After 90 days of no-reply, contact's `sequence_round` increments + status reset to enable a new send cycle.
-- [ ] Round 2+ sequences select a different subject/icebreaker variant pool than round 1.
-- [ ] Tests cover the round transition + the variant-pool difference.
+- [x] After 90 days of no-reply, contact's `sequence_round` increments + status reset to `'ready'` to enable a new send cycle. Two-phase runtime (`enter_cool_off_for_idle` + `re_enter_after_cool_off`) plus combined `run_cycle`. Max-rounds cap (default 4) → marks contact `dead` with `reason='max_rounds_reached'` instead of advancing.
+- [ ] Round 2+ sequences select a different subject/icebreaker variant pool than round 1. **Deferred to Phase 5 follow-up** — composer-side change touching the bandit-pull + variant-selection logic; runtime-only Task 2.3.4 doesn't couple to it.
+- [x] 16 tests cover both phases (CoolOffRuntime unit + SupabaseCoolOffBackend with FakeSupabaseClient): cool-off entry filters, re-entry transitions, max-rounds dead path, blocked-status exclusions.
+- [ ] Operator applies migration 019 (`scripts/sql/019_contacts_cool_off.sql`) to dev Supabase.
+- [ ] Operator-side: schedule periodic `run_cycle` invocation (cron daily for v1).
 
 ## Phase 4: Cost optimiser foundation
 

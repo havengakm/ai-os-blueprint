@@ -289,3 +289,33 @@ def _escalation_runtime_singleton() -> Any:
         decision_logger=get_beacon_decision_logger(),
         slack_notifier=get_slack_notifier(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Cool-off runtime (Plan 2 Phase 3 Task 2.3.4)
+# ---------------------------------------------------------------------------
+
+
+def get_cool_off_backend() -> Any:
+    return _cool_off_backend_singleton()
+
+
+def get_cool_off_runtime() -> Any:
+    return _cool_off_runtime_singleton()
+
+
+@lru_cache(maxsize=1)
+def _cool_off_backend_singleton() -> Any:
+    from systems.beacon.storage.cool_off_supabase_backend import (
+        SupabaseCoolOffBackend,
+    )
+    return SupabaseCoolOffBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _cool_off_runtime_singleton() -> Any:
+    from systems.beacon.reply.cool_off import CoolOffRuntime
+    return CoolOffRuntime(
+        backend=get_cool_off_backend(),
+        decision_logger=get_beacon_decision_logger(),
+    )
