@@ -477,11 +477,12 @@ The skill calls `Agent` with `subagent_type` to run the grading sub-agent. No An
 When run on a persisted draft: write grade to a new `outreach_drafts.predicted_grade` jsonb column (schema migration alongside this task). When run on a variant before approval: write to a stand-alone YAML file the operator commits to `data/captures/copy_grades/`.
 
 **Acceptance**:
-- [ ] Skill loads + runs successfully against a sample variant.
-- [ ] Grade JSON shape: `{predicted_reply_rate: float, tier: "A"|"B"|"C"|"D", critique: [str, str, str]}`.
-- [ ] Persisted-draft path writes to `outreach_drafts.predicted_grade`.
-- [ ] Variant-only path writes to `data/captures/copy_grades/<variant_key>-<timestamp>.yaml`.
-- [ ] No Anthropic API call; runs purely via the Claude Code Agent tool.
+- [x] Skill manifest at `skills/operations/grade-cold-email-copy.md` with frontmatter (input/output schema + requires_skills/tools + references).
+- [x] Grade JSON shape: `{predicted_reply_rate: float, tier: "A"|"B"|"C"|"D", critique: [str, str, str], graded_at: ISO}`.
+- [x] Migration 023 adds `outreach_drafts.predicted_grade JSONB` + partial index for "drafts with grade" queries.
+- [x] Skill instructions cover both paths (persisted draft → DB write; variant file → YAML capture).
+- [x] No Anthropic API call — instructs the operator to dispatch via the Claude Code Agent tool.
+- [ ] Operator runs the skill once against a sample variant + verifies the round-trip — operator-side acceptance after migration 023 lands.
 
 ### Task 2.5.5: Copy grader learning loop (daemon weekly job)
 
@@ -511,10 +512,13 @@ Uses `Agent` with `subagent_type=general-purpose` to run a sub-agent that loads 
 Output format: annotated CSV with two new columns (`icp_fit`, `icp_reasoning`). Operator imports surviving rows (`fit=yes`) into the daemon via `scripts/ingest_preresolved_contacts.py`.
 
 **Acceptance**:
-- [ ] Skill runs against a 10-row sample CSV.
-- [ ] Each row has `icp_fit` + `icp_reasoning` populated.
-- [ ] No Anthropic API call.
-- [ ] Operator can re-import the annotated CSV cleanly.
+- [x] Skill manifest at `skills/operations/filter-icp-list.md` with frontmatter (input/output schema + requires_tools).
+- [x] Per-row + batched-by-10 dispatch instructions (cap reasoning at 120 chars; retry once on overlong).
+- [x] Annotated output written to `<csv_path>.icp-filtered.csv` sibling file — never mutates source.
+- [x] No Anthropic API call — Claude Code Agent tool only.
+- [x] Output schema: original columns + `icp_fit` ∈ {yes, maybe, no} + `icp_reasoning` ≤120 chars.
+- [ ] Operator runs the skill against a 10-row sample CSV — operator-side acceptance.
+- [ ] Operator re-imports surviving rows via `scripts/ingest_preresolved_contacts.py` cleanly.
 
 ### Task 2.5.7: Screen-stage uncertain-zone LLM augment (daemon, API)
 
