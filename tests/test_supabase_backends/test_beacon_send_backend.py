@@ -274,28 +274,37 @@ async def test_increment_account_sent_count_bumps_existing_row() -> None:
 # --------------------------------------------------------------------------- #
 
 
-async def test_get_contact_total_cost_cents_sums_decision_log_entries() -> None:
-    fake = FakeSupabaseClient(
-        tables={
-            "decision_log": [
-                {"context": {"contact_id": "u1", "cost_cents": 2}},
-                {"context": {"contact_id": "u1", "cost_cents": 1}},
-                {"context": {"contact_id": "u2", "cost_cents": 5}},
-                {"context": {"contact_id": "u1"}},  # no cost field
-                {"context": {}},  # unrelated entry
-            ]
-        }
-    )
+async def test_get_contact_total_cost_cents_calls_rpc_with_contact_id() -> None:
+    """Phase 4 Task 2.4.2: rollup goes through the get_contact_cost RPC
+    (migration 020). The backend passes contact_id_param to the RPC and
+    returns the scalar response."""
+    fake = FakeSupabaseClient()
+    fake.set_rpc("get_contact_cost", lambda params: 3 if params["contact_id_param"] == "u1" else 0)
     backend = SupabaseSendBackend(fake)
+
     total = await backend.get_contact_total_cost_cents("u1")
     assert total == 3
+    assert fake.rpc_calls("get_contact_cost") == [
+        {"name": "get_contact_cost", "params": {"contact_id_param": "u1"}}
+    ]
 
 
-async def test_get_contact_total_cost_cents_returns_zero_when_no_rows() -> None:
-    fake = FakeSupabaseClient(tables={"decision_log": []})
+async def test_get_contact_total_cost_cents_returns_zero_when_rpc_returns_none() -> None:
+    fake = FakeSupabaseClient()
+    fake.set_rpc("get_contact_cost", None)  # static None response
     backend = SupabaseSendBackend(fake)
     total = await backend.get_contact_total_cost_cents("u1")
     assert total == 0
+
+
+async def test_get_contact_total_cost_cents_handles_list_wrapped_scalar() -> None:
+    """Defensive — some Supabase client versions wrap scalar RPC results
+    in a single-element list. The backend unwraps."""
+    fake = FakeSupabaseClient()
+    fake.set_rpc("get_contact_cost", [7])
+    backend = SupabaseSendBackend(fake)
+    total = await backend.get_contact_total_cost_cents("u1")
+    assert total == 7
 
 
 # --------------------------------------------------------------------------- #

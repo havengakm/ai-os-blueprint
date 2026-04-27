@@ -191,23 +191,32 @@ class SupabaseSendBackend:
     async def get_contact_total_cost_cents(
         self, contact_id: str,
     ) -> int:
-        """v1 sums ``decision_log.context.cost_cents`` for entries whose
-        context references this contact. Phase 4 ships a SQL view
-        (``v_contact_cost``) that replaces this with O(1) lookup."""
+        """Per-contact spend rollup.
+
+        Calls the ``get_contact_cost(contact_id_param TEXT) RETURNS INTEGER``
+        Postgres RPC (migration 020) which sums
+        ``decision_log.context.cost_cents`` over rows where
+        ``context.contact_id`` matches.
+
+        The pre-Phase-4 v1 implementation was a Python full-table scan
+        over decision_log; the RPC pushes that to SQL with the
+        ``v_contact_cost_rollup`` view as the underlying engine.
+
+        Returns 0 when the contact has no logged cost rows.
+        """
         resp = (
-            self._client.table("decision_log")
-            .select("context")
+            self._client
+            .rpc("get_contact_cost", {"contact_id_param": contact_id})
             .execute()
         )
-        total = 0
-        for row in resp.data or []:
-            context = row.get("context") or {}
-            if context.get("contact_id") != contact_id:
-                continue
-            cost = context.get("cost_cents")
-            if isinstance(cost, (int, float)):
-                total += int(cost)
-        return total
+        # Real Supabase RPC returns the scalar in ``.data`` for scalar-
+        # returning functions; FakeSupabaseClient mirrors this.
+        value = resp.data
+        if value is None:
+            return 0
+        if isinstance(value, list):  # defensive — some clients wrap scalars
+            value = value[0] if value else 0
+        return int(value)
 
     async def persist_send_log(
         self,

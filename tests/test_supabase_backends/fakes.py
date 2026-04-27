@@ -222,6 +222,35 @@ def _apply_filters(
     return out
 
 
+class _RpcBuilder:
+    """Chainable RPC builder mirroring ``client.rpc(name, params).execute()``.
+
+    The fake supports an arbitrary number of RPC stubs registered on the
+    client via ``client.set_rpc(name, responder)`` where ``responder`` is
+    either:
+      - a static value (returned verbatim as ``FakeResult.data``)
+      - a callable ``responder(params: dict) -> Any`` for dynamic responses
+    """
+
+    def __init__(self, client: "FakeSupabaseClient", name: str, params: dict[str, Any]) -> None:
+        self._client = client
+        self._name = name
+        self._params = params
+
+    def execute(self) -> FakeResult:
+        if self._name not in self._client._rpcs:
+            raise RuntimeError(
+                f"FakeSupabaseClient: no RPC stub for {self._name!r}; "
+                f"call client.set_rpc({self._name!r}, ...) in the test."
+            )
+        responder = self._client._rpcs[self._name]
+        result = responder(self._params) if callable(responder) else responder
+        # Real Supabase wraps RPC results in APIResponse(data=...).
+        # Postgres functions returning a scalar deliver it as the scalar
+        # itself in ``data``; we mirror that.
+        return FakeResult(data=result)
+
+
 class FakeSupabaseClient:
     """In-memory Supabase stand-in.
 
@@ -230,6 +259,9 @@ class FakeSupabaseClient:
     (``_insert_calls``, ``_upsert_calls``, ``_update_calls``) let tests
     assert on exact wire calls when shape-matters (e.g. the item-62
     gate test inspects the update payload).
+
+    RPC support: register stubs via ``client.set_rpc(name, value_or_callable)``.
+    Production code calls ``client.rpc(name, params).execute()``.
     """
 
     def __init__(
@@ -240,11 +272,27 @@ class FakeSupabaseClient:
         self._insert_calls: list[dict[str, Any]] = []
         self._upsert_calls: list[dict[str, Any]] = []
         self._update_calls: list[dict[str, Any]] = []
+        self._rpcs: dict[str, Any] = {}
+        self._rpc_calls: list[dict[str, Any]] = []
 
     def table(self, name: str) -> _QueryBuilder:
         return _QueryBuilder(self, name)
+
+    def rpc(self, name: str, params: dict[str, Any] | None = None) -> _RpcBuilder:
+        self._rpc_calls.append({"name": name, "params": params or {}})
+        return _RpcBuilder(self, name, params or {})
+
+    def set_rpc(self, name: str, responder: Any) -> None:
+        """Register a stub for an RPC. ``responder`` may be a static
+        value or a callable taking the params dict."""
+        self._rpcs[name] = responder
 
     # Convenience read-only views for tests ----------------------------
 
     def rows(self, table: str) -> list[dict[str, Any]]:
         return list(self._tables.get(table, []))
+
+    def rpc_calls(self, name: str | None = None) -> list[dict[str, Any]]:
+        if name is None:
+            return list(self._rpc_calls)
+        return [c for c in self._rpc_calls if c["name"] == name]
