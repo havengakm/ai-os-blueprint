@@ -18,8 +18,12 @@ import logging
 import structlog
 from fastapi import FastAPI
 
-from api.deps import get_beacon_webhook_handler, get_escalation_runtime
-from api.routers import beacon_webhooks, health, inbox, pipeline
+from api.deps import (
+    get_beacon_webhook_handler,
+    get_escalation_runtime,
+    get_optimizer_recommendation_engine,
+)
+from api.routers import beacon_webhooks, health, inbox, optimizer, pipeline
 from config.settings import get_settings
 
 
@@ -48,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(pipeline.router)
     app.include_router(beacon_webhooks.router)
     app.include_router(inbox.router)
+    app.include_router(optimizer.router)
 
     # Beacon webhook handler — production wiring. The router's default
     # ``get_webhook_handler`` raises so unwired deployments fail loud;
@@ -58,6 +63,9 @@ def create_app() -> FastAPI:
     )
     app.dependency_overrides[inbox.get_escalation_runtime] = (
         get_escalation_runtime
+    )
+    app.dependency_overrides[optimizer.get_recommendation_engine] = (
+        get_optimizer_recommendation_engine
     )
 
     return app

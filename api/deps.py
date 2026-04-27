@@ -319,3 +319,33 @@ def _cool_off_runtime_singleton() -> Any:
         backend=get_cool_off_backend(),
         decision_logger=get_beacon_decision_logger(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Optimizer recommendation engine (Plan 2 Phase 5 Task 2.5.2)
+# ---------------------------------------------------------------------------
+
+
+def get_optimizer_recommendation_store() -> Any:
+    return _optimizer_recommendation_store_singleton()
+
+
+def get_optimizer_recommendation_engine() -> Any:
+    return _optimizer_recommendation_engine_singleton()
+
+
+@lru_cache(maxsize=1)
+def _optimizer_recommendation_store_singleton() -> Any:
+    from systems.optimizer.storage.recommendation_supabase_store import (
+        SupabaseRecommendationStore,
+    )
+    return SupabaseRecommendationStore(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _optimizer_recommendation_engine_singleton() -> Any:
+    from systems.optimizer.recommendations import RecommendationEngine
+    return RecommendationEngine(
+        store=get_optimizer_recommendation_store(),
+        decision_logger=get_beacon_decision_logger(),
+    )

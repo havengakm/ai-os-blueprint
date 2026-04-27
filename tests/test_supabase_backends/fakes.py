@@ -99,6 +99,14 @@ class _QueryBuilder:
         self._filters.append(("gte", col, val))
         return self
 
+    def lt(self, col: str, val: Any) -> "_QueryBuilder":
+        self._filters.append(("lt", col, val))
+        return self
+
+    def lte(self, col: str, val: Any) -> "_QueryBuilder":
+        self._filters.append(("lte", col, val))
+        return self
+
     def is_(self, col: str, val: str) -> "_QueryBuilder":
         self._filters.append(("is", col, val))
         return self
@@ -202,6 +210,10 @@ def _apply_filters(
             out = [r for r in out if r.get(col) == val]
         elif kind == "gte":
             out = [r for r in out if (r.get(col) is not None and r.get(col) >= val)]
+        elif kind == "lt":
+            out = [r for r in out if (r.get(col) is not None and r.get(col) < val)]
+        elif kind == "lte":
+            out = [r for r in out if (r.get(col) is not None and r.get(col) <= val)]
         elif kind == "is":
             # supabase is_(col, "null") -> col IS NULL
             if val == "null":

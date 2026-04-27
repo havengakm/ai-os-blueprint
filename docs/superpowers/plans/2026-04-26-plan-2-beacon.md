@@ -430,21 +430,24 @@ Each recommendation has a confidence score + the underlying numbers. Operator re
 
 ### Task 2.5.2: Recommendation persistence + approval flow
 
-**File**: `scripts/sql/019_optimizer_recommendations.sql` (new), `api/routers/optimizer.py` (new).
+**File**: `scripts/sql/022_optimizer_recommendations.sql` (renumbered from 019; 019-021 used in earlier slices), `api/routers/optimizer.py` (new), `systems/optimizer/recommendations.py` (new), `systems/optimizer/storage/recommendation_supabase_store.py` (new).
 
 Schema:
-- `optimizer_recommendation` — one row per recommendation (`client_id`, `category`, `payload` JSONB, `confidence`, `created_at`, `status` ∈ {pending, approved, rejected, expired}, `applied_at`).
+- `optimizer_recommendation` — one row per recommendation (`client_id`, `category`, `payload` JSONB, `confidence`, `reasoning`, `created_at`, `status` ∈ {pending, approved, rejected, expired}, `reviewed_by`, `reviewed_at`, `applied_at`, `apply_error`).
 
 API endpoints:
-- `POST /api/optimizer/recommendations/<id>/approve` — operator approves; system applies the recommendation (e.g. updates variant win_rate prior).
+- `GET  /api/optimizer/recommendations?client_id=<id>` — list pending.
+- `POST /api/optimizer/recommendations/<id>/approve` — operator approves; engine emits decision_log + persists verdict. Underlying change runs when Task 2.5.3 applicators land.
 - `POST /api/optimizer/recommendations/<id>/reject` — dismissed.
-- Auto-expire after 7 days if not approved.
+- Auto-expire after 7 days via `RecommendationEngine.expire_stale()`.
 
 **Acceptance**:
-- [ ] Recommendations persist across runs.
-- [ ] Approve/reject endpoints work + trigger the underlying change.
-- [ ] Expiry job retires stale recommendations.
-- [ ] Tests cover the full lifecycle.
+- [x] Recommendations persist across runs (migration 022 + SupabaseRecommendationStore).
+- [x] Approve/reject endpoints work + emit `decision_type='system_config'` decision_log entries (underlying change deferred to Task 2.5.3).
+- [x] `expire_stale()` method retires pending rows older than 7 days; tests cover custom thresholds.
+- [x] 27 tests cover the full lifecycle: 13 RecommendationEngine unit tests + 7 SupabaseRecommendationStore tests + 7 router smoke tests (auth + happy paths + 422/404/409 error paths).
+- [ ] Operator applies migration 022 to dev Supabase.
+- [ ] Operator-side: schedule cron for `RecommendationEngine.expire_stale()` (small CLI script in a follow-up).
 
 ### Task 2.5.3: Bandit weight adjustments + autonomy promotions
 
