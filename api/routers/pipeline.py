@@ -35,7 +35,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from api.deps import get_scout_system
-from api.middleware.verify_signatures import require_cron_secret
+from api.middleware.verify_signatures import cron_secret_dep
 from systems.scout.skill import ScoutSystem
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
@@ -153,7 +153,7 @@ async def run_render(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/trigger", dependencies=[require_cron_secret()])
+@router.post("/trigger", dependencies=[cron_secret_dep()])
 async def trigger(req: TriggerRequest):
     """Legacy stage-name dispatch stub. Real work is done by the
     per-stage endpoints above (``/pull``, ``/score``, etc.). Kept so
