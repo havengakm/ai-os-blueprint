@@ -63,6 +63,14 @@ Always use these. They are your operating procedures.
 - Use `--limit 2` to validate before full runs
 - `--dry-run` before any write operation
 
+### Workload tier — operator-interactive vs daemon-autonomous
+Default new features to **operator-interactive** (run inside Claude Code via the Agent tool with `subagent_type`). Move to **daemon-autonomous** only when the unattended runtime path requires it.
+
+- **Operator-interactive (Claude Code Max-plan credits)**: variant authoring, list filtering, experiment design, weekly review, ad-hoc ICP audits, copy grading at variant-approval time. Runs in interactive Claude Code sessions; the operator drives + approves. Cost is bundled into the Max subscription, not paid per-call to Anthropic.
+- **Daemon-autonomous (Anthropic API)**: per-contact runtime — icebreaker generation, reply classification, send-time decisions, deep research extraction. Runs unattended in the Python daemon; pays per Anthropic API call. Haiku-by-default per the rules above.
+- **Decision rule**: when a task is borderline (e.g. pre-send copy QA), start operator-interactive at `suggest` autonomy. Promote to daemon-autonomous via the autonomy progression once the operator-interactive version has proven calibration over 30+ days.
+- Sub-agents in Claude Code (Explore / Plan / general-purpose / specialised) are the runtime for operator-interactive work. The Claude Agent SDK is the runtime for daemon-autonomous work.
+
 ### Communication
 - Short, direct sentences
 - Lead with the answer, not the reasoning

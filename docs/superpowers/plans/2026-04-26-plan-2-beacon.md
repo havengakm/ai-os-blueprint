@@ -340,6 +340,39 @@ Web app version is backlog; CLI ships now.
 - [ ] Tool runs, produces a readable summary.
 - [ ] Numbers reconcile against `client_config.tier_spent_cents` and `decision_log` rollups.
 
+### Task 2.4.5: Per-field enrichment coverage rollup view
+
+**Source**: 2026-04-27 scope expansion (operator's "90%+ enrichment" target).
+**File**: `scripts/sql/019_enrichment_coverage_rollup.sql` (new).
+
+SQL view + RPC that aggregates per-contact enrichment-field presence by `(client_id, niche, icp_tier)`:
+- `email_present + email_verified` (ZeroBounce status)
+- `linkedin_url` non-null
+- `phone` non-null
+- `domain_resolved` (identity stage)
+- `research_data.trigger_events` non-empty (Trigify hit rate)
+
+Targets per `feedback_cost_optimiser_continuous_concern` (operator decision 2026-04-27): email + LinkedIn ≥90% across Tier A/B/C; phone ≥90% on Tier A only (gated per `feedback_enrichment_tiers`).
+
+**Acceptance**:
+- [ ] View returns one row per `(client_id, niche, icp_tier)` with each field's presence count + percentage.
+- [ ] RPC `get_enrichment_coverage(client_id)` callable from Python.
+- [ ] Tests against the existing dev cohort (kirsten-client-zero, 31 contacts) produce sane numbers.
+
+### Task 2.4.6: Coverage dashboard CLI extension
+
+**File**: `scripts/cost_dashboard.py` (extend existing — Task 2.4.4 ships first).
+
+New `--coverage` flag adds a coverage report alongside the cost report:
+- Per-tier per-field presence vs the 90% target.
+- Adapter-level coverage breakdown (which adapter found the email / LinkedIn / phone — informs which is the weak link).
+- Highlights tiers/fields under the target.
+
+**Acceptance**:
+- [ ] `uv run python scripts/cost_dashboard.py --client-id=kirsten-client-zero --coverage` produces a readable table.
+- [ ] Numbers reconcile with the SQL view from Task 2.4.5.
+- [ ] Gap-source identification works (e.g. "Tier B email coverage is 78% — Apollo found 62%, Hunter found 14%, Claude scraper found 2%, missing 22%").
+
 ## Phase 5: Optimizer agent v1 (read-only recommendations)
 
 Closes the learning loop. v1 is **recommendations-only** — operator approves before changes ship. Auto-apply (v2) deferred to a future plan once v1 has usage history showing the recommendations are reliable.
@@ -397,6 +430,78 @@ Autonomy promotions are gated by the existing autonomy_rules CHECK constraints; 
 **Acceptance**:
 - [ ] Each applicator has a tested success path + a tested rollback path.
 - [ ] Autonomy promotion never auto-applies without operator approval.
+
+### Task 2.5.4: Cold email copy grader skill (operator-interactive)
+
+**Source**: 2026-04-27 scope expansion. Operator-interactive per `feedback_max_credits_vs_api_boundary`.
+**File**: `skills/operations/grade-cold-email-copy.md` (new).
+
+Skill that runs inside Claude Code (Sonnet via Max-plan credits). Inputs: a draft (variant text or rendered email body) + optional prior reply-rate context. Outputs: predicted reply rate (0.0-1.0), tier (A/B/C/D), 3-line critique (what works, what doesn't, what to change).
+
+The skill calls `Agent` with `subagent_type` to run the grading sub-agent. No Anthropic SDK code in the daemon. No per-call cost beyond the operator's Max subscription.
+
+When run on a persisted draft: write grade to a new `outreach_drafts.predicted_grade` jsonb column (schema migration alongside this task). When run on a variant before approval: write to a stand-alone YAML file the operator commits to `data/captures/copy_grades/`.
+
+**Acceptance**:
+- [ ] Skill loads + runs successfully against a sample variant.
+- [ ] Grade JSON shape: `{predicted_reply_rate: float, tier: "A"|"B"|"C"|"D", critique: [str, str, str]}`.
+- [ ] Persisted-draft path writes to `outreach_drafts.predicted_grade`.
+- [ ] Variant-only path writes to `data/captures/copy_grades/<variant_key>-<timestamp>.yaml`.
+- [ ] No Anthropic API call; runs purely via the Claude Code Agent tool.
+
+### Task 2.5.5: Copy grader learning loop (daemon weekly job)
+
+**Source**: 2026-04-27 scope expansion.
+**File**: `systems/optimizer/grader_calibration.py` (new), extends `weekly_review.py` from Task 2.5.1.
+
+Weekly job that:
+1. Pulls all `outreach_drafts` with `predicted_grade` set + an associated `outreach_reply` outcome from the past 30 days.
+2. Computes calibration: did high-tier predictions correlate with replies? What was the AUC / Brier score?
+3. Surfaces drift in the Optimizer weekly report: "Grader predicted Tier A drafts at 12% reply rate; actual was 4%. Recommend recalibrating tier-A threshold downward."
+4. Operator approves the recalibration before grader weights update (operator-approval flow shared with Task 2.5.2).
+
+**Acceptance**:
+- [ ] Calibration metrics land in the weekly report.
+- [ ] Recommendation persistence works (uses the same approval flow as Task 2.5.2).
+- [ ] Tests with fixture predicted/actual pairs cover the Brier-score branch + the no-data branch.
+
+### Task 2.5.6: ICP filter sub-agent skill (operator-interactive)
+
+**Source**: 2026-04-27 scope expansion. Operator-interactive per `feedback_max_credits_vs_api_boundary`.
+**File**: `skills/operations/filter-icp-list.md` (new).
+
+Skill that runs inside Claude Code (Sonnet via Max-plan credits). Input: a CSV path with company name + description + website + size signals. For each row, output: `fit ∈ {yes, maybe, no}` + 1-line reasoning.
+
+Uses `Agent` with `subagent_type=general-purpose` to run a sub-agent that loads `client_config.icp` + the row data, returns the verdict.
+
+Output format: annotated CSV with two new columns (`icp_fit`, `icp_reasoning`). Operator imports surviving rows (`fit=yes`) into the daemon via `scripts/ingest_preresolved_contacts.py`.
+
+**Acceptance**:
+- [ ] Skill runs against a 10-row sample CSV.
+- [ ] Each row has `icp_fit` + `icp_reasoning` populated.
+- [ ] No Anthropic API call.
+- [ ] Operator can re-import the annotated CSV cleanly.
+
+### Task 2.5.7: Screen-stage uncertain-zone LLM augment (daemon, API)
+
+**Source**: 2026-04-27 scope expansion. Daemon-autonomous per `feedback_max_credits_vs_api_boundary` (per-contact runtime).
+**File**: `systems/scout/pipeline/screen.py` (modify).
+
+When the rule-based `icp_score` lands in the uncertain zone (default 40-60, configurable per `client_config.icp.uncertain_zone`), invoke a Haiku-tier LLM judge that:
+1. Reads the contact's company description + size + industry from `raw_data` + `research_data`.
+2. Reads `client_config.icp` (titles, geographies, size band, positive + negative examples).
+3. Returns `nudge ∈ {-15, -5, 0, +5, +15}` to apply to the rule-based score.
+4. Logs the judgment to `decision_log` with `decision_type='icp_threshold'` + reasoning.
+
+Cost-bounded: only ~10-20% of contacts hit the uncertain zone, so per-cohort cost stays low (~0.1c each via Haiku). Maintains tier_budget tracking like other adapters.
+
+**Acceptance**:
+- [ ] Contact with rule-score=50 fires the LLM judge; judgment lands in `decision_log`.
+- [ ] Final score = rule_score + nudge.
+- [ ] Contact with rule-score=20 (clearly archive) skips the judge — no LLM call.
+- [ ] Contact with rule-score=85 (clearly Tier A) skips the judge.
+- [ ] Tests: 4 contacts at scores {20, 45, 55, 90}; LLM fires for 2 of them.
+- [ ] Per-tier cost increase measured against the cost dashboard from Task 2.4.4.
 
 ## Phase 6: Productisation deployment script
 
