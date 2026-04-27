@@ -265,9 +265,11 @@ For each classified reply with `recommended_action='auto_respond'`:
 Templates are operator-authored per `feedback_copy_architecture` — AI fills placeholders only.
 
 **Acceptance**:
-- [ ] 5 operator-authored objection templates land at `data/reference/sequences/<niche>/components/reply_responses/`.
-- [ ] Auto-respond fires for confident objections; escalates everything else.
-- [ ] 8+ tests covering each template + the escalation path + the Calendly-link path.
+- [x] 6 skeleton templates landed at `data/reference/sequences/creative_branding/components/reply_responses/` (objection_pricing/timing/authority/other + meeting_request + positive_interest). Operator can revise.
+- [x] Auto-respond fires for confident objections + meeting_request + positive_interest; skips with `skipped:not_auto_respond` for everything else (negative → archive, unsubscribe → add_to_dnd, etc., handled upstream by the classifier action).
+- [x] 19 tests in `test_auto_respond.py` covering each template render + skip/failure paths (validator-fail, no-template, no-calendly-url, dry-run, responder-error). 6 production-template smoke tests in `test_auto_respond_production_templates.py` ensure deployed templates pass the validator.
+- [ ] `ReplyResponder` Protocol production wiring against Instantly's `POST /api/v2/emails/:id/reply` endpoint — deferred follow-up.
+- [ ] Calendly URL stored in `client_facts.calendly_url` per client (operator-side data entry).
 
 ### Task 2.3.3: Human escalation queue + Slack/web app surface
 
