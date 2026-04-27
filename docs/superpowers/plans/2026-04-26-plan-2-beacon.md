@@ -322,14 +322,15 @@ Currently `claude_deep_research` runs for every tier-A/B/C contact. Per `feedbac
 
 ### Task 2.4.2: Per-contact cost rollup view
 
-**File**: `scripts/sql/018_per_contact_cost_rollup.sql` (new).
+**File**: `scripts/sql/020_per_contact_cost_rollup.sql` (renumbered from 018; 018 + 019 used for escalations + cool-off).
 
-`contact_cost_rollup` SQL view aggregating `decision_log.context.cost_cents` per `contact_id`. Plus an RPC `get_contact_cost(contact_id) -> int_cents` for Python callers.
+`v_contact_cost_rollup` SQL view aggregating `decision_log.context.cost_cents` per `(contact_id, decision_type)`. Plus `get_contact_cost(contact_id_param TEXT) RETURNS INTEGER` RPC for Python callers.
 
 **Acceptance**:
-- [ ] View returns total spend per contact, broken down by stage.
-- [ ] RPC callable from Python; tests use a fixture contact.
-- [ ] Existing tier-level budget queries still work.
+- [x] View returns total spend per contact, broken down by stage (`decision_type`).
+- [x] RPC callable from Python; `SupabaseSendBackend.get_contact_total_cost_cents` now uses it instead of the v1 full-table scan.
+- [x] FakeSupabaseClient extended with `.rpc()` support so existing send-backend tests stub the RPC.
+- [ ] Existing tier-level budget queries still work (operator-side verification after applying migration 020).
 
 ### Task 2.4.3: Per-contact 5c hard ceiling
 
@@ -359,13 +360,15 @@ Outputs:
 Web app version is backlog; CLI ships now.
 
 **Acceptance**:
-- [ ] Tool runs, produces a readable summary.
-- [ ] Numbers reconcile against `client_config.tier_spent_cents` and `decision_log` rollups.
+- [x] Tool runs, produces a readable summary (cost-per-active-contact + per-tier + per-adapter + top-N + tier-budget).
+- [x] Numbers reconcile against `client_config.tier_spent_cents` (lifetime tier spend column) and `decision_log` rollups (windowed spend).
+- [x] OK / OVER markers vs $0.002 target ($0.002 = 0.2c rendered exactly).
+- [x] 7 unit tests covering the data-fetcher (window filtering, tier grouping, adapter grouping, top-N, empty data, client_config lookup) + 2 formatter tests (over-target, under-target) + 1 CLI smoke test.
 
 ### Task 2.4.5: Per-field enrichment coverage rollup view
 
 **Source**: 2026-04-27 scope expansion (operator's "90%+ enrichment" target).
-**File**: `scripts/sql/019_enrichment_coverage_rollup.sql` (new).
+**File**: `scripts/sql/021_enrichment_coverage_rollup.sql` (renumbered from 019; 019 used for cool-off, 020 for the cost rollup).
 
 SQL view + RPC that aggregates per-contact enrichment-field presence by `(client_id, niche, icp_tier)`:
 - `email_present + email_verified` (ZeroBounce status)
@@ -377,9 +380,10 @@ SQL view + RPC that aggregates per-contact enrichment-field presence by `(client
 Targets per `feedback_cost_optimiser_continuous_concern` (operator decision 2026-04-27): email + LinkedIn ≥90% across Tier A/B/C; phone ≥90% on Tier A only (gated per `feedback_enrichment_tiers`).
 
 **Acceptance**:
-- [ ] View returns one row per `(client_id, niche, icp_tier)` with each field's presence count + percentage.
-- [ ] RPC `get_enrichment_coverage(client_id)` callable from Python.
-- [ ] Tests against the existing dev cohort (kirsten-client-zero, 31 contacts) produce sane numbers.
+- [x] View returns one row per `(client_id, niche, icp_tier)` with each field's presence count + percentage. Tier D excluded (archived).
+- [x] RPC `get_enrichment_coverage(client_id_param TEXT) RETURNS JSONB` callable from Python via `EnrichmentCoverageBackend`.
+- [x] 4 backend wrapper tests + 1 fetcher test in cost_dashboard test suite.
+- [ ] Verification against the existing dev cohort (kirsten-client-zero, 31 contacts) — operator-side after applying migration 021.
 
 ### Task 2.4.6: Coverage dashboard CLI extension
 
@@ -391,9 +395,10 @@ New `--coverage` flag adds a coverage report alongside the cost report:
 - Highlights tiers/fields under the target.
 
 **Acceptance**:
-- [ ] `uv run python scripts/cost_dashboard.py --client-id=kirsten-client-zero --coverage` produces a readable table.
-- [ ] Numbers reconcile with the SQL view from Task 2.4.5.
-- [ ] Gap-source identification works (e.g. "Tier B email coverage is 78% — Apollo found 62%, Hunter found 14%, Claude scraper found 2%, missing 22%").
+- [x] `uv run python scripts/cost_dashboard.py --client-id=<id> --coverage` produces a readable per-(niche, tier) table with email_verified / linkedin / phone percentages + UNDER / OK / n/a markers.
+- [x] Phone-on-Tier-B/C rendered as "n/a — Tier A only" (per `feedback_enrichment_tiers`).
+- [ ] Adapter-level gap-source breakdown (e.g. "Tier B email coverage is 78%: Apollo found 62%, Hunter 14%, scraper 2%") — **deferred**: requires `contacts.email_source` field tracking which adapter found each field. Lands in a small follow-up after migration 022 adds `email_source` / `linkedin_source` / `phone_source` (phone_source already exists per `004_contacts_extensions.sql`).
+- [ ] Numbers reconcile against the migration 021 view — operator-side verification after applying.
 
 ## Phase 5: Optimizer agent v1 (read-only recommendations)
 
