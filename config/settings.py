@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     telegram_admin_chat_id: str = ""
     calendly_webhook_secret: str = ""
 
+    # --- Operator escalations (Plan 2 Phase 3 Task 2.3.3) ---
+    # When unset, the EscalationRuntime skips the Slack path entirely
+    # (DB insert + decision_log still fire). Set to a Slack incoming-
+    # webhook URL (https://hooks.slack.com/services/...) to enable.
+    slack_webhook_url: str = ""
+
     # --- Internal ---
     # cron_secret is optional with empty default. Daemon-only deployments
     # don't need it set; only the HTTP cron-trigger middleware reads it

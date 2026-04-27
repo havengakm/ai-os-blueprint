@@ -240,3 +240,52 @@ def _beacon_webhook_handler_singleton() -> Any:
         backend=get_beacon_webhook_backend(),
         decision_logger=get_beacon_decision_logger(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Escalation runtime + Slack notifier (Plan 2 Phase 3 Task 2.3.3)
+# ---------------------------------------------------------------------------
+
+
+def get_escalation_backend() -> Any:
+    return _escalation_backend_singleton()
+
+
+def get_slack_notifier() -> Any:
+    """Returns ``HttpxSlackNotifier`` if ``settings.slack_webhook_url`` is
+    set, else ``None``. EscalationRuntime treats None as "Slack disabled"
+    and skips that path silently (DB insert + decision_log still fire)."""
+    return _slack_notifier_singleton()
+
+
+def get_escalation_runtime() -> Any:
+    return _escalation_runtime_singleton()
+
+
+@lru_cache(maxsize=1)
+def _escalation_backend_singleton() -> Any:
+    from systems.beacon.storage.escalation_supabase_backend import (
+        SupabaseEscalationBackend,
+    )
+    return SupabaseEscalationBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _slack_notifier_singleton() -> Any:
+    from config.settings import get_settings
+    from systems.beacon.reply.slack_notifier import HttpxSlackNotifier
+
+    url = get_settings().slack_webhook_url
+    if not url:
+        return None
+    return HttpxSlackNotifier(webhook_url=url)
+
+
+@lru_cache(maxsize=1)
+def _escalation_runtime_singleton() -> Any:
+    from systems.beacon.reply.escalation import EscalationRuntime
+    return EscalationRuntime(
+        backend=get_escalation_backend(),
+        decision_logger=get_beacon_decision_logger(),
+        slack_notifier=get_slack_notifier(),
+    )

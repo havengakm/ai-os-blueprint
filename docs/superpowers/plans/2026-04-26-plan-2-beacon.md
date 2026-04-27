@@ -280,9 +280,14 @@ Replies that need human attention land in `escalations` table + Slack notificati
 Defer the Next.js web app side to a later plan; this task only ships the **API + Slack** surface so escalations reach the operator.
 
 **Acceptance**:
-- [ ] Escalations land in DB + Slack channel.
-- [ ] Operator can mark resolved via simple POST endpoint.
-- [ ] No-op gracefully if Slack webhook URL unset.
+- [x] Escalations land in `escalations` table (migration 018) + Slack channel via incoming-webhook POST.
+- [x] Operator marks resolved via `POST /api/inbox/escalations/{id}/resolve` (cron_secret-gated for v1).
+- [x] Slack delivery is best-effort: a Slack outage does NOT lose an escalation (DB insert + decision_log fire first; Slack failure is logged + swallowed).
+- [x] When `settings.slack_webhook_url` is unset, EscalationRuntime is initialised with `slack_notifier=None` and the Slack path is a silent no-op.
+- [x] Also exposes `POST /api/inbox/escalations/{id}/dismiss` + `GET /api/inbox/escalations?client_id=<id>` for the operator triage UX.
+- [ ] Operator applies migration 018 to dev Supabase.
+- [ ] Operator-side: set `SLACK_WEBHOOK_URL` env var to enable Slack notifications (optional).
+- [ ] Wire EscalationRuntime call sites: WebhookHandler (low_confidence_reply / cannot_classify_reply / spam_marked_reply / out_of_office_reply) + AutoRespondRuntime (auto_respond_failed). Deferred follow-up.
 
 ### Task 2.3.4: 90-day cool-off + round-based re-entry
 
