@@ -6,9 +6,9 @@
 #   TRIGIFY_API_KEY, APOLLO_API_KEY, HUNTER_API_KEY, ZEROBOUNCE_API_KEY,
 #   CRON_SECRET, CLIENT_ID
 #
-# Without all of these set, `api.main:create_app()` raises at import time
-# (config/settings.py hard-requires them). Railway will surface the error in
-# deploy logs.
+# Without all of these set, `api.asgi:app` import (which calls create_app()
+# from api.main) raises at import time (config/settings.py hard-requires them).
+# Railway will surface the error in deploy logs.
 
 [build]
 builder = "nixpacks"
@@ -21,7 +21,7 @@ builder = "nixpacks"
 buildCommand = "uv sync --frozen && uv run playwright install --with-deps chromium"
 
 [deploy]
-startCommand = "uvicorn api.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "uvicorn api.asgi:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
