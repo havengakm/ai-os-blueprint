@@ -1,9 +1,14 @@
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
-from systems.scout.sources.clutch import ClutchAdapter, _parse_listing_page
+from systems.scout.sources.clutch import (
+    ClutchAdapter,
+    ClutchSuspiciousEmptyError,
+    _parse_listing_page,
+)
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -13,9 +18,18 @@ def _load(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
 
 
-def _response(text: str):
+def _response(text: str, status_code: int = 200):
     resp = MagicMock()
-    resp.raise_for_status = MagicMock(return_value=None)
+    if status_code >= 400:
+        resp.raise_for_status = MagicMock(
+            side_effect=httpx.HTTPStatusError(
+                f"HTTP {status_code}", request=MagicMock(), response=resp,
+            )
+        )
+        resp.status_code = status_code
+    else:
+        resp.raise_for_status = MagicMock(return_value=None)
+        resp.status_code = 200
     resp.text = text
     return resp
 
@@ -126,14 +140,104 @@ async def test_clutch_adapter_name_includes_category():
 
 
 @pytest.mark.asyncio
-async def test_clutch_adapter_builds_correct_url():
+async def test_clutch_retries_on_429_then_succeeds():
+    """Plan 2 Task 2.0.5 (Plan 1 follow-up item 10): adapter must retry
+    transient 429 with backoff instead of aborting the entire pull.
+    Locks the resilience contract before the first live Clutch run."""
+    page0 = _load("clutch_shopify_page0.html")
+    empty = _load("clutch_shopify_empty.html")
+    responses = [_response("", status_code=429), _response(page0)]
+
+    async def _get(url):
+        # After the 429+200 retry pair, fall through to empty for page 1+
+        # so the loop terminates cleanly.
+        return responses.pop(0) if responses else _response(empty)
+
     mock_client = AsyncMock()
-    mock_client.get.return_value = _response(_load("clutch_shopify_empty.html"))
+    mock_client.get.side_effect = _get
+    adapter = ClutchAdapter(
+        category_path="developers/shopify",
+        http_client=mock_client,
+        throttle_seconds=0,
+        retry_backoff_seconds=0,  # speed up the test
+    )
+    rows = await adapter.pull(client_id="clymb", max_companies=50, max_pages=2)
+    assert len(rows) == 3  # page0 yielded 3 after retry; page1 stopped clean
+    # 1 retry on page 0 + 1 success on page 0 + 1 empty-stop on page 1 = 3
+    assert mock_client.get.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_clutch_retries_on_503_then_succeeds():
+    """Same pattern as 429 but for transient 503 (server overload)."""
+    page0 = _load("clutch_shopify_page0.html")
+    empty = _load("clutch_shopify_empty.html")
+    responses = [_response("", status_code=503), _response(page0)]
+
+    async def _get(url):
+        return responses.pop(0) if responses else _response(empty)
+
+    mock_client = AsyncMock()
+    mock_client.get.side_effect = _get
+    adapter = ClutchAdapter(
+        category_path="developers/shopify",
+        http_client=mock_client,
+        throttle_seconds=0,
+        retry_backoff_seconds=0,
+    )
+    rows = await adapter.pull(client_id="clymb", max_companies=50, max_pages=2)
+    assert len(rows) == 3
+    assert mock_client.get.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_clutch_raises_after_retries_exhausted():
+    """If 429 persists across all retries, adapter raises rather than
+    silently returning empty results (which could masquerade as a clean
+    end-of-listings signal in decision_log)."""
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _response("", status_code=429)
+    adapter = ClutchAdapter(
+        category_path="developers/shopify",
+        http_client=mock_client,
+        throttle_seconds=0,
+        retry_backoff_seconds=0,
+        max_retries=2,  # tight budget for the test
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await adapter.pull(client_id="clymb", max_companies=10, max_pages=2)
+
+
+@pytest.mark.asyncio
+async def test_clutch_suspicious_empty_first_page_raises():
+    """Plan 2 Task 2.0.5 (Plan 1 follow-up item 9): a 200 OK page 0 that
+    yields 0 parsed entries is suspicious — could be a CAPTCHA interstitial,
+    soft-block page, or layout change masquerading as a clean empty page.
+    Adapter raises so the pull stage can log it as `scout.source.empty_first_page`
+    instead of silently treating it as a successful empty pull."""
+    empty_html = _load("clutch_shopify_empty.html")
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _response(empty_html)
     adapter = ClutchAdapter(
         category_path="developers/shopify",
         http_client=mock_client,
         throttle_seconds=0,
     )
-    await adapter.pull(client_id="clymb", max_companies=10)
+    with pytest.raises(ClutchSuspiciousEmptyError):
+        await adapter.pull(client_id="clymb", max_companies=50, max_pages=5)
+
+
+@pytest.mark.asyncio
+async def test_clutch_adapter_builds_correct_url():
+    # Use a non-empty fixture so page 0 doesn't trigger the suspicious-empty
+    # raise (Plan 2 Task 2.0.5). The test only checks URL construction.
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _response(_load("clutch_shopify_page0.html"))
+    adapter = ClutchAdapter(
+        category_path="developers/shopify",
+        http_client=mock_client,
+        throttle_seconds=0,
+    )
+    await adapter.pull(client_id="clymb", max_companies=3)
     first_call_url = mock_client.get.call_args_list[0].args[0]
     assert first_call_url == "https://clutch.co/developers/shopify?page=0"

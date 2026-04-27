@@ -36,6 +36,22 @@ def test_pipeline_trigger_accepts_valid_secret(client):
     assert "status" in body
 
 
+def test_pipeline_trigger_rejects_invalid_stage(client):
+    """Locks the ``TriggerRequest.stage`` Literal contract — any value
+    outside {pull, score, screen, enrich, research, render, full} must
+    be rejected by Pydantic validation, not silently accepted by the
+    stub. SOPs hardcode literal stage names (e.g. "full"); regressing
+    the contract would let an SOP typo through unnoticed.
+
+    Plan 2 Task 2.0.3 (Plan 1 follow-up item 2)."""
+    r = client.post(
+        "/api/pipeline/trigger",
+        headers={"X-Cron-Secret": "test-cron"},
+        json={"stage": "invalid_stage", "dry_run": True},
+    )
+    assert r.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # Stub ScoutSystem — records per-method calls, returns a dataclass result
 # ---------------------------------------------------------------------------

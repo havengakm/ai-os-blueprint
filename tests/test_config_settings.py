@@ -30,6 +30,31 @@ def test_settings_missing_required_raises(monkeypatch):
         get_settings()
 
 
+def test_settings_env_vars_resolve_case_insensitive(monkeypatch):
+    """``Settings.model_config`` sets ``case_sensitive=False`` so a
+    lowercase env var (e.g. from a quirky shell config) resolves the
+    same as the documented uppercase name. Lock that in against
+    regression — operators sometimes set vars lowercase by accident,
+    and a regression here would cause silent ValidationError on
+    deploy.
+
+    Plan 2 Task 2.0.3 (Plan 1 follow-up item 7)."""
+    # Required fields use uppercase, the new SMARTLEAD_API_KEY is the
+    # one we lowercase to verify the case-insensitive path.
+    monkeypatch.setenv("CLIENT_ID", "test-client")
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+    # Lowercase-set field — should still be picked up by pydantic-settings.
+    monkeypatch.setenv("smartlead_api_key", "lowercase-resolved")
+
+    from config.settings import get_settings
+    get_settings.cache_clear()
+    s = get_settings()
+
+    assert s.smartlead_api_key == "lowercase-resolved"
+
+
 def test_settings_lead_stack_keys_default_empty(monkeypatch):
     monkeypatch.setenv("CLIENT_ID", "test-client")
     monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
