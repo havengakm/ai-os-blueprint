@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     voyage_api_key: str = ""
 
     # --- Email sending (Plan 2) ---
+    # Instantly is the locked ESP per docs/superpowers/decisions/2026-04-27-esp-comparison.md.
+    # Smartlead retained for backup-pool warming (~30 days post-switch) but not the build target.
+    instantly_api_key: str = ""
+    instantly_webhook_secret: str = ""
     smartlead_api_key: str = ""
     smartlead_webhook_secret: str = ""
 
