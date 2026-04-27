@@ -339,10 +339,13 @@ Currently `claude_deep_research` runs for every tier-A/B/C contact. Per `feedbac
 Before each LLM-spending step, check `get_contact_cost(contact_id)`. If approaching 5c, halt further enrichment + flag the contact for operator review (`status='cost_ceiling_hit'`).
 
 **Acceptance**:
-- [ ] Contact halted at 5c spend; doesn't continue to compose.
-- [ ] Operator review queue gets the flagged contact.
-- [ ] Configurable per-tier (`client_config.per_contact_cost_ceiling_cents` JSONB; default 5 for all tiers).
-- [ ] 6+ tests covering halt-before-DR, halt-before-icebreaker, halt-before-compose, edge cases.
+- [x] `PerContactCeiling` capability ships at `systems/scout/budget/per_contact_ceiling.py` with `check()` (pure read) + `check_and_mark()` (read + status transition) methods.
+- [x] Configurable via `default_ceiling_cents` constructor arg (default 5c) + per-call `ceiling_cents` override (used when caller has looked up `client_config.per_contact_cost_ceiling_cents` per-tier).
+- [x] 11 unit tests covering pass / halt-at-ceiling / halt-over-ceiling / no-history / per-call-override / zero-ceiling-edge / status-transition-on-halt / no-status-transition-when-passing / programmer-error-without-status-backend.
+- [ ] Wire into `EnrichOrchestrator` before each adapter dispatch — **deferred follow-up** (touches existing 676-line orchestrator; lands as a focused individual commit).
+- [ ] Wire into `Composer` before LLM body generation — **deferred follow-up**.
+- [ ] `client_config.per_contact_cost_ceiling_cents` JSONB column + lookup helper — **deferred** (lands with the wiring commit; caller passes the looked-up value to `check(ceiling_cents=...)`).
+- [ ] Operator review queue integration (transition status='cost_ceiling_hit' → trigger EscalationRuntime.enqueue with type='manual_flag') — **deferred follow-up** (small change once status backend impl lands).
 
 ### Task 2.4.4: Operator cost dashboard (CLI)
 
