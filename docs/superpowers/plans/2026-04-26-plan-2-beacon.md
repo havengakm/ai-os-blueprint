@@ -225,7 +225,7 @@ Replies arrive on this webhook too — they're routed to Phase 3's reply runtime
 - [x] Engagement events (opened / link_clicked) acknowledged with no status change + no decision_log emit (signal-to-noise).
 - [x] Replies inserted into `outreach_reply` + emit `reply_received` decision_log row → picked up by Phase 3 classifier via `idx_reply_pending_classification` partial index.
 - [x] Tests with HMAC-signed payloads cover happy path + bad signature + orphan correlations + unknown event types.
-- [ ] Real Supabase webhook backend (`api.deps.get_beacon_webhook_handler`) — pending; lands with `systems/beacon/storage/webhook_supabase_backend.py`.
+- [x] Real Supabase webhook backend (`SupabaseWebhookBackend`) + `SupabaseSendBackend` + `SupabaseDecisionLogger` (handles both SendStage + WebhookHandler shapes); production wiring via `api.deps.get_beacon_webhook_handler` registered as `dependency_override` in `create_app()`.
 - [ ] Operator applies migration 017 (`scripts/sql/017_decision_log_send_event.sql`) to dev Supabase.
 
 ## Phase 3: Reply ingestion + classification + auto-respond

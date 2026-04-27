@@ -177,3 +177,66 @@ def get_scout_system() -> ScoutSystem:
 @lru_cache(maxsize=1)
 def _scout_system_singleton() -> ScoutSystem:
     return ScoutSystem.from_registry(get_registry())
+
+
+# ---------------------------------------------------------------------------
+# Beacon backends + webhook handler
+# ---------------------------------------------------------------------------
+# Beacon's send + reply ingest backends share the same Supabase client as
+# Scout (single-writer assumption — see module docstring).
+
+
+def get_beacon_send_backend() -> Any:
+    """Real-Supabase impl of the SendBackend Protocol (SendStage)."""
+    return _beacon_send_backend_singleton()
+
+
+def get_beacon_webhook_backend() -> Any:
+    """Real-Supabase impl of the BeaconWebhookBackend Protocol."""
+    return _beacon_webhook_backend_singleton()
+
+
+def get_beacon_decision_logger() -> Any:
+    """SupabaseDecisionLogger — used by both SendStage and WebhookHandler."""
+    return _beacon_decision_logger_singleton()
+
+
+def get_beacon_webhook_handler() -> Any:
+    """Production WebhookHandler wired to the real Supabase backends.
+
+    Used as a FastAPI ``dependency_overrides`` target for
+    ``api.routers.beacon_webhooks.get_webhook_handler``. Tests override
+    this with a fake-backed handler instead.
+    """
+    return _beacon_webhook_handler_singleton()
+
+
+@lru_cache(maxsize=1)
+def _beacon_send_backend_singleton() -> Any:
+    from systems.beacon.storage.send_supabase_backend import SupabaseSendBackend
+    return SupabaseSendBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _beacon_webhook_backend_singleton() -> Any:
+    from systems.beacon.storage.webhook_supabase_backend import (
+        SupabaseWebhookBackend,
+    )
+    return SupabaseWebhookBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _beacon_decision_logger_singleton() -> Any:
+    from systems.beacon.storage.decision_logger_supabase import (
+        SupabaseDecisionLogger,
+    )
+    return SupabaseDecisionLogger(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _beacon_webhook_handler_singleton() -> Any:
+    from systems.beacon.pipeline.webhook_handler import WebhookHandler
+    return WebhookHandler(
+        backend=get_beacon_webhook_backend(),
+        decision_logger=get_beacon_decision_logger(),
+    )
