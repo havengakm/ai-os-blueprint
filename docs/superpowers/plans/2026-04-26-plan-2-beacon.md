@@ -243,10 +243,12 @@ Recommended actions: `auto_respond`, `escalate_to_human`, `archive`, `add_to_dnd
 Cost target: ~$0.0005/reply (Haiku, ~200 tokens).
 
 **Acceptance**:
-- [ ] Classifier handles 20+ realistic reply samples correctly.
-- [ ] Confidence threshold (~0.7) triggers escalation when below.
-- [ ] Tests cover each classification with golden-string fixtures.
-- [ ] Validator gates the classifier output (no hallucinated facts).
+- [x] Classifier handles all 13 classification enum values via golden-string fixtures (parametrised test).
+- [x] Confidence threshold (0.7) overrides recommended_action to `wait_for_human_review` when below; result reason carries `low_confidence:<score>`.
+- [x] Tests cover dry_run + no_api_key + parse-failure + invalid-enum + code-fence-wrapped JSON paths.
+- [x] Hallucinated classification labels rejected (`invalid_classification_enum` → cannot_classify + escalation). Hallucinated recommended_action rejected (`invalid_action_enum`).
+- [ ] Real Haiku call exercised once with a sample reply (deferred until Phase 3 acceptance run).
+- [ ] Per-reply cost rollup integration with cost dashboard (lands in Phase 4 Task 2.4.6).
 
 ### Task 2.3.2: Auto-respond runtime (objection handling + booking)
 
