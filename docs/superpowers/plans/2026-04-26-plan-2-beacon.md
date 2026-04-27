@@ -17,8 +17,8 @@ This plan doc is the source of truth. If a decision changes mid-execution, updat
 ### In scope
 
 - **Phase 0**: Pre-Plan-2 hardening from `docs/superpowers/plans/follow-ups-plan1.md` items 1-15 (the items explicitly tagged for the Plan-2-kickoff window).
-- **Phase 1**: ESP evaluation (Instantly / Smartlead / PlusVibe.ai). Operator picks based on a 1-page comparison.
-- **Phase 2**: Beacon email send foundation. Schema (outreach_send_log, outreach_reply, send_account, send_caps), Beacon adapter against the chosen ESP, send orchestrator (daily caps + DND check + buying signal gate), webhook signature verification, send-time autonomy gating.
+- **Phase 1**: ESP evaluation. ✅ DECIDED 2026-04-27 = **Instantly Growth ($47/mo)** — see `docs/superpowers/decisions/2026-04-27-esp-comparison.md`.
+- **Phase 2**: Beacon email send foundation. Schema (outreach_send_log, outreach_reply, send_account, send_caps), Beacon adapter against **Instantly v2 API**, send orchestrator (daily caps + DND check + buying signal gate), webhook signature verification, send-time autonomy gating.
 - **Phase 3**: Reply ingestion + classification + auto-respond runtime. Webhook ingest, Haiku classifier (positive / negative / objection / unsubscribe / OOO), auto-respond for objections + bookings, human escalation queue, 90-day cool-off + round-based re-entry.
 - **Phase 4**: Cost optimiser foundation. Signal-gated Deep Research (only fire `claude_deep_research` when Trigify returned no signal), per-contact cost rollup SQL view + RPC, per-contact 5c hard ceiling, operator cost dashboard (CLI initially).
 - **Phase 5**: Optimizer agent v1 (read-only recommendations). Weekly review job that reads decision_log + outreach_send_log + outreach_reply: cost-per-lead / cost-per-reply / cost-per-meeting, variant performance (which subjects/icebreakers convert), adapter ROI (which signals correlate with positive replies), recommendations surfaced to operator. No auto-apply yet — operator approves before changes ship.
@@ -115,7 +115,7 @@ Distinguish empty-page vs CAPTCHA / rate-limit / layout-change in pagination. Ha
 - [ ] HTTP 429 / 403 / 503 trigger backoff + retry, not abort.
 - [ ] Tests cover both paths (mocked HTTP responses).
 
-## Phase 1: ESP evaluation
+## Phase 1: ESP evaluation ✅ COMPLETE (2026-04-27 = Instantly Growth)
 
 ### Task 2.1.1: ESP comparison doc — Instantly vs Smartlead vs PlusVibe.ai
 
@@ -165,9 +165,17 @@ Plus `contacts.touch_state` (text, nullable) for cross-channel state tracking.
 - [ ] `EnrichBackend.persist_send_attempt()` etc. callable from Python.
 - [ ] All new columns have sensible defaults; no breaking change to existing reads.
 
-### Task 2.2.2: Beacon adapter (against chosen ESP)
+### Task 2.2.2: Beacon adapter (Instantly v2 API)
 
-**File**: `systems/beacon/__init__.py`, `systems/beacon/adapter.py`, `systems/beacon/skill.py`, `systems/beacon/storage/{smartlead,instantly}_adapter.py` (whichever picked in 2.1.1).
+**File**: `systems/beacon/__init__.py`, `systems/beacon/adapter.py`, `systems/beacon/skill.py`, `systems/beacon/storage/instantly_adapter.py`.
+
+Target endpoints (validated 2026-04-27 against `developer.instantly.ai/llms.txt`):
+- `POST /api/v2/campaigns` — create campaign
+- `PATCH /api/v2/campaign-subsequences/:id` — update sequence step content (body + subject)
+- `POST /api/v2/leads/bulk` — add leads (1000 per request)
+- `POST /api/v2/campaigns/:id/activate` — launch / resume
+- `GET /api/v2/emails` — pull replies (rate-limited 20 req/min)
+- `POST /api/v2/emails/:id/reply` — send reply
 
 Adapter responsibilities:
 - `add_lead_to_campaign(client_id, contact_id, draft_id, account_id) -> esp_message_id`
@@ -179,7 +187,7 @@ Mirrors the Scout adapter pattern (Apollo, Trigify): protocol-based dependency i
 
 **Acceptance**:
 - [ ] Adapter contract documented + tested with FakeESP.
-- [ ] Real adapter against the chosen ESP works against a sandbox/test campaign.
+- [ ] Real adapter against Instantly v2 API works against a sandbox/test campaign.
 - [ ] Cost discipline: Haiku for any LLM-tokenised step, never Opus, Sonnet only when conversational reasoning is required.
 
 ### Task 2.2.3: Send orchestrator (daily caps + DND + buying signal gate)
