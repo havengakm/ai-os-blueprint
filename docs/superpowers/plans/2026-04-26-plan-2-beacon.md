@@ -423,10 +423,14 @@ Cron-scheduled (e.g. Monday 6am operator-local) job that produces a per-client w
 Each recommendation has a confidence score + the underlying numbers. Operator reviews + approves before changes apply.
 
 **Acceptance**:
-- [ ] Optimizer can be invoked manually via `uv run python scripts/run_optimizer_weekly.py --client-id=kirsten-client-zero`.
-- [ ] Report renders to markdown (committed to `data/captures/optimizer/<date>.md` for record).
-- [ ] Slack notification with summary + link to full report.
-- [ ] 8+ tests covering each analysis section against fixture data.
+- [x] `uv run python scripts/run_optimizer_weekly.py --client-id=<id> [--days=7]` invokes the review.
+- [x] Report renders to `data/captures/optimizer/<YYYY-MM-DD>-<client_id>.md` (idempotent — re-running same date overwrites).
+- [x] Slack notification posts a one-block summary when `SLACK_WEBHOOK_URL` set; silent no-op otherwise. Slack failure logged to stderr but never blocks the job.
+- [x] 10 tests: 6 WeeklyReview unit (full report, reply_rate edge cases, cool-off counts, render_markdown sections + empty-data) + 4 CLI smoke (slack summary format, report path, no-Slack no-op, slack-failure-swallowed).
+- [x] Agent persona at `agents/optimizer.md` documents how to invoke + what's in/out of scope for v1 vs v2 (Plan 4 autoresearch).
+- [ ] **v1 covers**: cost analysis (reuses cost_dashboard fetcher) + reply rate + pending recommendations count + open escalations count + cool-off queue. **Deferred to v2** (need data first): variant performance, adapter ROI, send-time analysis.
+- [ ] Operator schedules cron (e.g. Monday 6am operator-local) — operator-side.
+- [ ] Operator-side: verify against kirsten-client-zero after migrations 020-022 applied.
 
 ### Task 2.5.2: Recommendation persistence + approval flow
 
