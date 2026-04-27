@@ -157,7 +157,15 @@ async def run_render(
 async def trigger(req: TriggerRequest):
     """Legacy stage-name dispatch stub. Real work is done by the
     per-stage endpoints above (``/pull``, ``/score``, etc.). Kept so
-    existing cron entries continue to succeed during the transition."""
+    existing cron entries continue to succeed during the transition.
+
+    NOTE: ``status="accepted"`` is a silent-success acknowledgement —
+    the request validated against the ``TriggerRequest`` Literal but
+    nothing was dispatched. Real callers should use the per-stage
+    endpoints. Operators monitoring this endpoint must know that an
+    "accepted" response confirms only that the stage name was
+    syntactically valid + the cron secret matched, NOT that any
+    pipeline stage actually ran."""
     return {
         "stage": req.stage,
         "dry_run": req.dry_run,
