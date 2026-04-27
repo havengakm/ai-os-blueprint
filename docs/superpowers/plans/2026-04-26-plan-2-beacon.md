@@ -18,7 +18,7 @@ This plan doc is the source of truth. If a decision changes mid-execution, updat
 
 - **Phase 0**: Pre-Plan-2 hardening from `docs/superpowers/plans/follow-ups-plan1.md` items 1-15 (the items explicitly tagged for the Plan-2-kickoff window).
 - **Phase 1**: ESP evaluation. ✅ DECIDED 2026-04-27 = **Instantly Growth ($47/mo)** — see `docs/superpowers/decisions/2026-04-27-esp-comparison.md`.
-- **Phase 2**: Beacon email send foundation. Schema (outreach_send_log, outreach_reply, send_account, send_caps), Beacon adapter against **Instantly v2 API**, send orchestrator (daily caps + DND check + buying signal gate), webhook signature verification, send-time autonomy gating.
+- **Phase 2**: Beacon email send foundation. Schema (outreach_send_log, outreach_reply, send_account, send_caps), Beacon adapter against **Instantly v2 API**, send orchestrator (tier gate + DND check + daily cap + per-contact cost ceiling + autonomy), webhook signature verification, send-time autonomy gating. Signal-presence is a **ranking** factor (signal-having contacts go first within the same tier), not a gate.
 - **Phase 3**: Reply ingestion + classification + auto-respond runtime. Webhook ingest, Haiku classifier (positive / negative / objection / unsubscribe / OOO), auto-respond for objections + bookings, human escalation queue, 90-day cool-off + round-based re-entry.
 - **Phase 4**: Cost optimiser foundation. Signal-gated Deep Research (only fire `claude_deep_research` when Trigify returned no signal), per-contact cost rollup SQL view + RPC, per-contact 5c hard ceiling, operator cost dashboard (CLI initially).
 - **Phase 5**: Optimizer agent v1 (read-only recommendations). Weekly review job that reads decision_log + outreach_send_log + outreach_reply: cost-per-lead / cost-per-reply / cost-per-meeting, variant performance (which subjects/icebreakers convert), adapter ROI (which signals correlate with positive replies), recommendations surfaced to operator. No auto-apply yet — operator approves before changes ship.
@@ -190,12 +190,12 @@ Mirrors the Scout adapter pattern (Apollo, Trigify): protocol-based dependency i
 - [ ] Real adapter against Instantly v2 API works against a sandbox/test campaign.
 - [ ] Cost discipline: Haiku for any LLM-tokenised step, never Opus, Sonnet only when conversational reasoning is required.
 
-### Task 2.2.3: Send orchestrator (daily caps + DND + buying signal gate)
+### Task 2.2.3: Send orchestrator (tier + DND + daily caps + cost ceiling + autonomy)
 
 **File**: `systems/beacon/pipeline/send_stage.py`, `systems/beacon/storage/send_caps.py`.
 
 Pipeline stage runs after compose. For each contact with a draft and `status='ready_to_send'`:
-1. Check buying signal present in `research_data` — REQUIRED per `feedback_surround_sound_architecture` ("buying signals REQUIRED before send").
+1. Check `icp_tier` is in {A, B, C}. Tier D and archived contacts blocked. **Note**: signal presence is NOT a gate — it's a ranking factor only. Signal-having contacts get priority within their tier (better reply-rate odds via more relevant outreach), but no-signal contacts are still sendable as a colder list. Per operator clarification 2026-04-27: "Signals = high quality lead because we can approach them with more relevance to their situation which will equal an overall better reply rate. If they don't have signals, we can still message them, they will just be scored lower and be a colder list."
 2. Check global DND (`contacts.dnd_at IS NULL` or contact-level opt-out).
 3. Check daily cap on the chosen send account (`send_caps_daily.sent_count < send_account.daily_cap`).
 4. Check per-contact 5c cost ceiling (Phase 5).
@@ -209,7 +209,7 @@ Autonomy levels respected: at `suggest`, queue the send for human review; at `ac
 - [ ] Send orchestrator dispatches when all gates pass.
 - [ ] Send blocked + decision_log entry written when any gate fails.
 - [ ] Daily cap enforced atomically (no race conditions on cap exhaustion).
-- [ ] 8+ tests covering the gates (signal absent, DND, cap exhausted, cost ceiling, autonomy gate, success path, etc.).
+- [ ] 8+ tests covering the gates (DND, cap exhausted, cost ceiling, autonomy gate, success path, dry_run, ranking-by-signal, etc.).
 
 ### Task 2.2.4: ESP webhook ingest endpoint
 
