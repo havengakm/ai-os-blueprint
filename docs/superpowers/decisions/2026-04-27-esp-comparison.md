@@ -3,7 +3,7 @@
 **Decision required:** which Email Service Provider does Beacon (Plan 2 Phase 2) build against?
 **Decision owner:** Kirsten
 **Decision target date:** before Plan 2 Phase 2 kickoff
-**Status:** **DRAFT — operator decision pending** (see "Operator decision" section at the bottom)
+**Status:** ✅ **DECIDED 2026-04-27 — Instantly Growth ($47/mo)** — see "Operator decision" section at the bottom
 
 ## Context
 
@@ -104,29 +104,50 @@ Per `feedback_esp_evaluation_pending`, in order:
 
 **PlusVibe is dropped** — no developer API. Webhook/Zapier integrations don't cover Beacon's needs (programmatic campaign create, sequence step injection, reply pull).
 
-## Open questions for operator
+## Open questions for operator (RESOLVED 2026-04-27)
 
-Before final decision:
+1. **Smartlead pool warming duration?** → 10 days (started Apr 17). Low sunk cost.
+2. **Have you exercised Smartlead's Pro tier API ($94)?** → No.
+3. **"Smartlead API is better" — hands-on or marketing impression?** → Marketing impression. Operator hadn't used the API hands-on, only the warming free trial.
+4. **Multi-client volume cap concern?** → Each client gets its own sub-account at agency level. Per-client volume cap, not per-org. 5K/mo Growth tier = 1 client; agency scaling moves to Hypergrowth $97 (100K/mo) which still beats Smartlead Smart $174.
 
-1. **How many days has the Smartlead pool been warming?** If <14 days, switching is low-cost. If 21+, the warming sunk cost matters.
-2. **Have you exercised Smartlead's Pro tier API ($94)?** Their pricing page lists "API access" on Pro but the docs are thin — the $174 Smart tier is where "full API access" is explicit. Worth a 30-min sandbox spike to confirm Pro tier covers Beacon's needs.
-3. **Was the "Smartlead API is better" comment based on hands-on use or marketing impression?** Hands-on > marketing.
-4. **Is there a 3-5 account multi-client need we'd hit on Instantly's Growth tier?** "Unlimited accounts" is true but the 5K monthly email cap might bite on the cohort scale Plan 2 Phase 2 needs.
+## Mid-decision technical validation: programmatic campaign creation
 
-## Operator decision
+Operator raised a critical concern late in the eval: **"can you push email campaigns using Instantly API, or do campaigns have to be pre-built with merge fields?"** Validated against both APIs:
 
-**To be filled in by Kirsten:**
+**Instantly v2 API supports the full Beacon + Plan 4 autoresearch loop:**
 
-- [ ] Final ESP choice: ☐ Instantly  ☐ Smartlead  ☐ PlusVibe.ai  ☐ Other
-- [ ] Tier picked: __________
-- [ ] Reasoning (1-2 sentences): __________
-- [ ] Sunk-cost decision on existing Smartlead warming: ☐ keep warming as backup ☐ pause warming ☐ switch all to chosen ESP
-- [ ] Decision date: __________
+| Need | Endpoint |
+|---|---|
+| Create campaign | `POST /api/v2/campaigns` |
+| Update sequence step content (email body) | `PATCH /api/v2/campaign-subsequences/:id` |
+| Add leads (1000 per request) | `POST /api/v2/leads/bulk` |
+| Launch / resume | `POST /api/v2/campaigns/:id/activate` |
+| Pull replies + emails | `GET /api/v2/emails` |
+| Send a reply | `POST /api/v2/emails/:id/reply` |
 
-After operator fills this in, append a row to `memory/INDEX.md` Recent Decisions and update Plan 2 plan doc's references from "the chosen ESP" to the actual name.
+**Smartlead API parity** (from their llms.txt index): `POST /campaigns/create`, `POST /campaigns/{id}/sequences`, `POST /campaigns/{id}/leads`, `PATCH /campaigns/{id}/status`. Reply-pull endpoint not surfaced in the public index but likely exists deeper.
+
+**Reference proof point:** Nick Saraev's autoresearch orchestrator (the inspiration for Plan 4) deploys baseline + challenger campaigns autonomously via Instantly's API — the pattern is validated working.
+
+**The merge-fields concern is half-true:** Yes, Instantly campaigns use templates with `{{firstName}}` placeholders. But the template body itself can be created + updated programmatically via `PATCH /api/v2/campaign-subsequences/:id`. So Plan 4 autoresearch's auto-generated challengers can land as new campaigns + sequence content via API without any UI touch.
+
+## Operator decision (2026-04-27)
+
+- [x] **Final ESP choice: Instantly**
+- [x] **Tier picked: Growth ($47/mo)** — covers MVP volume + API + webhooks + unlimited warmup. Upgrade to Hypergrowth ($97/mo) when agency scales to 5+ clients.
+- [x] **Reasoning:** API parity at $47 vs Smartlead Smart $174 (3.7× cheaper). Operator's "Smartlead API better" was marketing impression, never hands-on validated. Max Mitcham reference value (Trigify ↔ Instantly patterns + Saraev's working orchestrator). 10 days of Smartlead warming is recoverable.
+- [x] **Sunk-cost decision on Smartlead pool:** Keep warming as backup for 30 more days; pause adding NEW domains there. Start fresh Instantly warming pool. Switch send activity Instantly once it's fully warmed (~30 days from start).
+- [x] **Decision date:** 2026-04-27.
+
+Next steps unblocked:
+- Plan 2 plan doc references updated from "the chosen ESP" → "Instantly".
+- `memory/INDEX.md` decision row added.
+- `feedback_esp_evaluation_pending` harness memory marked resolved.
+- Phase 2 (Beacon email foundation) starts; Beacon adapter targets Instantly v2 API.
 
 ## What this doc does NOT do
 
-- Does not run a hands-on API sandbox spike. That's the next step if the doc-level analysis isn't enough to decide.
 - Does not commit to an architecture for `Beacon` — that's Plan 2 Phase 2 task work.
-- Does not pre-build adapters for both — per the operator decision rule, build against the picked ESP first; abstract later only if a second ESP is needed.
+- Does not pre-build adapters for both — operator decision rule: build against Instantly first; abstract only if a second ESP is needed later.
+- Does not run a hands-on API sandbox spike — operator chose to lock in based on doc + Saraev's working orchestrator as proof points. If unexpected gaps surface during Phase 2, revisit.
