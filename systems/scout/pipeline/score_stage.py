@@ -127,6 +127,20 @@ class ScoreStorageBackend(Protocol):
     ) -> None: ...
 
 
+class UncertainZoneJudgeProtocol(Protocol):
+    """Protocol matched by ``systems.scout.score.uncertain_zone_judge.UncertainZoneJudge``.
+    Defined inline (not imported) so this stage stays decoupled from the
+    judge implementation — tests inject a fake judge directly."""
+
+    async def judge(
+        self,
+        *,
+        contact: dict[str, Any],
+        client_icp: dict[str, Any],
+        dry_run: bool = False,
+    ) -> Any: ...
+
+
 # ---------------------------------------------------------------------------
 # Stage
 # ---------------------------------------------------------------------------
@@ -138,8 +152,34 @@ class ScoreStage:
     Standalone orchestrator — no BaseSystem, no foundation loading (Task 17).
     """
 
-    def __init__(self, storage: ScoreStorageBackend) -> None:
+    def __init__(
+        self,
+        storage: ScoreStorageBackend,
+        *,
+        judge: "UncertainZoneJudgeProtocol | None" = None,
+    ) -> None:
+        """``judge`` (optional, Plan 2 Phase 5 Task 2.5.7) is invoked for
+        contacts whose rule-based score lands in the uncertain zone
+        (default 40-60, configurable per ``client_config.icp.uncertain_zone``).
+        It returns a nudge ∈ {-15, -5, 0, +5, +15} applied to the score
+        before tier assignment. When ``judge`` is None, behaviour matches
+        the pre-Phase-5 rule-only path."""
         self._storage = storage
+        self._judge = judge
+
+    @staticmethod
+    def _uncertain_zone_bounds(client_config: dict[str, Any]) -> tuple[int, int]:
+        """Read uncertain-zone bounds from client_config.icp.uncertain_zone,
+        falling back to (40, 60). Returned as (low, high) inclusive."""
+        from systems.scout.score.uncertain_zone_judge import (
+            DEFAULT_UNCERTAIN_ZONE_HIGH,
+            DEFAULT_UNCERTAIN_ZONE_LOW,
+        )
+        zone = (client_config.get("icp") or {}).get("uncertain_zone") or {}
+        return (
+            int(zone.get("low", DEFAULT_UNCERTAIN_ZONE_LOW)),
+            int(zone.get("high", DEFAULT_UNCERTAIN_ZONE_HIGH)),
+        )
 
     async def run(
         self,
@@ -177,9 +217,33 @@ class ScoreStage:
             )
         )
 
+        zone_low, zone_high = self._uncertain_zone_bounds(client_config)
+        client_icp = client_config.get("icp") or {}
+
         for contact in contacts:
             contact_dict = asdict(contact)
             score = score_fn(contact_dict, client_config)
+
+            # Plan 2 Phase 5 Task 2.5.7: uncertain-zone LLM augment.
+            # When the rule score lands in the configured zone, ask the
+            # judge for a nudge ∈ {-15, -5, 0, +5, +15}. Judge failure
+            # falls back silently to the rule score (fail-safe — never
+            # lose a contact to a judge outage).
+            if (
+                self._judge is not None
+                and zone_low <= score <= zone_high
+            ):
+                nudge_result = await self._call_judge(
+                    client_id=client_id,
+                    contact_id=contact.contact_id,
+                    contact_dict=contact_dict,
+                    client_icp=client_icp,
+                    rule_score=score,
+                    dry_run=dry_run,
+                )
+                if nudge_result is not None:
+                    score = max(0, min(100, score + nudge_result))
+
             tier = assign_tier(score, client_config)
 
             if tier == "archive":
@@ -255,3 +319,72 @@ class ScoreStage:
             )
         except Exception:
             pass  # logging must never propagate
+
+    async def _call_judge(
+        self,
+        *,
+        client_id: str,
+        contact_id: str,
+        contact_dict: dict[str, Any],
+        client_icp: dict[str, Any],
+        rule_score: int,
+        dry_run: bool,
+    ) -> int | None:
+        """Dispatch the uncertain-zone judge + emit decision_log.
+
+        Returns the nudge to apply (int) on success, or None when the
+        judge raised — caller falls back to the rule score in either
+        the None case OR the ok=False NudgeResult case (both produce
+        nudge=0 effectively, but None signals "don't even log because
+        the judge isn't reachable").
+
+        On a successful call (ok=True or ok=False), emits a
+        decision_log row with decision_type='icp_threshold' so the
+        cost dashboard + Optimizer can audit judge behaviour.
+        """
+        try:
+            result = await self._judge.judge(
+                contact=contact_dict,
+                client_icp=client_icp,
+                dry_run=dry_run,
+            )
+        except Exception as exc:
+            # Judge outage — fail-safe to rule score.
+            try:
+                await self._storage.log_decision(
+                    client_id,
+                    decision_type="icp_threshold",
+                    decision=f"uncertain_zone_judge:error:{contact_id}",
+                    reasoning=f"{type(exc).__name__}: {exc}"[:500],
+                    context={
+                        "contact_id": contact_id,
+                        "rule_score": rule_score,
+                        "nudge": 0,
+                        "reason": "judge_error",
+                    },
+                )
+            except Exception:
+                pass
+            return None
+
+        nudge = getattr(result, "nudge", 0)
+        reason = getattr(result, "reason", "ok")
+        reasoning = getattr(result, "reasoning", "") or ""
+
+        try:
+            await self._storage.log_decision(
+                client_id,
+                decision_type="icp_threshold",
+                decision=f"uncertain_zone_judge:{contact_id}",
+                reasoning=reasoning[:500],
+                context={
+                    "contact_id": contact_id,
+                    "rule_score": rule_score,
+                    "nudge": nudge,
+                    "reason": reason,
+                },
+            )
+        except Exception:
+            pass
+
+        return nudge

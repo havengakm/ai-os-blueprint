@@ -534,12 +534,15 @@ When the rule-based `icp_score` lands in the uncertain zone (default 40-60, conf
 Cost-bounded: only ~10-20% of contacts hit the uncertain zone, so per-cohort cost stays low (~0.1c each via Haiku). Maintains tier_budget tracking like other adapters.
 
 **Acceptance**:
-- [ ] Contact with rule-score=50 fires the LLM judge; judgment lands in `decision_log`.
-- [ ] Final score = rule_score + nudge.
-- [ ] Contact with rule-score=20 (clearly archive) skips the judge — no LLM call.
-- [ ] Contact with rule-score=85 (clearly Tier A) skips the judge.
-- [ ] Tests: 4 contacts at scores {20, 45, 55, 90}; LLM fires for 2 of them.
-- [ ] Per-tier cost increase measured against the cost dashboard from Task 2.4.4.
+- [x] `UncertainZoneJudge` capability ships at `systems/scout/score/uncertain_zone_judge.py` with Haiku 4.5 backend, prompt at `systems/scout/score/prompts/uncertain_zone_judge.md`, default uncertain zone 40-60 (configurable via `client_config.icp.uncertain_zone`).
+- [x] Wired into `ScoreStage` as an optional injection — backward compat preserved when no judge configured. Judge invoked only when rule score in zone (clearly-archive + clearly-Tier-A skip the LLM call).
+- [x] Final score = `clamp(rule_score + nudge, 0, 100)`. Nudge ∈ {-15, -5, 0, +5, +15}; invalid values fall back to nudge=0 (rule score stands).
+- [x] Decision-log entry per judge call: `decision_type='icp_threshold'`, decision starts with `uncertain_zone_judge:`, context carries contact_id + rule_score + nudge + reason.
+- [x] Judge failure (raise / no_api_key / parse_failed) is fail-safe — score_stage continues with the rule score; no contact lost.
+- [x] 30 tests: 21 judge unit (constants, zone helper, all 5 valid nudges, dry_run, no_api_key, parse failures, code-fence, prompt assembly) + 9 score_stage integration (no-judge backward compat, in-zone fires, below-zone skipped, above-zone skipped, custom bounds, tier promotion, score clamping, judge exception fallback, ok=False fallback).
+- [ ] Real Haiku call exercised against a sample contact — operator-side after Phase 5 acceptance run.
+- [ ] Per-tier cost increase measured via cost dashboard (Task 2.4.4) — operator-side.
+- [ ] Wire into production via `api.deps.get_uncertain_zone_judge` — deferred follow-up (capability ships, ScoreStage takes the optional injection; production wiring is a thin call-site addition).
 
 ## Phase 6: Productisation deployment script
 
