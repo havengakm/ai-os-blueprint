@@ -47,6 +47,33 @@ TIER_ADAPTERS: dict[str, list[str]] = {
 _DECISION_TYPE: Final[str] = "enrich_contact"
 
 
+# Plan 2 Phase 4 Task 2.4.1: signal-gated Deep Research.
+# Per ``feedback_plan15_cost_optimizations``: claude_deep_research only
+# fires when no buying signals were surfaced by prior adapters.
+# Tier 1-3 icebreakers fire from those signals; only Tier 4 fallback
+# contacts need the full website extract from DR.
+def _should_run_deep_research(adapter_results: dict[str, "EnrichResult"]) -> bool:
+    """Return True if claude_deep_research should run for this contact.
+
+    Returns False when ANY prior adapter result has:
+      - non-empty ``trigger_events`` in ``data`` (Trigify), OR
+      - non-empty ``structural_signals`` in ``data`` (claude_web_triggers,
+        apollo_enrich, future adapters)
+
+    Empty / missing fields don't count — the absence of a signal is
+    what triggers DR (the whole point of running it is to find one
+    via website extraction)."""
+    for ar in adapter_results.values():
+        if ar is None or not getattr(ar, "data", None):
+            continue
+        data = ar.data
+        if data.get("trigger_events"):
+            return False
+        if data.get("structural_signals"):
+            return False
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # Budget tracker protocol                                                       #
 # --------------------------------------------------------------------------- #
@@ -196,6 +223,25 @@ class EnrichOrchestrator:
                 continue
 
             adapter = self._adapters[name]
+
+            # --- signal-gated Deep Research ---------------------------
+            # Plan 2 Phase 4 Task 2.4.1: skip claude_deep_research when
+            # prior adapters have already surfaced trigger_events
+            # (Trigify) or structural_signals (web_triggers / apollo).
+            # Tier 1-3 icebreakers fire from those signals; only Tier 4
+            # fallback contacts need the full website extract.
+            # Other adapters in the tier list are NOT signal-gated.
+            if name == "claude_deep_research" and not _should_run_deep_research(
+                result.adapter_results
+            ):
+                result.skipped[name] = "signal_gated_skip"
+                await self._log_signal_gated_skip(
+                    client_id=client_id,
+                    contact_id=contact_id,
+                    tier=tier,
+                    adapter_name=name,
+                )
+                continue
 
             # --- budget check ----------------------------------------
             #
@@ -439,6 +485,39 @@ class EnrichOrchestrator:
                 decision=decision,
                 reasoning=reasoning,
                 context=context,
+                source="system",
+                confidence=None,
+            )
+        except Exception:
+            pass  # logging must never break the fan-out
+
+    async def _log_signal_gated_skip(
+        self,
+        client_id: str,
+        contact_id: str,
+        tier: str,
+        adapter_name: str,
+    ) -> None:
+        """Plan 2 Phase 4 Task 2.4.1: log when claude_deep_research is
+        skipped because earlier adapters surfaced buying signals."""
+        if self._decision_logger is None:
+            return
+        try:
+            await self._decision_logger.log_decision(
+                client_id=client_id,
+                decision_type=_DECISION_TYPE,
+                decision=f"enrich_contact:{tier}:{adapter_name}:signal_gated_skip",
+                reasoning=(
+                    f"Tier {tier} contact has prior trigger_events or "
+                    f"structural_signals; skipping {adapter_name} per "
+                    "feedback_plan15_cost_optimizations."
+                ),
+                context={
+                    "contact_id": contact_id,
+                    "tier": tier,
+                    "adapter": adapter_name,
+                    "reason": "signal_gated_skip",
+                },
                 source="system",
                 confidence=None,
             )

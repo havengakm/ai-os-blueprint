@@ -315,10 +315,11 @@ Closes the gap from today's $0.01-0.03/contact toward the $0.002 target.
 Currently `claude_deep_research` runs for every tier-A/B/C contact. Per `feedback_plan15_cost_optimizations`: only fire when Trigify + structural signals are absent. Tier 1-3 icebreaker contacts skip Deep Research entirely; only Tier 4 fallback contacts need the website extract.
 
 **Acceptance**:
-- [ ] `_should_run_deep_research(contact, merged_research_data) -> bool` predicate at orchestrator level.
-- [ ] Per-contact cost drops to ~$0.005 when signal-gating active (verified via decision_log spend rollup).
-- [ ] Tests: contact with trigger_event signals → DR skipped; contact with no signals → DR runs.
-- [ ] Quality regression: a 20-contact cohort produces equivalent or better icebreaker quality vs always-on DR (manual operator review against the 4-tier ladder).
+- [x] `_should_run_deep_research(adapter_results)` predicate at orchestrator module level — checks every prior adapter's `data` for non-empty `trigger_events` (Trigify) or `structural_signals` (claude_web_triggers, apollo_enrich).
+- [x] DR skipped with `signal_gated_skip` reason in `result.skipped` + `decision_log` entry via `_log_signal_gated_skip`. Other adapters in the tier list are NOT signal-gated (zerobounce, trigify, web_triggers, apollo always run).
+- [x] 8 tests cover: trigify signals → DR skipped / web_triggers signals → DR skipped / apollo signals → DR skipped / both signal types → DR skipped / no signals anywhere → DR runs / empty signal arrays → DR runs / other adapters not gated / cost-not-charged-on-gate-skip.
+- [ ] Per-contact cost drops to ~$0.005 verified via the cost dashboard against kirsten-client-zero — operator-side after migration 020 + a reseed run.
+- [ ] Quality regression: 20-contact icebreaker cohort vs always-on DR — operator manual review.
 
 ### Task 2.4.2: Per-contact cost rollup view
 
