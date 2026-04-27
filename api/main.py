@@ -19,7 +19,7 @@ import structlog
 from fastapi import FastAPI
 
 from config.settings import get_settings
-from api.routers import health, pipeline
+from api.routers import beacon_webhooks, health, pipeline
 
 
 def _configure_logging(level: str) -> None:
@@ -45,5 +45,6 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(pipeline.router)
+    app.include_router(beacon_webhooks.router)
 
     return app

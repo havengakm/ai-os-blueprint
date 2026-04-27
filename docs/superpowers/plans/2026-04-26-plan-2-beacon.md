@@ -220,10 +220,13 @@ POST endpoint receives ESP webhook events (sent, bounced, delivered, opened, cli
 Replies arrive on this webhook too — they're routed to Phase 3's reply runtime via `outreach_reply` insert + a `decision_type='reply_received'` decision_log row.
 
 **Acceptance**:
-- [ ] Webhook signature verification works (rejects on bad signature).
-- [ ] All 6 event types update the right status/state.
-- [ ] Replies trigger Phase 3 classification (Phase 3 task 2.3.2).
-- [ ] Tests with FakeESP-signed payloads cover happy path + bad signature.
+- [x] Webhook signature verification works (rejects on bad signature).
+- [x] All status-changing event types (sent / bounced / deferred / failed / complained) update outreach_send_log.status + emit `send_event` decision_log row.
+- [x] Engagement events (opened / link_clicked) acknowledged with no status change + no decision_log emit (signal-to-noise).
+- [x] Replies inserted into `outreach_reply` + emit `reply_received` decision_log row → picked up by Phase 3 classifier via `idx_reply_pending_classification` partial index.
+- [x] Tests with HMAC-signed payloads cover happy path + bad signature + orphan correlations + unknown event types.
+- [ ] Real Supabase webhook backend (`api.deps.get_beacon_webhook_handler`) — pending; lands with `systems/beacon/storage/webhook_supabase_backend.py`.
+- [ ] Operator applies migration 017 (`scripts/sql/017_decision_log_send_event.sql`) to dev Supabase.
 
 ## Phase 3: Reply ingestion + classification + auto-respond
 
