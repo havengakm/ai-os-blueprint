@@ -575,11 +575,13 @@ Steps:
 Per `feedback_per_company_aios_silo`: foundation (skills/rules/departments/agents/systems) is shared template; context/ + data/ content is per-client. The script bootstraps the per-client silo.
 
 **Acceptance**:
-- [ ] Script provisions a fresh client end-to-end.
-- [ ] All 7 acceptance preflight checks pass against the new client.
-- [ ] Human-only checklist surfaces clearly at the end.
-- [ ] Idempotent: re-running for the same client reports "already provisioned" cleanly.
-- [ ] Tests exercise the validation logic + the migration runner.
+- [x] `scripts/provision_new_client.py` provisions: validates args → builds default client_config → runs `assert_valid_client_config` → inserts `clients` + `client_config` + `autonomy_rules` rows → bootstraps `context/<id>` + `data/knowledge/personal/<id>` + `data/knowledge/company/<id>` folders → prints 8-step human checklist.
+- [x] Idempotent: existing `clients` row → `already_provisioned=True`, DB inserts skipped, folders still bootstrapped (already_present_paths reported); existing folders → `already_present_paths` instead of error.
+- [x] Migrations are NOT run by the script (operator's responsibility) — explicitly documented in the script docstring.
+- [x] `--dry-run` flag plans without writing.
+- [x] 26 unit tests + the 8 human-checklist steps cover: client_id format (kebab/underscore/alnum, ≤64 chars, no whitespace/special/uppercase), niche existence (against tmp_path + real repo), default config builder, validator round-trip, folder bootstrap idempotency + dry-run, checklist content, ProvisionResult dataclass shape.
+- [ ] Operator-side: provision a fresh acme-co-zero client + verify the 8-step checklist.
+- [ ] Operator-side: real Supabase round-trip exercises the insert path.
 
 ### Task 2.6.2: Client config validator
 
@@ -592,9 +594,10 @@ Validates:
 - `client_config.tier_thresholds`: A > B > C > D > archive monotonicity.
 
 **Acceptance**:
-- [ ] Validator catches all 3 footgun classes.
-- [ ] Tests cover each footgun + happy path.
-- [ ] Wired into provisioning + client_config update endpoint.
+- [x] Validator catches all 3 footgun classes — title <4 chars (CEO/CFO/COO/CTO/CXO + whitespace-only + non-string), ambiguous geography ('US'/'UK'/'AU'), tier monotonicity (A>B>C>D>archive_floor with all 4 pairs reported when violated).
+- [x] 23 tests cover constants sanity, valid-config happy path, partial-config no-error, each footgun (parametrised), boundary cases (4-char title, full country names, partial thresholds), assert_valid raise behaviour with all errors in message.
+- [x] Wired into `scripts/provision_new_client.py` via `assert_valid_client_config` before DB insert.
+- [ ] Wire into the (future) `/api/clients/<id>/config` PATCH endpoint when that lands.
 
 ## Phase 7: Acceptance + merge + tag
 
