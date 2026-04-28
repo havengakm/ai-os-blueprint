@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     voyage_api_key: str = ""
 
     # --- Email sending (Plan 2) ---
+    # Instantly is the locked ESP per docs/superpowers/decisions/2026-04-27-esp-comparison.md.
+    # Smartlead retained for backup-pool warming (~30 days post-switch) but not the build target.
+    instantly_api_key: str = ""
+    instantly_webhook_secret: str = ""
     smartlead_api_key: str = ""
     smartlead_webhook_secret: str = ""
 
@@ -54,6 +58,12 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_admin_chat_id: str = ""
     calendly_webhook_secret: str = ""
+
+    # --- Operator escalations (Plan 2 Phase 3 Task 2.3.3) ---
+    # When unset, the EscalationRuntime skips the Slack path entirely
+    # (DB insert + decision_log still fire). Set to a Slack incoming-
+    # webhook URL (https://hooks.slack.com/services/...) to enable.
+    slack_webhook_url: str = ""
 
     # --- Internal ---
     # cron_secret is optional with empty default. Daemon-only deployments

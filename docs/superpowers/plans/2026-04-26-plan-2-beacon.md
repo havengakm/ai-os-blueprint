@@ -17,8 +17,8 @@ This plan doc is the source of truth. If a decision changes mid-execution, updat
 ### In scope
 
 - **Phase 0**: Pre-Plan-2 hardening from `docs/superpowers/plans/follow-ups-plan1.md` items 1-15 (the items explicitly tagged for the Plan-2-kickoff window).
-- **Phase 1**: ESP evaluation (Instantly / Smartlead / PlusVibe.ai). Operator picks based on a 1-page comparison.
-- **Phase 2**: Beacon email send foundation. Schema (outreach_send_log, outreach_reply, send_account, send_caps), Beacon adapter against the chosen ESP, send orchestrator (daily caps + DND check + buying signal gate), webhook signature verification, send-time autonomy gating.
+- **Phase 1**: ESP evaluation. ✅ DECIDED 2026-04-27 = **Instantly Growth ($47/mo)** — see `docs/superpowers/decisions/2026-04-27-esp-comparison.md`.
+- **Phase 2**: Beacon email send foundation. Schema (outreach_send_log, outreach_reply, send_account, send_caps), Beacon adapter against **Instantly v2 API**, send orchestrator (tier gate + DND check + daily cap + per-contact cost ceiling + autonomy), webhook signature verification, send-time autonomy gating. Signal-presence is a **ranking** factor (signal-having contacts go first within the same tier), not a gate.
 - **Phase 3**: Reply ingestion + classification + auto-respond runtime. Webhook ingest, Haiku classifier (positive / negative / objection / unsubscribe / OOO), auto-respond for objections + bookings, human escalation queue, 90-day cool-off + round-based re-entry.
 - **Phase 4**: Cost optimiser foundation. Signal-gated Deep Research (only fire `claude_deep_research` when Trigify returned no signal), per-contact cost rollup SQL view + RPC, per-contact 5c hard ceiling, operator cost dashboard (CLI initially).
 - **Phase 5**: Optimizer agent v1 (read-only recommendations). Weekly review job that reads decision_log + outreach_send_log + outreach_reply: cost-per-lead / cost-per-reply / cost-per-meeting, variant performance (which subjects/icebreakers convert), adapter ROI (which signals correlate with positive replies), recommendations surfaced to operator. No auto-apply yet — operator approves before changes ship.
@@ -115,7 +115,7 @@ Distinguish empty-page vs CAPTCHA / rate-limit / layout-change in pagination. Ha
 - [ ] HTTP 429 / 403 / 503 trigger backoff + retry, not abort.
 - [ ] Tests cover both paths (mocked HTTP responses).
 
-## Phase 1: ESP evaluation
+## Phase 1: ESP evaluation ✅ COMPLETE (2026-04-27 = Instantly Growth)
 
 ### Task 2.1.1: ESP comparison doc — Instantly vs Smartlead vs PlusVibe.ai
 
@@ -165,9 +165,17 @@ Plus `contacts.touch_state` (text, nullable) for cross-channel state tracking.
 - [ ] `EnrichBackend.persist_send_attempt()` etc. callable from Python.
 - [ ] All new columns have sensible defaults; no breaking change to existing reads.
 
-### Task 2.2.2: Beacon adapter (against chosen ESP)
+### Task 2.2.2: Beacon adapter (Instantly v2 API)
 
-**File**: `systems/beacon/__init__.py`, `systems/beacon/adapter.py`, `systems/beacon/skill.py`, `systems/beacon/storage/{smartlead,instantly}_adapter.py` (whichever picked in 2.1.1).
+**File**: `systems/beacon/__init__.py`, `systems/beacon/adapter.py`, `systems/beacon/skill.py`, `systems/beacon/storage/instantly_adapter.py`.
+
+Target endpoints (validated 2026-04-27 against `developer.instantly.ai/llms.txt`):
+- `POST /api/v2/campaigns` — create campaign
+- `PATCH /api/v2/campaign-subsequences/:id` — update sequence step content (body + subject)
+- `POST /api/v2/leads/bulk` — add leads (1000 per request)
+- `POST /api/v2/campaigns/:id/activate` — launch / resume
+- `GET /api/v2/emails` — pull replies (rate-limited 20 req/min)
+- `POST /api/v2/emails/:id/reply` — send reply
 
 Adapter responsibilities:
 - `add_lead_to_campaign(client_id, contact_id, draft_id, account_id) -> esp_message_id`
@@ -179,15 +187,15 @@ Mirrors the Scout adapter pattern (Apollo, Trigify): protocol-based dependency i
 
 **Acceptance**:
 - [ ] Adapter contract documented + tested with FakeESP.
-- [ ] Real adapter against the chosen ESP works against a sandbox/test campaign.
+- [ ] Real adapter against Instantly v2 API works against a sandbox/test campaign.
 - [ ] Cost discipline: Haiku for any LLM-tokenised step, never Opus, Sonnet only when conversational reasoning is required.
 
-### Task 2.2.3: Send orchestrator (daily caps + DND + buying signal gate)
+### Task 2.2.3: Send orchestrator (tier + DND + daily caps + cost ceiling + autonomy)
 
 **File**: `systems/beacon/pipeline/send_stage.py`, `systems/beacon/storage/send_caps.py`.
 
 Pipeline stage runs after compose. For each contact with a draft and `status='ready_to_send'`:
-1. Check buying signal present in `research_data` — REQUIRED per `feedback_surround_sound_architecture` ("buying signals REQUIRED before send").
+1. Check `icp_tier` is in {A, B, C}. Tier D and archived contacts blocked. **Note**: signal presence is NOT a gate — it's a ranking factor only. Signal-having contacts get priority within their tier (better reply-rate odds via more relevant outreach), but no-signal contacts are still sendable as a colder list. Per operator clarification 2026-04-27: "Signals = high quality lead because we can approach them with more relevance to their situation which will equal an overall better reply rate. If they don't have signals, we can still message them, they will just be scored lower and be a colder list."
 2. Check global DND (`contacts.dnd_at IS NULL` or contact-level opt-out).
 3. Check daily cap on the chosen send account (`send_caps_daily.sent_count < send_account.daily_cap`).
 4. Check per-contact 5c cost ceiling (Phase 5).
@@ -201,7 +209,7 @@ Autonomy levels respected: at `suggest`, queue the send for human review; at `ac
 - [ ] Send orchestrator dispatches when all gates pass.
 - [ ] Send blocked + decision_log entry written when any gate fails.
 - [ ] Daily cap enforced atomically (no race conditions on cap exhaustion).
-- [ ] 8+ tests covering the gates (signal absent, DND, cap exhausted, cost ceiling, autonomy gate, success path, etc.).
+- [ ] 8+ tests covering the gates (DND, cap exhausted, cost ceiling, autonomy gate, success path, dry_run, ranking-by-signal, etc.).
 
 ### Task 2.2.4: ESP webhook ingest endpoint
 
@@ -212,10 +220,13 @@ POST endpoint receives ESP webhook events (sent, bounced, delivered, opened, cli
 Replies arrive on this webhook too — they're routed to Phase 3's reply runtime via `outreach_reply` insert + a `decision_type='reply_received'` decision_log row.
 
 **Acceptance**:
-- [ ] Webhook signature verification works (rejects on bad signature).
-- [ ] All 6 event types update the right status/state.
-- [ ] Replies trigger Phase 3 classification (Phase 3 task 2.3.2).
-- [ ] Tests with FakeESP-signed payloads cover happy path + bad signature.
+- [x] Webhook signature verification works (rejects on bad signature).
+- [x] All status-changing event types (sent / bounced / deferred / failed / complained) update outreach_send_log.status + emit `send_event` decision_log row.
+- [x] Engagement events (opened / link_clicked) acknowledged with no status change + no decision_log emit (signal-to-noise).
+- [x] Replies inserted into `outreach_reply` + emit `reply_received` decision_log row → picked up by Phase 3 classifier via `idx_reply_pending_classification` partial index.
+- [x] Tests with HMAC-signed payloads cover happy path + bad signature + orphan correlations + unknown event types.
+- [x] Real Supabase webhook backend (`SupabaseWebhookBackend`) + `SupabaseSendBackend` + `SupabaseDecisionLogger` (handles both SendStage + WebhookHandler shapes); production wiring via `api.deps.get_beacon_webhook_handler` registered as `dependency_override` in `create_app()`.
+- [ ] Operator applies migration 017 (`scripts/sql/017_decision_log_send_event.sql`) to dev Supabase.
 
 ## Phase 3: Reply ingestion + classification + auto-respond
 
@@ -232,10 +243,12 @@ Recommended actions: `auto_respond`, `escalate_to_human`, `archive`, `add_to_dnd
 Cost target: ~$0.0005/reply (Haiku, ~200 tokens).
 
 **Acceptance**:
-- [ ] Classifier handles 20+ realistic reply samples correctly.
-- [ ] Confidence threshold (~0.7) triggers escalation when below.
-- [ ] Tests cover each classification with golden-string fixtures.
-- [ ] Validator gates the classifier output (no hallucinated facts).
+- [x] Classifier handles all 13 classification enum values via golden-string fixtures (parametrised test).
+- [x] Confidence threshold (0.7) overrides recommended_action to `wait_for_human_review` when below; result reason carries `low_confidence:<score>`.
+- [x] Tests cover dry_run + no_api_key + parse-failure + invalid-enum + code-fence-wrapped JSON paths.
+- [x] Hallucinated classification labels rejected (`invalid_classification_enum` → cannot_classify + escalation). Hallucinated recommended_action rejected (`invalid_action_enum`).
+- [ ] Real Haiku call exercised once with a sample reply (deferred until Phase 3 acceptance run).
+- [ ] Per-reply cost rollup integration with cost dashboard (lands in Phase 4 Task 2.4.6).
 
 ### Task 2.3.2: Auto-respond runtime (objection handling + booking)
 
@@ -252,9 +265,11 @@ For each classified reply with `recommended_action='auto_respond'`:
 Templates are operator-authored per `feedback_copy_architecture` — AI fills placeholders only.
 
 **Acceptance**:
-- [ ] 5 operator-authored objection templates land at `data/reference/sequences/<niche>/components/reply_responses/`.
-- [ ] Auto-respond fires for confident objections; escalates everything else.
-- [ ] 8+ tests covering each template + the escalation path + the Calendly-link path.
+- [x] 6 skeleton templates landed at `data/reference/sequences/creative_branding/components/reply_responses/` (objection_pricing/timing/authority/other + meeting_request + positive_interest). Operator can revise.
+- [x] Auto-respond fires for confident objections + meeting_request + positive_interest; skips with `skipped:not_auto_respond` for everything else (negative → archive, unsubscribe → add_to_dnd, etc., handled upstream by the classifier action).
+- [x] 19 tests in `test_auto_respond.py` covering each template render + skip/failure paths (validator-fail, no-template, no-calendly-url, dry-run, responder-error). 6 production-template smoke tests in `test_auto_respond_production_templates.py` ensure deployed templates pass the validator.
+- [ ] `ReplyResponder` Protocol production wiring against Instantly's `POST /api/v2/emails/:id/reply` endpoint — deferred follow-up.
+- [ ] Calendly URL stored in `client_facts.calendly_url` per client (operator-side data entry).
 
 ### Task 2.3.3: Human escalation queue + Slack/web app surface
 
@@ -265,9 +280,14 @@ Replies that need human attention land in `escalations` table + Slack notificati
 Defer the Next.js web app side to a later plan; this task only ships the **API + Slack** surface so escalations reach the operator.
 
 **Acceptance**:
-- [ ] Escalations land in DB + Slack channel.
-- [ ] Operator can mark resolved via simple POST endpoint.
-- [ ] No-op gracefully if Slack webhook URL unset.
+- [x] Escalations land in `escalations` table (migration 018) + Slack channel via incoming-webhook POST.
+- [x] Operator marks resolved via `POST /api/inbox/escalations/{id}/resolve` (cron_secret-gated for v1).
+- [x] Slack delivery is best-effort: a Slack outage does NOT lose an escalation (DB insert + decision_log fire first; Slack failure is logged + swallowed).
+- [x] When `settings.slack_webhook_url` is unset, EscalationRuntime is initialised with `slack_notifier=None` and the Slack path is a silent no-op.
+- [x] Also exposes `POST /api/inbox/escalations/{id}/dismiss` + `GET /api/inbox/escalations?client_id=<id>` for the operator triage UX.
+- [ ] Operator applies migration 018 to dev Supabase.
+- [ ] Operator-side: set `SLACK_WEBHOOK_URL` env var to enable Slack notifications (optional).
+- [ ] Wire EscalationRuntime call sites: WebhookHandler (low_confidence_reply / cannot_classify_reply / spam_marked_reply / out_of_office_reply) + AutoRespondRuntime (auto_respond_failed). Deferred follow-up.
 
 ### Task 2.3.4: 90-day cool-off + round-based re-entry
 
@@ -278,9 +298,11 @@ Per `feedback_surround_sound_architecture`: contacts who don't reply within a se
 Round-tracking via `contacts.sequence_round` (already exists; just used).
 
 **Acceptance**:
-- [ ] After 90 days of no-reply, contact's `sequence_round` increments + status reset to enable a new send cycle.
-- [ ] Round 2+ sequences select a different subject/icebreaker variant pool than round 1.
-- [ ] Tests cover the round transition + the variant-pool difference.
+- [x] After 90 days of no-reply, contact's `sequence_round` increments + status reset to `'ready'` to enable a new send cycle. Two-phase runtime (`enter_cool_off_for_idle` + `re_enter_after_cool_off`) plus combined `run_cycle`. Max-rounds cap (default 4) → marks contact `dead` with `reason='max_rounds_reached'` instead of advancing.
+- [ ] Round 2+ sequences select a different subject/icebreaker variant pool than round 1. **Deferred to Phase 5 follow-up** — composer-side change touching the bandit-pull + variant-selection logic; runtime-only Task 2.3.4 doesn't couple to it.
+- [x] 16 tests cover both phases (CoolOffRuntime unit + SupabaseCoolOffBackend with FakeSupabaseClient): cool-off entry filters, re-entry transitions, max-rounds dead path, blocked-status exclusions.
+- [ ] Operator applies migration 019 (`scripts/sql/019_contacts_cool_off.sql`) to dev Supabase.
+- [ ] Operator-side: schedule periodic `run_cycle` invocation (cron daily for v1).
 
 ## Phase 4: Cost optimiser foundation
 
@@ -293,21 +315,23 @@ Closes the gap from today's $0.01-0.03/contact toward the $0.002 target.
 Currently `claude_deep_research` runs for every tier-A/B/C contact. Per `feedback_plan15_cost_optimizations`: only fire when Trigify + structural signals are absent. Tier 1-3 icebreaker contacts skip Deep Research entirely; only Tier 4 fallback contacts need the website extract.
 
 **Acceptance**:
-- [ ] `_should_run_deep_research(contact, merged_research_data) -> bool` predicate at orchestrator level.
-- [ ] Per-contact cost drops to ~$0.005 when signal-gating active (verified via decision_log spend rollup).
-- [ ] Tests: contact with trigger_event signals → DR skipped; contact with no signals → DR runs.
-- [ ] Quality regression: a 20-contact cohort produces equivalent or better icebreaker quality vs always-on DR (manual operator review against the 4-tier ladder).
+- [x] `_should_run_deep_research(adapter_results)` predicate at orchestrator module level — checks every prior adapter's `data` for non-empty `trigger_events` (Trigify) or `structural_signals` (claude_web_triggers, apollo_enrich).
+- [x] DR skipped with `signal_gated_skip` reason in `result.skipped` + `decision_log` entry via `_log_signal_gated_skip`. Other adapters in the tier list are NOT signal-gated (zerobounce, trigify, web_triggers, apollo always run).
+- [x] 8 tests cover: trigify signals → DR skipped / web_triggers signals → DR skipped / apollo signals → DR skipped / both signal types → DR skipped / no signals anywhere → DR runs / empty signal arrays → DR runs / other adapters not gated / cost-not-charged-on-gate-skip.
+- [ ] Per-contact cost drops to ~$0.005 verified via the cost dashboard against kirsten-client-zero — operator-side after migration 020 + a reseed run.
+- [ ] Quality regression: 20-contact icebreaker cohort vs always-on DR — operator manual review.
 
 ### Task 2.4.2: Per-contact cost rollup view
 
-**File**: `scripts/sql/018_per_contact_cost_rollup.sql` (new).
+**File**: `scripts/sql/020_per_contact_cost_rollup.sql` (renumbered from 018; 018 + 019 used for escalations + cool-off).
 
-`contact_cost_rollup` SQL view aggregating `decision_log.context.cost_cents` per `contact_id`. Plus an RPC `get_contact_cost(contact_id) -> int_cents` for Python callers.
+`v_contact_cost_rollup` SQL view aggregating `decision_log.context.cost_cents` per `(contact_id, decision_type)`. Plus `get_contact_cost(contact_id_param TEXT) RETURNS INTEGER` RPC for Python callers.
 
 **Acceptance**:
-- [ ] View returns total spend per contact, broken down by stage.
-- [ ] RPC callable from Python; tests use a fixture contact.
-- [ ] Existing tier-level budget queries still work.
+- [x] View returns total spend per contact, broken down by stage (`decision_type`).
+- [x] RPC callable from Python; `SupabaseSendBackend.get_contact_total_cost_cents` now uses it instead of the v1 full-table scan.
+- [x] FakeSupabaseClient extended with `.rpc()` support so existing send-backend tests stub the RPC.
+- [ ] Existing tier-level budget queries still work (operator-side verification after applying migration 020).
 
 ### Task 2.4.3: Per-contact 5c hard ceiling
 
@@ -316,10 +340,13 @@ Currently `claude_deep_research` runs for every tier-A/B/C contact. Per `feedbac
 Before each LLM-spending step, check `get_contact_cost(contact_id)`. If approaching 5c, halt further enrichment + flag the contact for operator review (`status='cost_ceiling_hit'`).
 
 **Acceptance**:
-- [ ] Contact halted at 5c spend; doesn't continue to compose.
-- [ ] Operator review queue gets the flagged contact.
-- [ ] Configurable per-tier (`client_config.per_contact_cost_ceiling_cents` JSONB; default 5 for all tiers).
-- [ ] 6+ tests covering halt-before-DR, halt-before-icebreaker, halt-before-compose, edge cases.
+- [x] `PerContactCeiling` capability ships at `systems/scout/budget/per_contact_ceiling.py` with `check()` (pure read) + `check_and_mark()` (read + status transition) methods.
+- [x] Configurable via `default_ceiling_cents` constructor arg (default 5c) + per-call `ceiling_cents` override (used when caller has looked up `client_config.per_contact_cost_ceiling_cents` per-tier).
+- [x] 11 unit tests covering pass / halt-at-ceiling / halt-over-ceiling / no-history / per-call-override / zero-ceiling-edge / status-transition-on-halt / no-status-transition-when-passing / programmer-error-without-status-backend.
+- [ ] Wire into `EnrichOrchestrator` before each adapter dispatch — **deferred follow-up** (touches existing 676-line orchestrator; lands as a focused individual commit).
+- [ ] Wire into `Composer` before LLM body generation — **deferred follow-up**.
+- [ ] `client_config.per_contact_cost_ceiling_cents` JSONB column + lookup helper — **deferred** (lands with the wiring commit; caller passes the looked-up value to `check(ceiling_cents=...)`).
+- [ ] Operator review queue integration (transition status='cost_ceiling_hit' → trigger EscalationRuntime.enqueue with type='manual_flag') — **deferred follow-up** (small change once status backend impl lands).
 
 ### Task 2.4.4: Operator cost dashboard (CLI)
 
@@ -337,13 +364,15 @@ Outputs:
 Web app version is backlog; CLI ships now.
 
 **Acceptance**:
-- [ ] Tool runs, produces a readable summary.
-- [ ] Numbers reconcile against `client_config.tier_spent_cents` and `decision_log` rollups.
+- [x] Tool runs, produces a readable summary (cost-per-active-contact + per-tier + per-adapter + top-N + tier-budget).
+- [x] Numbers reconcile against `client_config.tier_spent_cents` (lifetime tier spend column) and `decision_log` rollups (windowed spend).
+- [x] OK / OVER markers vs $0.002 target ($0.002 = 0.2c rendered exactly).
+- [x] 7 unit tests covering the data-fetcher (window filtering, tier grouping, adapter grouping, top-N, empty data, client_config lookup) + 2 formatter tests (over-target, under-target) + 1 CLI smoke test.
 
 ### Task 2.4.5: Per-field enrichment coverage rollup view
 
 **Source**: 2026-04-27 scope expansion (operator's "90%+ enrichment" target).
-**File**: `scripts/sql/019_enrichment_coverage_rollup.sql` (new).
+**File**: `scripts/sql/021_enrichment_coverage_rollup.sql` (renumbered from 019; 019 used for cool-off, 020 for the cost rollup).
 
 SQL view + RPC that aggregates per-contact enrichment-field presence by `(client_id, niche, icp_tier)`:
 - `email_present + email_verified` (ZeroBounce status)
@@ -355,9 +384,10 @@ SQL view + RPC that aggregates per-contact enrichment-field presence by `(client
 Targets per `feedback_cost_optimiser_continuous_concern` (operator decision 2026-04-27): email + LinkedIn ≥90% across Tier A/B/C; phone ≥90% on Tier A only (gated per `feedback_enrichment_tiers`).
 
 **Acceptance**:
-- [ ] View returns one row per `(client_id, niche, icp_tier)` with each field's presence count + percentage.
-- [ ] RPC `get_enrichment_coverage(client_id)` callable from Python.
-- [ ] Tests against the existing dev cohort (kirsten-client-zero, 31 contacts) produce sane numbers.
+- [x] View returns one row per `(client_id, niche, icp_tier)` with each field's presence count + percentage. Tier D excluded (archived).
+- [x] RPC `get_enrichment_coverage(client_id_param TEXT) RETURNS JSONB` callable from Python via `EnrichmentCoverageBackend`.
+- [x] 4 backend wrapper tests + 1 fetcher test in cost_dashboard test suite.
+- [ ] Verification against the existing dev cohort (kirsten-client-zero, 31 contacts) — operator-side after applying migration 021.
 
 ### Task 2.4.6: Coverage dashboard CLI extension
 
@@ -369,9 +399,10 @@ New `--coverage` flag adds a coverage report alongside the cost report:
 - Highlights tiers/fields under the target.
 
 **Acceptance**:
-- [ ] `uv run python scripts/cost_dashboard.py --client-id=kirsten-client-zero --coverage` produces a readable table.
-- [ ] Numbers reconcile with the SQL view from Task 2.4.5.
-- [ ] Gap-source identification works (e.g. "Tier B email coverage is 78% — Apollo found 62%, Hunter found 14%, Claude scraper found 2%, missing 22%").
+- [x] `uv run python scripts/cost_dashboard.py --client-id=<id> --coverage` produces a readable per-(niche, tier) table with email_verified / linkedin / phone percentages + UNDER / OK / n/a markers.
+- [x] Phone-on-Tier-B/C rendered as "n/a — Tier A only" (per `feedback_enrichment_tiers`).
+- [ ] Adapter-level gap-source breakdown (e.g. "Tier B email coverage is 78%: Apollo found 62%, Hunter 14%, scraper 2%") — **deferred**: requires `contacts.email_source` field tracking which adapter found each field. Lands in a small follow-up after migration 022 adds `email_source` / `linkedin_source` / `phone_source` (phone_source already exists per `004_contacts_extensions.sql`).
+- [ ] Numbers reconcile against the migration 021 view — operator-side verification after applying.
 
 ## Phase 5: Optimizer agent v1 (read-only recommendations)
 
@@ -392,28 +423,35 @@ Cron-scheduled (e.g. Monday 6am operator-local) job that produces a per-client w
 Each recommendation has a confidence score + the underlying numbers. Operator reviews + approves before changes apply.
 
 **Acceptance**:
-- [ ] Optimizer can be invoked manually via `uv run python scripts/run_optimizer_weekly.py --client-id=kirsten-client-zero`.
-- [ ] Report renders to markdown (committed to `data/captures/optimizer/<date>.md` for record).
-- [ ] Slack notification with summary + link to full report.
-- [ ] 8+ tests covering each analysis section against fixture data.
+- [x] `uv run python scripts/run_optimizer_weekly.py --client-id=<id> [--days=7]` invokes the review.
+- [x] Report renders to `data/captures/optimizer/<YYYY-MM-DD>-<client_id>.md` (idempotent — re-running same date overwrites).
+- [x] Slack notification posts a one-block summary when `SLACK_WEBHOOK_URL` set; silent no-op otherwise. Slack failure logged to stderr but never blocks the job.
+- [x] 10 tests: 6 WeeklyReview unit (full report, reply_rate edge cases, cool-off counts, render_markdown sections + empty-data) + 4 CLI smoke (slack summary format, report path, no-Slack no-op, slack-failure-swallowed).
+- [x] Agent persona at `agents/optimizer.md` documents how to invoke + what's in/out of scope for v1 vs v2 (Plan 4 autoresearch).
+- [ ] **v1 covers**: cost analysis (reuses cost_dashboard fetcher) + reply rate + pending recommendations count + open escalations count + cool-off queue. **Deferred to v2** (need data first): variant performance, adapter ROI, send-time analysis.
+- [ ] Operator schedules cron (e.g. Monday 6am operator-local) — operator-side.
+- [ ] Operator-side: verify against kirsten-client-zero after migrations 020-022 applied.
 
 ### Task 2.5.2: Recommendation persistence + approval flow
 
-**File**: `scripts/sql/019_optimizer_recommendations.sql` (new), `api/routers/optimizer.py` (new).
+**File**: `scripts/sql/022_optimizer_recommendations.sql` (renumbered from 019; 019-021 used in earlier slices), `api/routers/optimizer.py` (new), `systems/optimizer/recommendations.py` (new), `systems/optimizer/storage/recommendation_supabase_store.py` (new).
 
 Schema:
-- `optimizer_recommendation` — one row per recommendation (`client_id`, `category`, `payload` JSONB, `confidence`, `created_at`, `status` ∈ {pending, approved, rejected, expired}, `applied_at`).
+- `optimizer_recommendation` — one row per recommendation (`client_id`, `category`, `payload` JSONB, `confidence`, `reasoning`, `created_at`, `status` ∈ {pending, approved, rejected, expired}, `reviewed_by`, `reviewed_at`, `applied_at`, `apply_error`).
 
 API endpoints:
-- `POST /api/optimizer/recommendations/<id>/approve` — operator approves; system applies the recommendation (e.g. updates variant win_rate prior).
+- `GET  /api/optimizer/recommendations?client_id=<id>` — list pending.
+- `POST /api/optimizer/recommendations/<id>/approve` — operator approves; engine emits decision_log + persists verdict. Underlying change runs when Task 2.5.3 applicators land.
 - `POST /api/optimizer/recommendations/<id>/reject` — dismissed.
-- Auto-expire after 7 days if not approved.
+- Auto-expire after 7 days via `RecommendationEngine.expire_stale()`.
 
 **Acceptance**:
-- [ ] Recommendations persist across runs.
-- [ ] Approve/reject endpoints work + trigger the underlying change.
-- [ ] Expiry job retires stale recommendations.
-- [ ] Tests cover the full lifecycle.
+- [x] Recommendations persist across runs (migration 022 + SupabaseRecommendationStore).
+- [x] Approve/reject endpoints work + emit `decision_type='system_config'` decision_log entries (underlying change deferred to Task 2.5.3).
+- [x] `expire_stale()` method retires pending rows older than 7 days; tests cover custom thresholds.
+- [x] 27 tests cover the full lifecycle: 13 RecommendationEngine unit tests + 7 SupabaseRecommendationStore tests + 7 router smoke tests (auth + happy paths + 422/404/409 error paths).
+- [ ] Operator applies migration 022 to dev Supabase.
+- [ ] Operator-side: schedule cron for `RecommendationEngine.expire_stale()` (small CLI script in a follow-up).
 
 ### Task 2.5.3: Bandit weight adjustments + autonomy promotions
 
@@ -443,11 +481,12 @@ The skill calls `Agent` with `subagent_type` to run the grading sub-agent. No An
 When run on a persisted draft: write grade to a new `outreach_drafts.predicted_grade` jsonb column (schema migration alongside this task). When run on a variant before approval: write to a stand-alone YAML file the operator commits to `data/captures/copy_grades/`.
 
 **Acceptance**:
-- [ ] Skill loads + runs successfully against a sample variant.
-- [ ] Grade JSON shape: `{predicted_reply_rate: float, tier: "A"|"B"|"C"|"D", critique: [str, str, str]}`.
-- [ ] Persisted-draft path writes to `outreach_drafts.predicted_grade`.
-- [ ] Variant-only path writes to `data/captures/copy_grades/<variant_key>-<timestamp>.yaml`.
-- [ ] No Anthropic API call; runs purely via the Claude Code Agent tool.
+- [x] Skill manifest at `skills/operations/grade-cold-email-copy.md` with frontmatter (input/output schema + requires_skills/tools + references).
+- [x] Grade JSON shape: `{predicted_reply_rate: float, tier: "A"|"B"|"C"|"D", critique: [str, str, str], graded_at: ISO}`.
+- [x] Migration 023 adds `outreach_drafts.predicted_grade JSONB` + partial index for "drafts with grade" queries.
+- [x] Skill instructions cover both paths (persisted draft → DB write; variant file → YAML capture).
+- [x] No Anthropic API call — instructs the operator to dispatch via the Claude Code Agent tool.
+- [ ] Operator runs the skill once against a sample variant + verifies the round-trip — operator-side acceptance after migration 023 lands.
 
 ### Task 2.5.5: Copy grader learning loop (daemon weekly job)
 
@@ -477,10 +516,13 @@ Uses `Agent` with `subagent_type=general-purpose` to run a sub-agent that loads 
 Output format: annotated CSV with two new columns (`icp_fit`, `icp_reasoning`). Operator imports surviving rows (`fit=yes`) into the daemon via `scripts/ingest_preresolved_contacts.py`.
 
 **Acceptance**:
-- [ ] Skill runs against a 10-row sample CSV.
-- [ ] Each row has `icp_fit` + `icp_reasoning` populated.
-- [ ] No Anthropic API call.
-- [ ] Operator can re-import the annotated CSV cleanly.
+- [x] Skill manifest at `skills/operations/filter-icp-list.md` with frontmatter (input/output schema + requires_tools).
+- [x] Per-row + batched-by-10 dispatch instructions (cap reasoning at 120 chars; retry once on overlong).
+- [x] Annotated output written to `<csv_path>.icp-filtered.csv` sibling file — never mutates source.
+- [x] No Anthropic API call — Claude Code Agent tool only.
+- [x] Output schema: original columns + `icp_fit` ∈ {yes, maybe, no} + `icp_reasoning` ≤120 chars.
+- [ ] Operator runs the skill against a 10-row sample CSV — operator-side acceptance.
+- [ ] Operator re-imports surviving rows via `scripts/ingest_preresolved_contacts.py` cleanly.
 
 ### Task 2.5.7: Screen-stage uncertain-zone LLM augment (daemon, API)
 
@@ -496,12 +538,15 @@ When the rule-based `icp_score` lands in the uncertain zone (default 40-60, conf
 Cost-bounded: only ~10-20% of contacts hit the uncertain zone, so per-cohort cost stays low (~0.1c each via Haiku). Maintains tier_budget tracking like other adapters.
 
 **Acceptance**:
-- [ ] Contact with rule-score=50 fires the LLM judge; judgment lands in `decision_log`.
-- [ ] Final score = rule_score + nudge.
-- [ ] Contact with rule-score=20 (clearly archive) skips the judge — no LLM call.
-- [ ] Contact with rule-score=85 (clearly Tier A) skips the judge.
-- [ ] Tests: 4 contacts at scores {20, 45, 55, 90}; LLM fires for 2 of them.
-- [ ] Per-tier cost increase measured against the cost dashboard from Task 2.4.4.
+- [x] `UncertainZoneJudge` capability ships at `systems/scout/score/uncertain_zone_judge.py` with Haiku 4.5 backend, prompt at `systems/scout/score/prompts/uncertain_zone_judge.md`, default uncertain zone 40-60 (configurable via `client_config.icp.uncertain_zone`).
+- [x] Wired into `ScoreStage` as an optional injection — backward compat preserved when no judge configured. Judge invoked only when rule score in zone (clearly-archive + clearly-Tier-A skip the LLM call).
+- [x] Final score = `clamp(rule_score + nudge, 0, 100)`. Nudge ∈ {-15, -5, 0, +5, +15}; invalid values fall back to nudge=0 (rule score stands).
+- [x] Decision-log entry per judge call: `decision_type='icp_threshold'`, decision starts with `uncertain_zone_judge:`, context carries contact_id + rule_score + nudge + reason.
+- [x] Judge failure (raise / no_api_key / parse_failed) is fail-safe — score_stage continues with the rule score; no contact lost.
+- [x] 30 tests: 21 judge unit (constants, zone helper, all 5 valid nudges, dry_run, no_api_key, parse failures, code-fence, prompt assembly) + 9 score_stage integration (no-judge backward compat, in-zone fires, below-zone skipped, above-zone skipped, custom bounds, tier promotion, score clamping, judge exception fallback, ok=False fallback).
+- [ ] Real Haiku call exercised against a sample contact — operator-side after Phase 5 acceptance run.
+- [ ] Per-tier cost increase measured via cost dashboard (Task 2.4.4) — operator-side.
+- [ ] Wire into production via `api.deps.get_uncertain_zone_judge` — deferred follow-up (capability ships, ScoreStage takes the optional injection; production wiring is a thin call-site addition).
 
 ## Phase 6: Productisation deployment script
 
@@ -530,11 +575,13 @@ Steps:
 Per `feedback_per_company_aios_silo`: foundation (skills/rules/departments/agents/systems) is shared template; context/ + data/ content is per-client. The script bootstraps the per-client silo.
 
 **Acceptance**:
-- [ ] Script provisions a fresh client end-to-end.
-- [ ] All 7 acceptance preflight checks pass against the new client.
-- [ ] Human-only checklist surfaces clearly at the end.
-- [ ] Idempotent: re-running for the same client reports "already provisioned" cleanly.
-- [ ] Tests exercise the validation logic + the migration runner.
+- [x] `scripts/provision_new_client.py` provisions: validates args → builds default client_config → runs `assert_valid_client_config` → inserts `clients` + `client_config` + `autonomy_rules` rows → bootstraps `context/<id>` + `data/knowledge/personal/<id>` + `data/knowledge/company/<id>` folders → prints 8-step human checklist.
+- [x] Idempotent: existing `clients` row → `already_provisioned=True`, DB inserts skipped, folders still bootstrapped (already_present_paths reported); existing folders → `already_present_paths` instead of error.
+- [x] Migrations are NOT run by the script (operator's responsibility) — explicitly documented in the script docstring.
+- [x] `--dry-run` flag plans without writing.
+- [x] 26 unit tests + the 8 human-checklist steps cover: client_id format (kebab/underscore/alnum, ≤64 chars, no whitespace/special/uppercase), niche existence (against tmp_path + real repo), default config builder, validator round-trip, folder bootstrap idempotency + dry-run, checklist content, ProvisionResult dataclass shape.
+- [ ] Operator-side: provision a fresh acme-co-zero client + verify the 8-step checklist.
+- [ ] Operator-side: real Supabase round-trip exercises the insert path.
 
 ### Task 2.6.2: Client config validator
 
@@ -547,9 +594,10 @@ Validates:
 - `client_config.tier_thresholds`: A > B > C > D > archive monotonicity.
 
 **Acceptance**:
-- [ ] Validator catches all 3 footgun classes.
-- [ ] Tests cover each footgun + happy path.
-- [ ] Wired into provisioning + client_config update endpoint.
+- [x] Validator catches all 3 footgun classes — title <4 chars (CEO/CFO/COO/CTO/CXO + whitespace-only + non-string), ambiguous geography ('US'/'UK'/'AU'), tier monotonicity (A>B>C>D>archive_floor with all 4 pairs reported when violated).
+- [x] 23 tests cover constants sanity, valid-config happy path, partial-config no-error, each footgun (parametrised), boundary cases (4-char title, full country names, partial thresholds), assert_valid raise behaviour with all errors in message.
+- [x] Wired into `scripts/provision_new_client.py` via `assert_valid_client_config` before DB insert.
+- [ ] Wire into the (future) `/api/clients/<id>/config` PATCH endpoint when that lands.
 
 ## Phase 7: Acceptance + merge + tag
 

@@ -177,3 +177,175 @@ def get_scout_system() -> ScoutSystem:
 @lru_cache(maxsize=1)
 def _scout_system_singleton() -> ScoutSystem:
     return ScoutSystem.from_registry(get_registry())
+
+
+# ---------------------------------------------------------------------------
+# Beacon backends + webhook handler
+# ---------------------------------------------------------------------------
+# Beacon's send + reply ingest backends share the same Supabase client as
+# Scout (single-writer assumption — see module docstring).
+
+
+def get_beacon_send_backend() -> Any:
+    """Real-Supabase impl of the SendBackend Protocol (SendStage)."""
+    return _beacon_send_backend_singleton()
+
+
+def get_beacon_webhook_backend() -> Any:
+    """Real-Supabase impl of the BeaconWebhookBackend Protocol."""
+    return _beacon_webhook_backend_singleton()
+
+
+def get_beacon_decision_logger() -> Any:
+    """SupabaseDecisionLogger — used by both SendStage and WebhookHandler."""
+    return _beacon_decision_logger_singleton()
+
+
+def get_beacon_webhook_handler() -> Any:
+    """Production WebhookHandler wired to the real Supabase backends.
+
+    Used as a FastAPI ``dependency_overrides`` target for
+    ``api.routers.beacon_webhooks.get_webhook_handler``. Tests override
+    this with a fake-backed handler instead.
+    """
+    return _beacon_webhook_handler_singleton()
+
+
+@lru_cache(maxsize=1)
+def _beacon_send_backend_singleton() -> Any:
+    from systems.beacon.storage.send_supabase_backend import SupabaseSendBackend
+    return SupabaseSendBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _beacon_webhook_backend_singleton() -> Any:
+    from systems.beacon.storage.webhook_supabase_backend import (
+        SupabaseWebhookBackend,
+    )
+    return SupabaseWebhookBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _beacon_decision_logger_singleton() -> Any:
+    from systems.beacon.storage.decision_logger_supabase import (
+        SupabaseDecisionLogger,
+    )
+    return SupabaseDecisionLogger(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _beacon_webhook_handler_singleton() -> Any:
+    from systems.beacon.pipeline.webhook_handler import WebhookHandler
+    return WebhookHandler(
+        backend=get_beacon_webhook_backend(),
+        decision_logger=get_beacon_decision_logger(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Escalation runtime + Slack notifier (Plan 2 Phase 3 Task 2.3.3)
+# ---------------------------------------------------------------------------
+
+
+def get_escalation_backend() -> Any:
+    return _escalation_backend_singleton()
+
+
+def get_slack_notifier() -> Any:
+    """Returns ``HttpxSlackNotifier`` if ``settings.slack_webhook_url`` is
+    set, else ``None``. EscalationRuntime treats None as "Slack disabled"
+    and skips that path silently (DB insert + decision_log still fire)."""
+    return _slack_notifier_singleton()
+
+
+def get_escalation_runtime() -> Any:
+    return _escalation_runtime_singleton()
+
+
+@lru_cache(maxsize=1)
+def _escalation_backend_singleton() -> Any:
+    from systems.beacon.storage.escalation_supabase_backend import (
+        SupabaseEscalationBackend,
+    )
+    return SupabaseEscalationBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _slack_notifier_singleton() -> Any:
+    from config.settings import get_settings
+    from systems.beacon.reply.slack_notifier import HttpxSlackNotifier
+
+    url = get_settings().slack_webhook_url
+    if not url:
+        return None
+    return HttpxSlackNotifier(webhook_url=url)
+
+
+@lru_cache(maxsize=1)
+def _escalation_runtime_singleton() -> Any:
+    from systems.beacon.reply.escalation import EscalationRuntime
+    return EscalationRuntime(
+        backend=get_escalation_backend(),
+        decision_logger=get_beacon_decision_logger(),
+        slack_notifier=get_slack_notifier(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cool-off runtime (Plan 2 Phase 3 Task 2.3.4)
+# ---------------------------------------------------------------------------
+
+
+def get_cool_off_backend() -> Any:
+    return _cool_off_backend_singleton()
+
+
+def get_cool_off_runtime() -> Any:
+    return _cool_off_runtime_singleton()
+
+
+@lru_cache(maxsize=1)
+def _cool_off_backend_singleton() -> Any:
+    from systems.beacon.storage.cool_off_supabase_backend import (
+        SupabaseCoolOffBackend,
+    )
+    return SupabaseCoolOffBackend(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _cool_off_runtime_singleton() -> Any:
+    from systems.beacon.reply.cool_off import CoolOffRuntime
+    return CoolOffRuntime(
+        backend=get_cool_off_backend(),
+        decision_logger=get_beacon_decision_logger(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Optimizer recommendation engine (Plan 2 Phase 5 Task 2.5.2)
+# ---------------------------------------------------------------------------
+
+
+def get_optimizer_recommendation_store() -> Any:
+    return _optimizer_recommendation_store_singleton()
+
+
+def get_optimizer_recommendation_engine() -> Any:
+    return _optimizer_recommendation_engine_singleton()
+
+
+@lru_cache(maxsize=1)
+def _optimizer_recommendation_store_singleton() -> Any:
+    from systems.optimizer.storage.recommendation_supabase_store import (
+        SupabaseRecommendationStore,
+    )
+    return SupabaseRecommendationStore(get_supabase_client())
+
+
+@lru_cache(maxsize=1)
+def _optimizer_recommendation_engine_singleton() -> Any:
+    from systems.optimizer.recommendations import RecommendationEngine
+    return RecommendationEngine(
+        store=get_optimizer_recommendation_store(),
+        decision_logger=get_beacon_decision_logger(),
+    )
