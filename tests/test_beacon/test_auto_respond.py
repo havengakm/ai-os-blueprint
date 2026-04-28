@@ -307,6 +307,27 @@ async def test_positive_interest_skips_when_no_calendly_url(templates_dir):
     assert result.verdict == "skipped:no_calendly_url"
 
 
+async def test_objection_pricing_skips_when_no_calendly_url(templates_dir):
+    """objection_pricing redirects to a live call per the objection-handling
+    framework — the redirect requires a Calendly URL. Without one, the
+    runtime skips to the operator's manual queue."""
+    backend = FakeBackend(
+        contacts={"u1": {"email": "alice@acme.com", "first_name": "Alice", "company": "Acme"}},
+        client_facts={"c1": {"sender_name": "K"}},  # no calendly_url
+    )
+    responder = FakeResponder()
+    runtime = _make_runtime(templates_dir, backend, responder)
+    result = await runtime.respond(
+        client_id="c1",
+        contact_id="u1",
+        in_reply_to_message_id="msg-1",
+        original_subject="hi",
+        classify_result=_classify("objection_pricing"),
+    )
+    assert result.verdict == "skipped:no_calendly_url"
+    assert responder.calls == []
+
+
 # --------------------------------------------------------------------------- #
 # Placeholders                                                                #
 # --------------------------------------------------------------------------- #

@@ -65,8 +65,15 @@ CLASSIFICATION_TO_TEMPLATE: dict[str, str] = {
 # Templates that reference {calendly_url}. Skipped if client_facts
 # doesn't carry one, since dropping into the body without a URL would
 # leave the placeholder visible.
+#
+# objection_pricing joined this set per operator decision 2026-04-28:
+# pricing replies redirect to a live call (per
+# data/reference/frameworks/objection-handling.md "SELL THE MEETING,
+# NOT THE PRODUCT"), and the redirect requires a Calendly URL. Without
+# one, the runtime escalates to operator's manual queue instead of
+# sending a broken-link email.
 _CALENDLY_REQUIRED: frozenset[str] = frozenset(
-    {"meeting_request", "positive_interest"}
+    {"meeting_request", "positive_interest", "objection_pricing"}
 )
 
 

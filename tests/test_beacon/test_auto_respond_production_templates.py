@@ -88,8 +88,13 @@ async def test_production_template_renders_and_validates(classification):
         f"{classification}: verdict={result.verdict}, reason={result.reason}, "
         f"body={result.rendered_body!r}"
     )
-    # Sanity: rendered body has placeholders filled
+    # Sanity: rendered body has placeholders filled. Each template chooses
+    # whether to use {first_name} — punchy opener templates may omit it
+    # (e.g. objection_pricing's "Fair question." opener). Only assert
+    # substitution happened for templates that actually use the placeholder.
     body = responder.calls[0]["body"]
-    assert "Alice" in body
+    raw_template = (PROD_TEMPLATES_DIR / f"{classification}.md").read_text()
+    if "{first_name}" in raw_template:
+        assert "Alice" in body, f"{classification}: {{first_name}} not substituted"
     assert "{first_name}" not in body
     assert "{sender_name}" not in body

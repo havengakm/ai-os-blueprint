@@ -1,7 +1,9 @@
-Hi {first_name},
+Fair question.
 
-Got it, pricing matters.
+What we build depends on where the biggest payoff is in your business. For some that's new revenue, for others it's hours back. The 30 minutes on a call is how we figure out which it is for you.
 
-Quick question: what would a fair number look like for {company} given what you're trying to do? Even if we're not a fit, I'd rather know what range you're working with than waste your time.
+Whatever we build, it's designed to pay for itself within 90 days. If it doesn't, we keep rebuilding at no cost until it does.
+
+{calendly_url}
 
 {sender_name}
