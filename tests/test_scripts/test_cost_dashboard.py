@@ -160,6 +160,51 @@ async def test_fetch_cost_report_handles_empty_data():
     assert report["cost_per_active_contact_cents"] == 0.0
 
 
+async def test_fetch_cost_report_tolerates_non_dict_context_rows():
+    """Live regression: some legacy decision_log rows store ``context``
+    as a plain JSONB string instead of a JSONB object. The fetcher must
+    skip those rows without crashing — they carry no cost_cents to
+    aggregate anyway. Reported by operator 2026-04-28 against
+    kirsten-client-zero."""
+    now = _now()
+    recent = (now - timedelta(days=2)).isoformat()
+    fake = FakeSupabaseClient(
+        tables={
+            "contacts": [
+                {"id": "u1", "client_id": "c1", "icp_tier": "A"},
+            ],
+            "decision_log": [
+                # Normal object row — should aggregate.
+                {
+                    "client_id": "c1",
+                    "context": {"contact_id": "u1", "cost_cents": 3},
+                    "source": "scout.icebreaker",
+                    "created_at": recent,
+                },
+                # Legacy string row — must be skipped, not crash.
+                {
+                    "client_id": "c1",
+                    "context": "free-text legacy entry",
+                    "source": "manual",
+                    "created_at": recent,
+                },
+                # None row — also tolerated.
+                {
+                    "client_id": "c1",
+                    "context": None,
+                    "source": "manual",
+                    "created_at": recent,
+                },
+            ],
+            "client_config": [],
+        }
+    )
+    report = await fetch_cost_report(fake, "c1", days=7, now=now)
+    # Only the dict row aggregated.
+    assert report["total_cost_cents"] == 3
+    assert report["total_contacts_with_activity"] == 1
+
+
 # --------------------------------------------------------------------------- #
 # Cost report — formatter                                                     #
 # --------------------------------------------------------------------------- #

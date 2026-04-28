@@ -100,6 +100,11 @@ async def fetch_cost_report(
 
     for row in log_rows:
         ctx = row.get("context") or {}
+        # decision_log.context is JSONB. Most rows store an object here,
+        # but a handful of legacy rows have a plain JSON string. Skip
+        # those — they have no cost_cents to aggregate.
+        if not isinstance(ctx, dict):
+            continue
         cost = ctx.get("cost_cents")
         if not isinstance(cost, (int, float)):
             continue
