@@ -148,6 +148,7 @@ At the start of every session, read the memory layer in this order:
 1. `memory/MEMORY.md` for project context that rarely changes.
 2. `memory/INDEX.md` for recent decisions and open loops.
 3. The most recent file in `memory/sessions/` to see where we left off.
+4. `data/reference/sops/claude-code-workflow.md` for the per-session discipline checklist (validating steps + context management + adoption status of Claude Code workflow hacks).
 
 This layer sits alongside this file and harness auto-memory without duplicating them. See `memory/README.md` for how they relate.
 
