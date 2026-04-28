@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AIOS System Map</title>
+<style>
+  @page { size: A3 portrait; margin: 12mm 10mm; }
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 9pt;
+    line-height: 1.32;
+    color: #1a1a1a;
+    margin: 0;
+    padding: 0;
+  }
+  .title-bar {
+    border-bottom: 2px solid #2c3e50;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+  }
+  .title-bar h1 {
+    font-size: 17pt;
+    margin: 0 0 2px 0;
+    letter-spacing: 0.4px;
+    color: #1a1a1a;
+  }
+  .title-bar .subtitle {
+    font-size: 8.5pt;
+    color: #555;
+    line-height: 1.4;
+  }
+  .lane {
+    display: grid;
+    grid-template-columns: 110px 1fr 220px;
+    gap: 10px;
+    padding: 6px 0 4px 0;
+    align-items: stretch;
+    page-break-inside: avoid;
+  }
+  .lane-label {
+    text-transform: uppercase;
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #2c3e50;
+    letter-spacing: 0.5px;
+    border-left: 3px solid #2c3e50;
+    padding: 2px 0 2px 8px;
+    line-height: 1.2;
+  }
+  .lane-content {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .lane-row {
+    display: flex;
+    gap: 7px;
+    align-items: stretch;
+  }
+  .lane-row.center { justify-content: center; }
+  .arrow-down {
+    text-align: center;
+    color: #2c3e50;
+    font-size: 13pt;
+    line-height: 0.8;
+    margin: 0;
+    height: 12pt;
+  }
+  .box {
+    border: 1px solid #6a87a3;
+    border-radius: 4px;
+    padding: 5px 8px;
+    background: #cfe5f5;
+    flex: 1;
+    min-width: 0;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+  }
+  .box.process    { background: #cfe5f5; border-color: #5b87b3; }
+  .box.compose    { background: #cfe5f5; border-color: #5b87b3; }
+  .box.dispatch   { background: #cfe5f5; border-color: #5b87b3; }
+  .box.operator   { background: #d4e9c4; border-color: #6a9550; }
+  .box.cron       { background: #f5d0a8; border-color: #b87a3a; }
+  .box.parked     { background: #f5c8d0; border-color: #b8556a; }
+  .box.foundation { background: #dcd0e8; border-color: #7a5a99; }
+  .box.gate       { background: #fff3c4; border-color: #c9a73a; }
+  .box.future     { background: #ececec; border-color: #999; color: #555; }
+  .box-title {
+    font-weight: 600;
+    font-size: 9pt;
+    margin-bottom: 1px;
+    line-height: 1.25;
+  }
+  .box-title a {
+    color: #1a4b8c;
+    text-decoration: underline;
+  }
+  .box-title .tag {
+    display: inline-block;
+    font-size: 7pt;
+    font-weight: 700;
+    color: #fff;
+    background: #b8556a;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: 4px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .box-title .tag.live   { background: #6a9550; }
+  .box-title .tag.gated  { background: #b87a3a; }
+  .box-title .tag.parked { background: #b8556a; }
+  .box-title .tag.cron   { background: #4a6fa3; }
+  .box-title .tag.future { background: #888; }
+  .box-desc {
+    font-size: 8pt;
+    color: #444;
+    line-height: 1.32;
+  }
+  .box-cost {
+    font-size: 7.5pt;
+    color: #7a4a00;
+    margin-top: 2px;
+    font-style: italic;
+  }
+  .callout {
+    background: #fff5cc;
+    border: 1px solid #d4b54a;
+    border-radius: 4px;
+    padding: 5px 7px;
+    font-size: 7.8pt;
+    color: #4a3a00;
+    line-height: 1.36;
+    align-self: start;
+  }
+  .callout.danger { background: #fbe1e6; border-color: #c97585; color: #5a1525; }
+  .callout strong { color: #2c3e50; }
+  .callout.danger strong { color: #5a1525; }
+  .callout-title {
+    font-weight: 700;
+    margin-bottom: 2px;
+    font-size: 8pt;
+  }
+
+  .section-header {
+    margin-top: 14px;
+    margin-bottom: 8px;
+    padding: 5px 10px;
+    background: #2c3e50;
+    color: #fff;
+    font-weight: 700;
+    font-size: 10pt;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .section-header .agent-tag {
+    background: #fff;
+    color: #2c3e50;
+    padding: 1px 6px;
+    margin-right: 8px;
+    border-radius: 3px;
+    font-size: 9pt;
+    letter-spacing: 0.3px;
+  }
+  .section-header .agent-tag-future {
+    background: #888;
+    color: #fff;
+  }
+
+  .grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .grid-3col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .grid-4col {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .legend {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #ccc;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 8pt;
+    color: #555;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch {
+    width: 13px; height: 13px;
+    border: 1px solid #888;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .handoff {
+    text-align: center;
+    margin: 10px 0 6px 0;
+    padding: 6px 10px;
+    background: #f0f0f0;
+    border: 1px dashed #888;
+    border-radius: 4px;
+    font-size: 8.5pt;
+    color: #555;
+    font-style: italic;
+  }
+  .handoff strong { color: #2c3e50; font-style: normal; }
+
+  .footer {
+    margin-top: 14px;
+    padding-top: 6px;
+    border-top: 1px solid #ddd;
+    font-size: 7.5pt;
+    color: #777;
+    text-align: center;
+  }
+  a { color: #1a4b8c; }
+  a:visited { color: #1a4b8c; }
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+  <h1>AIOS System Map</h1>
+  <div class="subtitle">
+    <strong>Cold-email v1 contact flow</strong> &nbsp;•&nbsp; 5 climbing-themed agents &nbsp;•&nbsp; modules, hand-offs, operator surfaces &nbsp;•&nbsp; generated 2026-04-28
+    <br><strong>Scout</strong> (recon the route) &rarr; <strong>Lead</strong> (climb first) &rarr; <strong>Belay</strong> (catch falls, secure to anchor) &rarr; <strong>Compass</strong> (point the way) &nbsp;•&nbsp; <strong>Beacon</strong> (signal the route is open) &mdash; future content track
+    <br>LinkedIn / SMS / WhatsApp / voicemail / letters land in Plan 3 as channel sub-modules under <strong>Lead</strong> (not sibling agents). Replies on any channel route to <strong>Belay</strong>.
+  </div>
+</div>
+
+<!-- ============================ AGENT: SCOUT (master list builder) ============================ -->
+<div class="section-header"><span class="agent-tag">SCOUT</span>master list builder &nbsp;&mdash;&nbsp; recon the route, find the prospects, prepare the line</div>
+
+<!-- LANE 1: List Sourcing (Prospecting stage) -->
+<div class="lane">
+  <div class="lane-label">List Sourcing<br><em style="font-weight:400;font-size:7pt;color:#555">Prospecting stage</em></div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/sources/trigify_monitors.py">Trigify Monitors</a> <span class="tag gated">SIGNAL</span></div>
+        <div class="box-desc">silver-bullet signal-triggered: new hires &le;180d, funding rounds, new domains</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/sources/trigify_discovery.py">Trigify Discovery</a></div>
+        <div class="box-desc">broad niche search via Trigify CLI</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/sources/apollo_company.py">Apollo Company</a></div>
+        <div class="box-desc">last-resort firmographic search</div>
+      </div>
+    </div>
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/sources/clutch.py">Clutch Directory</a></div>
+        <div class="box-desc">specialist directory scrape (creative_branding niche)</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/sources/csv_ingest.py">CSV Ingest</a></div>
+        <div class="box-desc">manual list import</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Sources are channel-agnostic</div>
+    A contact is a contact regardless of how Lead will later reach them (email / LI / SMS). Plan 3 channels reuse this layer unchanged. See <a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/sops/lead-scraping-sop.md">lead-scraping SOP</a>.
+  </div>
+</div>
+<div class="lane"><div></div><div class="arrow-down">&#x25BC;</div><div></div></div>
+
+<!-- LANE 2: Pull & Dedupe -->
+<div class="lane">
+  <div class="lane-label">Pull &amp;<br>Dedupe</div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/pipeline/pull.py">pipeline / pull.py</a></div>
+        <div class="box-desc">insert contact rows; dedupe by email + LinkedIn URL; tag source provenance</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Provenance preserved</div>
+    Every contact row records which source surfaced it. Used downstream by Compass to compare per-source quality.
+  </div>
+</div>
+<div class="lane"><div></div><div class="arrow-down">&#x25BC;</div><div></div></div>
+
+<!-- LANE 3: Identity Resolution (Researcher stage) -->
+<div class="lane">
+  <div class="lane-label">Identity<br>Resolution<br><em style="font-weight:400;font-size:7pt;color:#555">Researcher stage</em></div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/identity/orchestrator.py">Identity Orchestrator</a></div>
+        <div class="box-desc">tries adapters in cost order; stops on first hit per field</div>
+      </div>
+    </div>
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/identity/apollo_people.py">Apollo People</a></div>
+        <div class="box-desc">name + title + LinkedIn URL</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/identity/hunter_domain.py">Hunter Domain</a></div>
+        <div class="box-desc">company-domain pattern email guess</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/identity/claude_identity_scraper.py">Claude Identity Scraper</a></div>
+        <div class="box-desc">fallback web scrape via Haiku</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Cost-ordered cascade</div>
+    Apollo first (cheapest per hit) &rarr; Hunter (free pattern match) &rarr; Claude scraper (~$0.001/contact) only when both miss.
+  </div>
+</div>
+<div class="lane"><div></div><div class="arrow-down">&#x25BC;</div><div></div></div>
+
+<!-- LANE 4: Qualify & Score -->
+<div class="lane">
+  <div class="lane-label">Qualify<br>&amp; Score</div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/pipeline/screen.py">pipeline / screen.py</a></div>
+        <div class="box-desc">rule-based ICP score 0-100: title match + employee band + niche + signal presence</div>
+        <div class="box-cost">$0 &mdash; pure rules</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/pipeline/score_stage.py">pipeline / score_stage.py</a></div>
+        <div class="box-desc">if rule score in <strong>40-60 uncertain band</strong> &rarr; fire LLM judge; else pass-through</div>
+      </div>
+      <div class="box gate">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/score/uncertain_zone_judge.py">Uncertain-Zone Judge</a> <span class="tag gated">CONDITIONAL</span></div>
+        <div class="box-desc">Haiku verdict nudges score: -15, -5, 0, +5, +15. Fail-safe: rule score on outage.</div>
+        <div class="box-cost">~$0.0003/call when triggered</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Tier gates downstream</div>
+    Score &lt;35 archived. &ge;50 unlocks phone enrichment + Deep Research. Per <a href="file:///home/kirsten/.claude/projects/-home-kirsten-01-PERSONAL-10-PERSONAL-PROJECTS-ai-os-blueprint/memory/feedback_enrichment_tiers.md">enrichment-tier memory</a>.
+  </div>
+</div>
+<div class="lane"><div></div><div class="arrow-down">&#x25BC;</div><div></div></div>
+
+<!-- LANE 5: Enrich (Enricher stage) -->
+<div class="lane">
+  <div class="lane-label">Enrich<br>(signal-gated)<br><em style="font-weight:400;font-size:7pt;color:#555">Enricher stage</em></div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/orchestrator.py">Enrich Orchestrator</a></div>
+        <div class="box-desc">runs adapters in cost order; signal-gates expensive ones; respects per-contact ceiling</div>
+      </div>
+    </div>
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/apollo_enrich.py">Apollo Enrich</a></div>
+        <div class="box-desc">firmographics + role detail</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/trigify.py">Trigify Enrich</a></div>
+        <div class="box-desc">trigger events: funding, hires, expansions</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/zerobounce.py">ZeroBounce</a></div>
+        <div class="box-desc">email deliverability verify</div>
+      </div>
+      <div class="box gate">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/claude_deep_research.py">Claude Deep Research</a> <span class="tag gated">SIGNAL-GATED</span></div>
+        <div class="box-desc"><strong>skipped</strong> if prior adapters surfaced trigger_events or structural_signals</div>
+        <div class="box-cost">headline cost win toward $0.002/contact target</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box gate">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/budget/per_contact_ceiling.py">Per-Contact Ceiling</a> <span class="tag gated">5&cent; CAP</span></div>
+        <div class="box-desc">hard cap across ALL enrichment adapters; skip next adapter if exceeded</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Why signal-gating matters</div>
+    Deep Research is the most expensive adapter. Skipping it when cheap adapters already found a signal is the headline lever moving cost from ~$0.05 toward the $0.002/contact target. Per <a href="file:///home/kirsten/.claude/projects/-home-kirsten-01-PERSONAL-10-PERSONAL-PROJECTS-ai-os-blueprint/memory/feedback_cost_optimiser_continuous_concern.md">cost-optimiser memory</a>.
+  </div>
+</div>
+
+<!-- ============================ HAND-OFF: Scout → Lead ============================ -->
+<div class="handoff">
+  &darr; &nbsp; <strong>HAND-OFF</strong>: Scout produces <code>contact</code> rows enriched + scored + tier-eligible &nbsp;&rarr;&nbsp; Lead picks them up to compose &amp; dispatch &nbsp; &darr;
+</div>
+
+<!-- ============================ AGENT: LEAD (multi-channel send) ============================ -->
+<div class="section-header"><span class="agent-tag">LEAD</span>multi-channel send agent &nbsp;&mdash;&nbsp; lead climber goes first, sets the route, places protection</div>
+
+<!-- LANE 6: Compose -->
+<div class="lane">
+  <div class="lane-label">Compose<br>(channel split: Plan 3)</div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box compose">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/outreach/composer.py">Composer</a></div>
+        <div class="box-desc">assembles draft from variant pool; bandit-driven selection</div>
+      </div>
+      <div class="box compose">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/outreach/component_store.py">Component Store</a></div>
+        <div class="box-desc">operator-approved variant pool: subject, body_template, icebreaker, offer_frame</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box compose">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/icebreaker_adapter.py">Icebreaker Adapter</a></div>
+        <div class="box-desc">Haiku composes per-contact opener; tier 1-4 prompts based on signal richness</div>
+        <div class="box-cost">~$0.0005/contact</div>
+      </div>
+      <div class="box gate">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/scout/enrich/icebreaker_adapter.py">Validator</a> <span class="tag gated">HARD GATE</span></div>
+        <div class="box-desc">banned words (leverage / solution / scale / pipeline / &hellip;), em-dash, banned diagnostic phrases &rarr; reject draft</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Plan 3 channel split happens HERE</div>
+    Everything in Scout (above) is channel-agnostic. The composer becomes channel-aware: <code>channels/email/</code> (today), <code>channels/linkedin/</code> + <code>channels/sms/</code> (Plan 3). Validator rules are shared across channels. Per <a href="file:///home/kirsten/.claude/projects/-home-kirsten-01-PERSONAL-10-PERSONAL-PROJECTS-ai-os-blueprint/memory/feedback_lead_multi_channel_module.md">Lead multi-channel-module memory</a>.
+  </div>
+</div>
+<div class="lane"><div></div><div class="arrow-down">&#x25BC;</div><div></div></div>
+
+<!-- LANE 7: Dispatch -->
+<div class="lane">
+  <div class="lane-label">Dispatch</div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box dispatch">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/pipeline/send_stage.py">Send Stage</a></div>
+        <div class="box-desc">picks ready drafts; respects suppression + cool-off + autonomy gate; calls Instantly v2 API</div>
+      </div>
+      <div class="box dispatch">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/sops/esp-migration-smartlead-to-instantly.md">Instantly v2 API</a> <span class="tag live">LIVE</span></div>
+        <div class="box-desc">ESP locked at $47/mo Growth tier; 6 mailboxes warming ~20-25/day</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box dispatch">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/pipeline/webhook_handler.py">Webhook Handler</a></div>
+        <div class="box-desc">Instantly fires on send / open / click / reply / bounce; routes to ingest queue</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Code lives at systems/beacon/pipeline/ pre-rename</div>
+    Per topology lock-in: send_stage + webhook_handler logically belong to Lead. Physical move (`systems/beacon/pipeline/*` &rarr; `systems/lead/dispatch/*`) is a post-`plan-2`-tag refactor; until then, code path is unchanged.
+  </div>
+</div>
+
+<!-- ============================ HAND-OFF: Lead → Belay ============================ -->
+<div class="handoff">
+  &darr; &nbsp; <strong>HAND-OFF</strong>: Lead dispatched message; prospect replies via Instantly &nbsp;&rarr;&nbsp; Belay receives reply via webhook &nbsp; &darr;
+</div>
+
+<!-- ============================ AGENT: BELAY (reply runtime) ============================ -->
+<div class="section-header"><span class="agent-tag">BELAY</span>reply runtime + nurture + booking &nbsp;&mdash;&nbsp; manage the rope, catch falls, secure climber to next anchor</div>
+
+<!-- LANE 8: Reply Handling -->
+<div class="lane">
+  <div class="lane-label">Reply<br>Handling</div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/reply/classifier.py">Reply Classifier</a></div>
+        <div class="box-desc">Haiku buckets reply: objection_pricing / objection_timing / objection_authority / objection_other / meeting_request / positive_interest</div>
+        <div class="box-cost">~$0.0005/reply</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box operator">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/reply/escalation.py">Manual Triage Queue</a> <span class="tag live">OPERATOR</span></div>
+        <div class="box-desc"><strong>EVERY reply lands here.</strong> Operator hand-writes; pulls from 6 reference templates</div>
+      </div>
+      <div class="box operator">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/reply/slack_notifier.py">Slack Notifier</a></div>
+        <div class="box-desc">posts to <code>SLACK_WEBHOOK_URL</code> when queue gets a new entry</div>
+      </div>
+    </div>
+    <div class="lane-row">
+      <div class="box parked">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/reply/auto_respond.py">Auto-Respond Runtime</a> <span class="tag parked">PARKED</span></div>
+        <div class="box-desc">code committed + tested; new <strong>Gate 0</strong> (<code>auto_respond_enabled=False</code>) keeps it parked at <code>suggest</code> until calibrated.</div>
+      </div>
+      <div class="box compose">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/sequences/creative_branding/components/reply_responses/">6 Reply-Response Templates</a></div>
+        <div class="box-desc">demoted to operator reference: objection_pricing (locked) + 5 skeletons</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/beacon/reply/cool_off.py">Cool-Off + Re-Entry</a></div>
+        <div class="box-desc">90d idle &rarr; eligible for round N+1; max 4 rounds; honours global DND on opt-out</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout danger">
+    <div class="callout-title">Phase 1 manual-first &rarr; Phase 2 auto-fire (post-calibration)</div>
+    Today: operator hand-writes every reply. Long-term: time-zone coverage (operator SA, prospects US Central, 8hr gap) makes manual same-day response infeasible &mdash; Belay MUST auto-handle minor objections + redirect to call. Phase 2 auto-fires <code>meeting_request</code> + <code>positive_interest</code> + low-friction objections; deep product/pricing always to human. Promotion gate: 30+ {prediction, reply, outcome} triples per class with &ge;80% accuracy. See <a href="file:///home/kirsten/.claude/projects/-home-kirsten-01-PERSONAL-10-PERSONAL-PROJECTS-ai-os-blueprint/memory/feedback_replies_manual_first_then_automate.md">manual-first memory</a> + <a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/frameworks/objection-handling.md">ARA/ACE objection-handling framework</a>.
+  </div>
+</div>
+
+<!-- ============================ AGENT: COMPASS (weekly learning loop) ============================ -->
+<div class="section-header"><span class="agent-tag">COMPASS</span>weekly learning loop &nbsp;&mdash;&nbsp; point the team in the right direction based on what's been learned</div>
+
+<!-- LANE 9: Learn -->
+<div class="lane">
+  <div class="lane-label">Learn</div>
+  <div class="lane-content">
+    <div class="lane-row">
+      <div class="box cron">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/scripts/run_optimizer_weekly.py">run_optimizer_weekly.py</a> <span class="tag cron">CRON</span></div>
+        <div class="box-desc">scheduled Mon 6am UTC; pulls last 7 days of decision_log + send + reply</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/optimizer/weekly_review.py">Weekly Review</a></div>
+        <div class="box-desc">analyses variant performance, ICP-tier thresholds, adapter ROI, cost/contact, coverage</div>
+      </div>
+      <div class="box process">
+        <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/systems/optimizer/recommendations.py">Recommendation Engine</a></div>
+        <div class="box-desc">writes to <code>optimizer_recommendation</code> table; status=pending</div>
+      </div>
+    </div>
+    <div class="arrow-down">&#x25BC;</div>
+    <div class="lane-row">
+      <div class="box operator">
+        <div class="box-title">Operator Approve / Reject <span class="tag live">OPERATOR</span></div>
+        <div class="box-desc">via <code>/api/optimizer/recommendations</code> (cron_secret-gated); read-only-recommendations in v1</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">v1 is read-only-recommendations</div>
+    Compass never auto-applies. Auto-apply is Plan 4 (<a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/docs/superpowers/plans/2026-04-27-plan-4-autoresearch.md">Karpathy auto-research framework</a>). Code lives at <code>systems/optimizer/*</code> pre-rename.
+  </div>
+</div>
+
+<!-- ============================ AGENT: BEACON (content ghostwriter, future) ============================ -->
+<div class="section-header"><span class="agent-tag agent-tag-future">BEACON</span>content ghostwriter (future) &nbsp;&mdash;&nbsp; signal fire visible from afar, drawing others to the same path</div>
+
+<div class="grid-2col">
+  <div class="box future">
+    <div class="box-title">Beacon &mdash; Content Ghostwriter <span class="tag future">FUTURE</span></div>
+    <div class="box-desc">Takes operator's themes &rarr; ghostwrites posts for LinkedIn, X, etc. Parallel track to Lead; no list dependency. Plan 4 or beyond.</div>
+  </div>
+  <div class="callout">
+    <div class="callout-title">Why parallel, not sequential</div>
+    Beacon doesn't consume Scout's list or wait for Belay's replies. It runs on operator-supplied themes. Content amplifies the inbound side (drawing prospects to CLYMB Co) where Scout&rarr;Lead&rarr;Belay handles outbound. Together: surround-sound.
+  </div>
+</div>
+
+<!-- ============================ OPERATOR SURFACE ============================ -->
+<div class="section-header">Operator Surface &nbsp;&mdash;&nbsp; Claude Code (Max credits) + manual queue</div>
+
+<div class="grid-3col">
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/skills/operations/filter-icp-list.md">/skill filter-icp-list</a></div>
+    <div class="box-desc">run inside Claude Code on a CSV; sub-agent (Sonnet, Max credits) returns fit yes/maybe/no per row + reasoning</div>
+    <div class="box-cost">$0 marginal &mdash; Max bundled</div>
+  </div>
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/skills/operations/grade-cold-email-copy.md">/skill grade-cold-email-copy</a></div>
+    <div class="box-desc">predict reply rate + tier A-D + 3-line critique on a draft variant; persists predicted_grade</div>
+    <div class="box-cost">$0 marginal &mdash; Max bundled</div>
+  </div>
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/scripts/cost_dashboard.py">cost_dashboard.py</a></div>
+    <div class="box-desc">CLI: per-contact cost rollup + per-field, per-tier coverage % vs 90% target</div>
+  </div>
+</div>
+
+<div class="grid-3col" style="margin-top: 6px;">
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/sops/claude-code-workflow.md">SOP: Claude Code Workflow</a></div>
+    <div class="box-desc">5-step session-start checklist + mid-session discipline (validating steps, context management, plan mode)</div>
+  </div>
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/frameworks/objection-handling.md">Framework: ARA / ACE</a></div>
+    <div class="box-desc">Acknowledge &rarr; Reassert &rarr; Advance for reply objections; sell the meeting, not the product</div>
+  </div>
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/frameworks/allbound-system.md">Framework: Allbound</a></div>
+    <div class="box-desc">signal-first (not filter-first), social warming before DM, 2-step campaigns, anti-personalization, conservative email infra</div>
+  </div>
+</div>
+
+<div class="grid-3col" style="margin-top: 6px;">
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/scripts/provision_new_client.py">provision_new_client.py</a></div>
+    <div class="box-desc">bootstrap a per-client AIOS silo end-to-end: validates &rarr; clients + client_config + autonomy_rules &rarr; context/data scaffold &rarr; 8-step operator checklist</div>
+  </div>
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/scripts/configure_trigify_monitors.py">configure_trigify_monitors.py</a></div>
+    <div class="box-desc">configure signal-triggered monitors per client niche</div>
+  </div>
+  <div class="box operator">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/sops/lead-scraping-sop.md">SOP: Lead Scraping</a></div>
+    <div class="box-desc">specialist directories first, Apollo last-resort, cost-per-quality-lead is the metric</div>
+  </div>
+</div>
+
+<!-- ============================ FOUNDATION ============================ -->
+<div class="section-header">Foundation &nbsp;&mdash;&nbsp; shared across all agents</div>
+
+<div class="grid-4col">
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/context/">context / &lt;client&gt;</a></div>
+    <div class="box-desc"><strong>identity</strong>: brand, integrations, active projects (per-company silo &mdash; never shared)</div>
+  </div>
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/knowledge/">data / knowledge</a></div>
+    <div class="box-desc"><strong>facts</strong>: personal / company / experts (Hormozi / Saraev / Brunson / Acosta / Walsh / Sapp)</div>
+  </div>
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/data/reference/sequences/">data / reference / sequences</a></div>
+    <div class="box-desc">YAML cadences + variant pools per niche; reply-response templates</div>
+  </div>
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/rules/">rules /</a></div>
+    <div class="box-desc">global writing guardrails enforced by every content-producing skill</div>
+  </div>
+</div>
+
+<div class="grid-4col" style="margin-top: 6px;">
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/skills/">skills /</a></div>
+    <div class="box-desc">three-tier library: capability (atomic) / composite (3-8 chained) / playbook (E2E + human gates)</div>
+  </div>
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/departments/">departments /</a></div>
+    <div class="box-desc">manifests activating skill subsets per business function (Operations / Finance / Marketing / Legal &hellip;)</div>
+  </div>
+  <div class="box foundation">
+    <div class="box-title">decision_log <em>(Supabase)</em></div>
+    <div class="box-desc">every significant action recorded; the substrate for Compass learning + audit</div>
+  </div>
+  <div class="box foundation">
+    <div class="box-title"><a href="file:///home/kirsten/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/memory/">memory /</a></div>
+    <div class="box-desc">MEMORY.md (stable) + INDEX.md (decisions + open loops) + sessions/ (daily logs)</div>
+  </div>
+</div>
+
+<!-- ============================ LEGEND ============================ -->
+<div class="legend">
+  <div class="legend-item"><span class="legend-swatch" style="background:#cfe5f5"></span> Process / pipeline</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#d4e9c4"></span> Operator-handled</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#f5d0a8"></span> Cron / scheduled</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#fff3c4"></span> Hard gate / cap</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#f5c8d0"></span> Parked (code present, not enabled)</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#dcd0e8"></span> Foundation / shared</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#ececec"></span> Future agent</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#fff5cc"></span> Clarifying note</div>
+</div>
+
+<div class="footer">
+  AIOS &mdash; per-company silo, productised &mdash; v1 cold-email &mdash; CLYMB Co climbing-themed agent topology &mdash; 2026-04-28 &mdash; underline = clickable file link &mdash;
+  source: <code>data/reference/diagrams/aios-system-map.html</code>
+</div>
+
+</body>
+</html>

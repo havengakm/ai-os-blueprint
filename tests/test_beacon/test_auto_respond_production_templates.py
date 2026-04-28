@@ -68,6 +68,10 @@ async def test_production_template_renders_and_validates(classification):
         backend=_Backend(),
         decision_logger=_DecisionLogger(),
         templates_dir=PROD_TEMPLATES_DIR,
+        # Smoke-test exercises the full render+validate+send path; opt in
+        # explicitly. Production DI defaults this to False per the
+        # manual-first decision (2026-04-28).
+        auto_respond_enabled=True,
     )
     result = await runtime.respond(
         client_id="c1",

@@ -156,12 +156,24 @@ def standard_backend() -> FakeBackend:
     )
 
 
-def _make_runtime(templates_dir, backend, responder=None, logger=None):
+def _make_runtime(
+    templates_dir,
+    backend,
+    responder=None,
+    logger=None,
+    auto_respond_enabled: bool = True,
+):
+    """Default to ``auto_respond_enabled=True`` because the existing tests
+    in this file exercise the auto-fire codepath; they explicitly opt in.
+    Production DI defaults to False per the manual-first decision; the
+    test exercising that gate constructs the runtime directly with
+    ``auto_respond_enabled=False`` rather than via this helper."""
     return AutoRespondRuntime(
         responder=responder or FakeResponder(),
         backend=backend,
         decision_logger=logger or FakeDecisionLogger(),
         templates_dir=templates_dir,
+        auto_respond_enabled=auto_respond_enabled,
     )
 
 
@@ -209,6 +221,49 @@ async def test_skips_when_recommended_action_is_not_auto_respond(
     # decision_log records the classification but not a send_attempt
     decision_types = [e["decision_type"] for e in logger.emits]
     assert "reply_classification" in decision_types
+    assert "send_attempt" not in decision_types
+
+
+# --------------------------------------------------------------------------- #
+# Skip: runtime disabled at client_config level                               #
+# --------------------------------------------------------------------------- #
+
+
+async def test_skips_when_auto_respond_disabled_even_with_valid_classification(
+    templates_dir, standard_backend
+):
+    """Per the 2026-04-28 manual-first directional decision, the runtime
+    parks at ``suggest`` autonomy until calibration evidence exists. The
+    ``auto_respond_enabled`` flag is the system-level gate: when False,
+    even a high-confidence classification with action='auto_respond' must
+    not fire. Classifier output is still recorded (training signal for
+    future promotion) but no send_attempt is emitted."""
+    responder = FakeResponder()
+    logger = FakeDecisionLogger()
+    runtime = AutoRespondRuntime(
+        responder=responder,
+        backend=standard_backend,
+        decision_logger=logger,
+        templates_dir=templates_dir,
+        auto_respond_enabled=False,
+    )
+
+    result = await runtime.respond(
+        client_id="c1",
+        contact_id="u1",
+        in_reply_to_message_id="msg-1",
+        original_subject="hi",
+        # A classification + action combination that WOULD fire if enabled.
+        classify_result=_classify("objection_pricing", action="auto_respond"),
+    )
+
+    assert result.verdict == "skipped:auto_respond_disabled"
+    assert "manual" in result.reason.lower() or "disabled" in result.reason.lower()
+    assert responder.calls == []
+    decision_types = [e["decision_type"] for e in logger.emits]
+    # Classifier prediction recorded (training signal for future promotion).
+    assert "reply_classification" in decision_types
+    # No send_attempt emitted; the runtime didn't try to fire.
     assert "send_attempt" not in decision_types
 
 

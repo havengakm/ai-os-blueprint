@@ -4,7 +4,7 @@
 
 Plan 1 (foundation + Scout) and Plan 1.5 (cost discipline + body template + acceptance hardening) are both shipped to `main` and tagged. The AIOS now produces validated, rendered outreach drafts at MVP cost (~$0.01-0.03/contact today, $0.002/contact target after this plan).
 
-Plan 2 takes the rendered drafts and **gets them in front of prospects**, closes the reply loop (classification + auto-respond), and adds the optimization layer that lets the system learn and improve. Plus a productisation deployment script so client #2 can be spun up cleanly.
+Plan 2 takes the rendered drafts and **gets them in front of prospects**, closes the reply loop (classification + manual triage by default; auto-respond runtime is built but parked per the 2026-04-28 manual-first decision — see `feedback_replies_manual_first_then_automate`), and adds the optimization layer that lets the system learn and improve. Plus a productisation deployment script so client #2 can be spun up cleanly.
 
 **Scope decision 2026-04-26**: operator chose to push LinkedIn (and all other channels) out of Plan 2. Plan 2 is **email-only, full-loop**: list scraping → enrichment → messaging → replies → optimisation. Multi-channel work moves to Plan 3.
 
@@ -229,6 +229,8 @@ Replies arrive on this webhook too — they're routed to Phase 3's reply runtime
 - [ ] Operator applies migration 017 (`scripts/sql/017_decision_log_send_event.sql`) to dev Supabase.
 
 ## Phase 3: Reply ingestion + classification + auto-respond
+
+> **Operator-side enablement note (2026-04-28):** the auto-respond runtime + 6 reply-response templates ship as designed below. They do NOT fire in production. The runtime parks at `auto_respond_enabled=False` (the new Gate 0 in `systems/beacon/reply/auto_respond.py`); replies route to the operator's manual triage queue. Promotion to live auto-fire requires 30+ {classifier_prediction, operator_reply, actual_outcome} triples per classification class with ≥80% classifier accuracy. See `feedback_replies_manual_first_then_automate` + INDEX.md decision row 2026-04-28.
 
 ### Task 2.3.1: Reply classifier (Haiku)
 
@@ -603,14 +605,17 @@ Validates:
 
 ### Task 2.7.1: End-to-end acceptance run
 
-Single client (kirsten-client-zero), single contact, full path: pull → score → screen → identity → enrich → compose → send → reply received → reply classified → auto-respond. Verify each stage wrote the right `decision_log` entries; verify outreach_send_log + outreach_reply rows.
+Single client (kirsten-client-zero), single contact, full path: pull → score → screen → identity → enrich → compose → send → reply received → reply classified → **routed to operator's manual triage queue**. Verify each stage wrote the right `decision_log` entries; verify outreach_send_log + outreach_reply rows.
+
+**Reply-runtime acceptance scope changed 2026-04-28** per the manual-first directional decision (`feedback_replies_manual_first_then_automate`): the auto-respond runtime is committed and tested but parks at `auto_respond_enabled=False` (Gate 0 in `systems/beacon/reply/auto_respond.py`). Acceptance ends at "classifier wrote `reply_classification` decision_log entry + escalation runtime put the reply in the operator queue." Operator hand-writes the reply pulling from the 6 reference templates; that hand-written reply is itself part of the calibration training signal for any future autonomy promotion. The acceptance run does NOT test auto-fire of templates.
 
 Cost benchmark: 100-contact dry-run cohort produces a per-contact cost ≤ $0.005 (signal-gated DR active, 5c ceiling enforced).
 
 **Acceptance**:
 - [ ] Full end-to-end pipeline run captured in `data/captures/plan2-acceptance/`.
+- [ ] Reply test fixture: classifier output recorded; reply visible in operator's manual queue (escalation row created); auto-respond runtime returns `skipped:auto_respond_disabled` — confirms the manual-first gate is wired correctly.
 - [ ] Cost benchmark report in same dir.
-- [ ] Test suite green: target 1100+ tests passing (936 baseline + ~150 new in Plan 2 phases).
+- [ ] Test suite green: 1270+ tests passing (1268 post-Phase 6 + 1 new disable-gate test + headroom for any small additions during acceptance hardening).
 
 ### Task 2.7.2: Merge `feat/plan-2-beacon` into main + tag `plan-2`
 
@@ -646,7 +651,7 @@ PR for the entire branch against main; review; merge `--no-ff`; tag `plan-2` at 
 End-to-end after all phases:
 
 1. **Test suite green**: `pytest -q tests/` reports 0 failures (~1100+ tests).
-2. **Beacon email end-to-end**: 1 contact sends, replies, gets classified, gets auto-responded.
+2. **Beacon email end-to-end**: 1 contact sends, replies, gets classified, gets routed to the operator's manual triage queue (auto-respond runtime parked at Gate 0 per 2026-04-28 manual-first decision; promotion to auto-fire is post-Plan-2).
 3. **Cost benchmark**: 100-contact dry-run cohort at ≤ $0.005/contact.
 4. **Optimizer weekly review**: report generates against the test data; recommendations land in `optimizer_recommendation` table; one approval applies cleanly.
 5. **Productisation**: provision a fresh test client end-to-end, run preflight clean.

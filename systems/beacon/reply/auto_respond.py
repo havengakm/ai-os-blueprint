@@ -20,6 +20,12 @@ Plan 2 Phase 3 Task 2.3.2. For each ``ClassifyResult`` with
 
 Verdicts:
   - ``sent`` — happy path, response_message_id set
+  - ``skipped:auto_respond_disabled`` — runtime parked at the system level
+    via ``auto_respond_enabled=False``. Per the 2026-04-28 manual-first
+    directional decision: replies stay operator-handled until 30+
+    {classifier_prediction, operator_reply, actual_outcome} triples per
+    classification class show ≥80% classifier accuracy. Classifier
+    output is still recorded as training signal for future promotion.
   - ``skipped:not_auto_respond`` — recommended_action != 'auto_respond'
   - ``skipped:no_template`` — classification has no matching template
   - ``skipped:no_calendly_url`` — meeting_request / positive_interest
@@ -80,6 +86,7 @@ _CALENDLY_REQUIRED: frozenset[str] = frozenset(
 # Verdict constants (mirror SendStage's prefix pattern for grouping in
 # decision_log queries).
 VERDICT_SENT = "sent"
+VERDICT_SKIPPED_DISABLED = "skipped:auto_respond_disabled"
 VERDICT_SKIPPED_NOT_AUTO_RESPOND = "skipped:not_auto_respond"
 VERDICT_SKIPPED_NO_TEMPLATE = "skipped:no_template"
 VERDICT_SKIPPED_NO_CALENDLY = "skipped:no_calendly_url"
@@ -184,11 +191,16 @@ class AutoRespondRuntime:
         backend: AutoRespondBackend,
         decision_logger: DecisionLogger,
         templates_dir: Path,
+        auto_respond_enabled: bool = False,
     ) -> None:
         self._responder = responder
         self._backend = backend
         self._logger = decision_logger
         self._templates_dir = Path(templates_dir)
+        # Defaults to False per the 2026-04-28 manual-first decision: the
+        # runtime stays parked until calibration evidence justifies
+        # promotion. Production DI must opt-in explicitly via client_config.
+        self._auto_respond_enabled = auto_respond_enabled
 
     async def respond(
         self,
@@ -201,8 +213,23 @@ class AutoRespondRuntime:
         dry_run: bool = False,
     ) -> AutoRespondResult:
         # Always emit reply_classification — records what the classifier
-        # decided, regardless of whether we end up auto-responding.
+        # decided, regardless of whether we end up auto-responding. The
+        # prediction is training signal for any future autonomy promotion.
         await self._emit_classification(client_id, contact_id, classify_result)
+
+        # Gate 0: system-level enablement. Per the 2026-04-28 manual-first
+        # decision, the runtime parks at this gate until calibration
+        # evidence (30+ {prediction, reply, outcome} triples per class with
+        # ≥80% classifier accuracy) justifies promotion. Production DI
+        # opts in via client_config; default is parked.
+        if not self._auto_respond_enabled:
+            return AutoRespondResult(
+                verdict=VERDICT_SKIPPED_DISABLED,
+                reason=(
+                    "auto_respond_enabled=False — runtime parked at suggest "
+                    "autonomy; reply routes to operator's manual queue"
+                ),
+            )
 
         # Gate 1: action must be auto_respond.
         if classify_result.recommended_action != "auto_respond":
