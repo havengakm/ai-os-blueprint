@@ -45,7 +45,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from systems.scout.pipeline.validate_config import assert_valid_client_config
+
+# Repo-root path setup so ``from systems.X import Y`` works when this
+# script is run directly. Matches scripts/run_optimizer_weekly.py +
+# scripts/load_components.py patterns.
+_REPO_ROOT = Path(__file__).parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+
+from systems.scout.pipeline.validate_config import assert_valid_client_config  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

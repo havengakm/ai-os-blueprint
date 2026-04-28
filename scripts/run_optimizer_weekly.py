@@ -20,7 +20,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from systems.optimizer.weekly_review import (
+
+# Repo-root path setup so ``from systems.X import Y`` works when this
+# script is run directly (uv run python scripts/run_optimizer_weekly.py).
+# Matches the pattern used by other scripts in this directory.
+_REPO_ROOT = Path(__file__).parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+
+from systems.optimizer.weekly_review import (  # noqa: E402
     WeeklyReview,
     WeeklyReviewReport,
     render_markdown,
