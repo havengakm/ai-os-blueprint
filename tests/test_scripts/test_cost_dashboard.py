@@ -92,7 +92,7 @@ def _seed_cost_data(now: datetime):
                 {
                     "client_id": "c1",
                     "tier_spent_cents": {"A": 50, "B": 30},
-                    "tier_budget_cents": {"A": 1000, "B": 500},
+                    "tier_budgets_cents": {"A": 1000, "B": 500},
                 }
             ],
         }

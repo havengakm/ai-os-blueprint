@@ -112,7 +112,7 @@ def test_build_default_client_config_includes_tier_budgets():
         offer_label="aios_scout_deployment",
         tier_budgets_cents={"A": 200, "B": 100, "C": 50, "D": 25},
     )
-    assert cfg["tier_budget_cents"] == {"A": 200, "B": 100, "C": 50, "D": 25}
+    assert cfg["tier_budgets_cents"] == {"A": 200, "B": 100, "C": 50, "D": 25}
     assert cfg["niche"] == "creative_branding"
     assert cfg["offer_label"] == "aios_scout_deployment"
 

@@ -140,7 +140,7 @@ def build_default_client_config(
         "client_name": client_name,
         "niche": niche,
         "offer_label": offer_label,
-        "tier_budget_cents": dict(tier_budgets_cents),
+        "tier_budgets_cents": dict(tier_budgets_cents),
         "tier_thresholds": dict(DEFAULT_TIER_THRESHOLDS),
         "tier_spent_cents": {tier: 0 for tier in tier_budgets_cents},
         "icp": {},

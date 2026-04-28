@@ -132,7 +132,7 @@ async def fetch_cost_report(
     # 6. Tier budget (from client_config).
     cfg_resp = (
         client.table("client_config")
-        .select("tier_spent_cents, tier_budget_cents")
+        .select("tier_spent_cents, tier_budgets_cents")
         .eq("client_id", client_id)
         .limit(1)
         .execute()
@@ -151,7 +151,7 @@ async def fetch_cost_report(
         "per_adapter_cost_cents": per_adapter,
         "top_contacts": top_contacts,
         "tier_spent": cfg.get("tier_spent_cents") or {},
-        "tier_budget": cfg.get("tier_budget_cents") or {},
+        "tier_budget": cfg.get("tier_budgets_cents") or {},
     }
 
 
