@@ -130,25 +130,28 @@ def _score_fit(contact: dict[str, Any], icp: dict[str, Any], cap: int) -> int:
     raw = 0
     raw_max = 0
 
+    # Industry + title are FUZZY string matches against ICP-author-curated
+    # term lists. A non-match often means substring-encoding drift (ICP says
+    # "creative director", vendor returns "Director") rather than a real
+    # negative signal. Treat "provided but no substring match" as NEUTRAL
+    # (skip from raw_max) so v2's added person-data can never DROP the score
+    # below v1's. Only matches contribute. Compare with employees/geography
+    # below, where "out of range" IS a hard negative signal kept in raw_max.
     industries: list[str] = icp.get("industries") or []
     contact_industry_raw = contact.get("industry")
     if contact_industry_raw is not None:
-        raw_max += _RAW_FIT_INDUSTRY
         contact_industry = str(contact_industry_raw).lower()
-        # Substring match (config term in contact industry) — same direction
-        # as title and geography. ICP authors broad terms ("consulting");
-        # vendor data returns specific taxonomy ("management consulting") —
-        # substring bridges the two.
         if contact_industry and any(i.lower() in contact_industry for i in industries if i):
             raw += _RAW_FIT_INDUSTRY
+            raw_max += _RAW_FIT_INDUSTRY
 
     titles: list[str] = icp.get("titles") or []
     contact_title_raw = contact.get("title")
     if contact_title_raw is not None:
-        raw_max += _RAW_FIT_TITLE
         contact_title = str(contact_title_raw).lower()
         if contact_title and any(t.lower() in contact_title for t in titles):
             raw += _RAW_FIT_TITLE
+            raw_max += _RAW_FIT_TITLE
 
     emp_min: int | None = icp.get("employee_min")
     emp_max: int | None = icp.get("employee_max")

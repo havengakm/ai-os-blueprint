@@ -285,6 +285,30 @@ def test_score_v2_no_research_data():
     assert v2 == v1
 
 
+def test_v2_does_not_drop_below_v1_when_title_added_with_no_match():
+    """Regression for Slice 18 bug: identity stage populates ``title``
+    BETWEEN v1 and v2 runs. If the resolved title doesn't substring-match
+    any ICP title, fit's denominator MUST NOT grow without numerator
+    growing — that would cause score_v2 < score_v1, archiving contacts
+    that had clean v1 scores.
+
+    Setup: v1 has industry but no title; v2 sees the same data + a
+    non-matching title. v2 should equal v1 (intent=0; title contributes
+    nothing in either direction).
+    """
+    base_v1 = _contact(industry="SaaS")  # title omitted
+    v1 = score_v1(base_v1, _BASE_CONFIG)
+
+    base_v2 = _contact(industry="SaaS", title="Director")  # not in ICP titles
+    v2 = score_v2(base_v2, _BASE_CONFIG)
+
+    assert v2 >= v1, (
+        f"v2={v2} dropped below v1={v1} after non-matching title added; "
+        "fit denominator grew without numerator. Title fields with no ICP "
+        "match must be NEUTRAL (skipped from raw_max), not negative."
+    )
+
+
 # ---------------------------------------------------------------------------
 # assign_tier
 # ---------------------------------------------------------------------------

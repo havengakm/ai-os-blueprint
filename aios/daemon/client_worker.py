@@ -32,12 +32,18 @@ logger = logging.getLogger(__name__)
 # (domain, industry) so score_v1 can evaluate fit AND identity stage has a
 # domain to query (Apollo + Hunter both REQUIRE a domain). Pattern C per
 # docs/superpowers/decisions/2026-04-29-scout-pipeline-order.md.
+#
+# 2026-04-29 fix: identity runs BEFORE screen so screen has populated
+# first_name/last_name to evaluate. Previous order (screen → identity)
+# caused screen to reject every Clutch contact for missing_name pre-
+# identity even though identity was about to populate the name. See
+# Slice 18 of memory/sessions/2026-04-29.md for the bug surface.
 STAGE_ORDER: tuple[str, ...] = (
     "pull",
     "cheap_resolve",
     "score_v1",
-    "screen",
     "identity",
+    "screen",
     "enrich",
     "score_v2",
     "compose",
