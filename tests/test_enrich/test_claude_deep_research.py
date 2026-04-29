@@ -499,10 +499,13 @@ async def test_deep_research_continues_past_page_error(_env, monkeypatch):
     monkeypatch.setattr("asyncio.sleep", AsyncMock())
     about_html = _load_fixture("about_page.html")
 
-    # about raises timeout; about-us succeeds
+    # case-studies raises timeout; work succeeds. Slice 27 (2026-04-29):
+    # path order changed to substantive-first (/case-studies, /work, ...);
+    # /about is now past the MAX_PAGES budget so the test would never fetch
+    # it. Tests use the new high-priority paths.
     url_map: dict[str, str | None] = {
-        "https://acme-consulting.com/about": None,        # triggers TimeoutError
-        "https://acme-consulting.com/about-us": about_html,
+        "https://acme-consulting.com/case-studies": None,    # triggers TimeoutError
+        "https://acme-consulting.com/work": about_html,
     }
     browser = _FakeBrowser(url_map=url_map, default_html="")
     fake_client = _FakeAnthropic(_full_response())
@@ -511,10 +514,10 @@ async def test_deep_research_continues_past_page_error(_env, monkeypatch):
     adapter = ClaudeDeepResearchAdapter(browser=browser, anthropic_client=fake_client)
     result = await adapter.enrich(_CONTACT)
 
-    # Should succeed — about-us loaded, Claude ran
+    # Should succeed — /work loaded, Claude ran
     assert result.ok is True
     assert result.reason in ("research_complete", "research_complete_sparse")
-    assert "https://acme-consulting.com/about-us" in result.data["sources_fetched"]
+    assert "https://acme-consulting.com/work" in result.data["sources_fetched"]
 
 
 @pytest.mark.asyncio
@@ -557,7 +560,9 @@ async def test_deep_research_aclose_closes_lazy_resources(_env):
 # --------------------------------------------------------------------------- #
 
 
-_STRUCTURAL_SOURCE_URL = "https://acme-consulting.com/about-us"
+# Slice 27 (2026-04-29): path order swapped to substantive-first;
+# /about-us is now past the MAX_PAGES budget. Tests use /case-studies.
+_STRUCTURAL_SOURCE_URL = "https://acme-consulting.com/case-studies"
 _STRUCTURAL_SOURCE_URL_2 = "https://www.linkedin.com/company/acme-consulting/posts/"
 
 

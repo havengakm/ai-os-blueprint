@@ -32,14 +32,25 @@ if TYPE_CHECKING:
 # run BEFORE heavy research (claude_deep_research) so the research extraction
 # prompt has trigger context available.
 #
-# claude_research (light-touch) is the tier-D fallback. It is NOT used when
-# deep research runs (tiers A/B).
+# Tier C also runs deep_research (Slice 27, 2026-04-29) — perfect-firmographic
+# contacts plateau at ~55 with no research, so they land in C; without DR
+# they can never earn the intent points to promote past C. Cost is bounded
+# by the fit-floor gate inside ``_should_run_deep_research`` (off-fit
+# contacts skip DR even when the tier list would otherwise include it).
+# Tier D still uses light-touch claude_research only — too low fit to
+# justify DR cost.
 TIER_ADAPTERS: dict[str, list[str]] = {
     "A": ["zerobounce", "trigify", "claude_web_triggers", "apollo_enrich", "claude_deep_research"],
     "B": ["zerobounce", "trigify", "claude_web_triggers", "apollo_enrich", "claude_deep_research"],
-    "C": ["zerobounce", "trigify", "claude_research"],
+    "C": ["zerobounce", "trigify", "claude_web_triggers", "claude_deep_research", "claude_research"],
     "D": ["zerobounce", "claude_research"],
 }
+
+# Default fit-score floor below which deep_research will not run regardless
+# of tier — protects against off-fit contacts whose tier total was lifted
+# into C by reach + recency rather than firmographic relevance. Override
+# per-client via ``client_config['tier_thresholds']['research_fit_floor']``.
+_DEFAULT_RESEARCH_FIT_FLOOR: Final[int] = 25
 
 # Final decision-type label for the enrich stage. Added to the
 # decision_log.decision_type CHECK constraint by
@@ -52,17 +63,30 @@ _DECISION_TYPE: Final[str] = "enrich_contact"
 # fires when no buying signals were surfaced by prior adapters.
 # Tier 1-3 icebreakers fire from those signals; only Tier 4 fallback
 # contacts need the full website extract from DR.
-def _should_run_deep_research(adapter_results: dict[str, "EnrichResult"]) -> bool:
+#
+# Slice 27 (2026-04-29): added fit-floor gate so DR also skips when
+# firmographic fit is too weak. Off-fit contacts can land in tier C
+# via reach + recency without being viable prospects; the fit-floor
+# stops DR cost on those.
+def _should_run_deep_research(
+    adapter_results: dict[str, "EnrichResult"],
+    contact: dict[str, Any] | None = None,
+    client_config: dict[str, Any] | None = None,
+) -> bool:
     """Return True if claude_deep_research should run for this contact.
 
-    Returns False when ANY prior adapter result has:
-      - non-empty ``trigger_events`` in ``data`` (Trigify), OR
-      - non-empty ``structural_signals`` in ``data`` (claude_web_triggers,
-        apollo_enrich, future adapters)
+    Skip when ANY prior adapter has surfaced ``trigger_events`` (Trigify)
+    or ``structural_signals`` (claude_web_triggers / apollo_enrich) —
+    research extraction would just duplicate what we already have.
 
-    Empty / missing fields don't count — the absence of a signal is
-    what triggers DR (the whole point of running it is to find one
-    via website extraction)."""
+    Skip when the contact's firmographic fit-score is below
+    ``client_config['tier_thresholds']['research_fit_floor']`` (default
+    25). Off-fit contacts can reach tier C via reach + recency without
+    being viable; DR cost on those is wasted.
+
+    Empty ``contact`` / ``client_config`` skip the fit-floor check
+    (used by tests that only exercise the signal-gate).
+    """
     for ar in adapter_results.values():
         if ar is None or not getattr(ar, "data", None):
             continue
@@ -71,6 +95,18 @@ def _should_run_deep_research(adapter_results: dict[str, "EnrichResult"]) -> boo
             return False
         if data.get("structural_signals"):
             return False
+
+    if contact is not None and client_config is not None:
+        from systems.scout.pipeline.score import _score_fit  # local import to avoid cycle
+        icp = client_config.get("icp") or {}
+        fit = _score_fit(contact, icp, cap=40)
+        floor = (
+            client_config.get("tier_thresholds", {}).get("research_fit_floor")
+            or _DEFAULT_RESEARCH_FIT_FLOOR
+        )
+        if fit < floor:
+            return False
+
     return True
 
 
@@ -142,6 +178,7 @@ class EnrichOrchestrator:
         budget_tracker: BudgetTracker,
         decision_logger: "DecisionLogger | None" = None,
         tier_adapters: dict[str, list[str]] | None = None,
+        client_config: dict[str, Any] | None = None,
     ) -> None:
         """
         adapters: list of EnrichAdapter instances. Any subset is allowed;
@@ -152,11 +189,15 @@ class EnrichOrchestrator:
         decision_logger: if provided, logs one entry per adapter call plus
                          one per auto-pause event.
         tier_adapters: override for tests; defaults to module-level TIER_ADAPTERS.
+        client_config: per-deployment ICP + tier thresholds. Used by the
+                       fit-floor gate inside ``_should_run_deep_research``.
+                       None disables the fit-floor check (signal-gate only).
         """
         self._adapters: dict[str, EnrichAdapter] = {a.name: a for a in adapters}
         self._budget_tracker = budget_tracker
         self._decision_logger = decision_logger
         self._tier_adapters = tier_adapters if tier_adapters is not None else TIER_ADAPTERS
+        self._client_config = client_config
 
     # ------------------------------------------------------------------ #
     # Public API                                                           #
@@ -232,7 +273,9 @@ class EnrichOrchestrator:
             # fallback contacts need the full website extract.
             # Other adapters in the tier list are NOT signal-gated.
             if name == "claude_deep_research" and not _should_run_deep_research(
-                result.adapter_results
+                result.adapter_results,
+                contact=contact,
+                client_config=self._client_config,
             ):
                 result.skipped[name] = "signal_gated_skip"
                 await self._log_signal_gated_skip(

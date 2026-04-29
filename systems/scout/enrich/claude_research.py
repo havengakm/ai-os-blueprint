@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any
 
 from anthropic import AsyncAnthropic
@@ -29,6 +30,26 @@ from systems.scout.enrich.base import EnrichResult
 
 
 logger = logging.getLogger(__name__)
+
+
+# Haiku regularly wraps JSON in ```json ... ``` fences despite the
+# prompt saying not to. Strip them before parsing. See
+# memory/sessions/2026-04-29.md Slice 27 for the live trace that
+# uncovered this — every tier-C/D contact was logging parse_failed
+# and getting null pain_match because of the fence wrapper.
+_FENCE_RE = re.compile(
+    r"^\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*$",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Return ``text`` with surrounding ```json``` fences removed.
+    No-op when the text isn't fenced. Idempotent."""
+    m = _FENCE_RE.match(text)
+    if m:
+        return m.group(1).strip()
+    return text
 
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 400  # caps worst-case cost; ~200 output tokens expected
@@ -171,10 +192,11 @@ class ClaudeResearchAdapter:
             messages=[{"role": "user", "content": user_message}],
         )
         raw_text = response.content[0].text.strip()
+        cleaned_text = _strip_code_fences(raw_text)
 
         # --- parse response ---
         try:
-            parsed: dict[str, Any] = json.loads(raw_text)
+            parsed: dict[str, Any] = json.loads(cleaned_text)
         except json.JSONDecodeError:
             logger.warning(
                 "claude_research parse_failed contact_id=%s raw=%r",

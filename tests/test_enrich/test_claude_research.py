@@ -167,6 +167,45 @@ async def test_research_handles_malformed_json(_env):
 
 
 @pytest.mark.asyncio
+async def test_research_strips_json_code_fences(_env):
+    """Haiku regularly wraps JSON in ```json ... ``` fences. Slice 27
+    diagnosis (2026-04-29): every tier-C/D contact today logged
+    parse_failed because the parser was fed the fenced text. Fix:
+    strip surrounding fences before json.loads."""
+    fenced = (
+        "```json\n"
+        + _valid_response_json(
+            pain_match="Scaling delivery without margin erosion",
+            pain_category="delivery",
+            confidence=0.72,
+        )
+        + "\n```"
+    )
+    fake = _FakeAnthropic(fenced)
+    adapter = _adapter(fake)
+    result = await adapter.enrich({"contact_id": "c8", "company": "LYFE Marketing"})
+
+    assert result.ok is True
+    assert result.reason == "research_complete"
+    assert result.data["pain_match"] == "Scaling delivery without margin erosion"
+    assert result.data["pain_category"] == "delivery"
+    assert abs(result.data["confidence"] - 0.72) < 1e-6
+
+
+@pytest.mark.asyncio
+async def test_research_strips_bare_code_fences(_env):
+    """Variant: ``` (no language hint) also gets stripped."""
+    fenced = "```\n" + _valid_response_json() + "\n```"
+    fake = _FakeAnthropic(fenced)
+    adapter = _adapter(fake)
+    result = await adapter.enrich({"contact_id": "c9", "company": "Acme"})
+
+    assert result.ok is True
+    assert result.reason == "research_complete"
+    assert result.data["pain_match"] is not None
+
+
+@pytest.mark.asyncio
 async def test_research_returns_no_api_key_when_unset(monkeypatch):
     """ANTHROPIC_API_KEY unset → ok=False, cost=0, reason='no_api_key', client not called."""
     monkeypatch.setenv("CLIENT_ID", "test")

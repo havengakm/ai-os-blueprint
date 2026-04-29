@@ -273,3 +273,119 @@ async def test_signal_gated_skip_does_not_charge_cost():
     )
     # Only zb + trigify + web + apollo charged: 1 + 0 + 1 + 1 = 3c. DR=99c skipped.
     assert result.total_cost_cents == 3
+
+
+# --------------------------------------------------------------------------- #
+# Slice 27 (2026-04-29): fit-floor gate                                        #
+# --------------------------------------------------------------------------- #
+
+_GOOD_FIT_CLIENT_CONFIG = {
+    "icp": {
+        "industries": ["marketing"],
+        "titles": ["founder", "ceo"],
+        "employee_min": 1,
+        "employee_max": 50,
+        "geographies": ["united states"],
+    },
+}
+
+
+def _make_orch_with_config(adapters, client_config):
+    return EnrichOrchestrator(
+        adapters=adapters,
+        budget_tracker=FakeBudget(),
+        decision_logger=FakeLogger(),
+        tier_adapters=_tier_a_with_dr(),
+        client_config=client_config,
+    )
+
+
+async def test_dr_runs_when_fit_meets_floor_and_no_signals():
+    """Slice 27: contact with strong firmographic fit, no signals → DR runs."""
+    zb = FakeAdapter("zerobounce", data={})
+    trigify = FakeAdapter("trigify", data={})
+    web_triggers = FakeAdapter("claude_web_triggers", data={})
+    apollo = FakeAdapter("apollo_enrich", data={})
+    dr = FakeAdapter("claude_deep_research", data={"citable_details": ["x"]})
+
+    contact = {
+        "contact_id": "u1",
+        "industry": "marketing",
+        "title": "founder",
+        "employees": 25,
+        "geography": "United States",
+    }
+    orch = _make_orch_with_config(
+        [zb, trigify, web_triggers, apollo, dr], _GOOD_FIT_CLIENT_CONFIG,
+    )
+    result = await orch.enrich_contact(client_id="c1", contact=contact, tier="A")
+    assert dr.enrich_calls == 1
+    assert "claude_deep_research" in result.adapter_results
+
+
+async def test_dr_skipped_when_fit_below_floor():
+    """Slice 27: contact with weak firmographic fit (off-industry, off-title,
+    out-of-band employees, off-geo) → DR skipped even when no signals fired.
+    Anti-gaming guard: research cost not spent on contacts who lifted into
+    tier C via reach + recency rather than relevance."""
+    zb = FakeAdapter("zerobounce", data={})
+    trigify = FakeAdapter("trigify", data={})
+    web_triggers = FakeAdapter("claude_web_triggers", data={})
+    apollo = FakeAdapter("apollo_enrich", data={})
+    dr = FakeAdapter("claude_deep_research", data={})
+
+    contact = {
+        "contact_id": "u2",
+        "industry": "construction",  # off
+        "title": "office manager",     # off
+        "employees": 500,              # out of band
+        "geography": "Mongolia",       # off
+    }
+    orch = _make_orch_with_config(
+        [zb, trigify, web_triggers, apollo, dr], _GOOD_FIT_CLIENT_CONFIG,
+    )
+    result = await orch.enrich_contact(client_id="c1", contact=contact, tier="A")
+    assert dr.enrich_calls == 0
+    assert result.skipped.get("claude_deep_research") == "signal_gated_skip"
+
+
+async def test_dr_runs_when_no_client_config_supplied():
+    """Backward compatibility: if client_config is None, fit-floor check is
+    skipped and only the signal-gate applies. Tests/legacy callers that
+    don't supply config behave as before."""
+    zb = FakeAdapter("zerobounce", data={})
+    trigify = FakeAdapter("trigify", data={})
+    web_triggers = FakeAdapter("claude_web_triggers", data={})
+    apollo = FakeAdapter("apollo_enrich", data={})
+    dr = FakeAdapter("claude_deep_research", data={"citable_details": ["x"]})
+
+    orch = _make_orch([zb, trigify, web_triggers, apollo, dr])  # no client_config
+    await orch.enrich_contact(
+        client_id="c1", contact={"contact_id": "u1"}, tier="A",
+    )
+    assert dr.enrich_calls == 1
+
+
+async def test_dr_skipped_when_fit_floor_overridden_higher():
+    """Per-client tier_thresholds.research_fit_floor override is respected."""
+    zb = FakeAdapter("zerobounce", data={})
+    trigify = FakeAdapter("trigify", data={})
+    web_triggers = FakeAdapter("claude_web_triggers", data={})
+    apollo = FakeAdapter("apollo_enrich", data={})
+    dr = FakeAdapter("claude_deep_research", data={})
+
+    contact = {
+        "contact_id": "u1",
+        "industry": "marketing",
+        "title": "founder",
+        "employees": 25,
+        "geography": "United States",
+    }
+    config = {
+        **_GOOD_FIT_CLIENT_CONFIG,
+        "tier_thresholds": {"research_fit_floor": 60},  # higher than max fit cap of 40
+    }
+    orch = _make_orch_with_config([zb, trigify, web_triggers, apollo, dr], config)
+    result = await orch.enrich_contact(client_id="c1", contact=contact, tier="A")
+    assert dr.enrich_calls == 0
+    assert result.skipped.get("claude_deep_research") == "signal_gated_skip"

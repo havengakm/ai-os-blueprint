@@ -41,7 +41,7 @@ CONTENT_CHAR_LIMIT = 12_000
 # Trimmed from 8 -> 5 pages. Most signal + identity lives on home +
 # about + team + services; 5 is plenty and saves ~3 page-fetches × ~4k
 # chars = ~12k tokens per contact.
-MAX_PAGES = 5
+MAX_PAGES = 8  # 2 LinkedIn + 6 company-path slots. Slice 27 bump from 5; cost ceiling unchanged because content is sliced to CONTENT_CHAR_LIMIT before Claude.
 FETCH_GAP_SECONDS = 1.0
 
 VALID_PAIN_CATEGORIES = frozenset(
@@ -83,10 +83,18 @@ VALID_STRUCTURAL_TYPES_BY_CATEGORY: dict[str, frozenset[str]] = {
     }),
 }
 
+# Order matters — early paths win the MAX_PAGES budget slots remaining after
+# LinkedIn consumes 2. Substantive content (case-studies, portfolio, named
+# clients, results) ranked first; generic marketing copy (about, services)
+# only ranked after those exhaust because most agencies host them but they
+# rarely contain referenceable specifics. Slice 27 (2026-04-29): reordered
+# from generic-first because LYFE Marketing run filled all 3 company slots
+# with /about + /about-us + /services and never reached portfolio pages.
 _COMPANY_PATHS = [
+    "/case-studies", "/work", "/portfolio", "/clients", "/case-study",
+    "/our-work", "/projects", "/testimonials", "/results",
     "/about", "/about-us", "/services", "/what-we-do", "/approach",
-    "/methodology", "/case-studies", "/clients", "/portfolio", "/work",
-    "/testimonials", "/team", "/our-team", "/leadership", "/blog",
+    "/methodology", "/team", "/our-team", "/leadership", "/blog",
 ]
 
 # ---------------------------------------------------------------------------

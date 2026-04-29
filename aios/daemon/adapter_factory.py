@@ -257,11 +257,17 @@ class AdapterFactory:
 
     def build_enrich_orchestrator(
         self,
-        client_config: dict[str, Any],  # noqa: ARG002 — reserved for per-client overrides
+        client_config: dict[str, Any],
     ) -> EnrichOrchestrator:
-        """Build an enrich fan-out orchestrator with the keyed adapters."""
+        """Build an enrich fan-out orchestrator with the keyed adapters.
+
+        ``client_config`` is threaded into the orchestrator so the
+        fit-floor gate inside ``_should_run_deep_research`` can read
+        ``icp`` + ``tier_thresholds.research_fit_floor``.
+        """
         return EnrichOrchestrator(
             adapters=self.build_enrich_adapters(),
             budget_tracker=self._registry.budget_tracker,
             decision_logger=self._registry.decision_logger,
+            client_config=client_config,
         )
