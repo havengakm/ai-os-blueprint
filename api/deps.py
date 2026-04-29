@@ -109,6 +109,19 @@ def get_embedder() -> Any:
     return get_registry().embedder
 
 
+def get_employee_memory() -> Any:
+    """Phase 1 of structural rewrite (2026-04-29) — per-employee
+    semantic memory store. See aios/foundation/employee_memory.py."""
+    return get_registry().employee_memory
+
+
+def get_feedback_loop() -> Any:
+    """Phase 1 of structural rewrite (2026-04-29) — peer-to-peer
+    learning channel + decision_log outcome backfill.
+    See aios/foundation/feedback_loop.py."""
+    return get_registry().feedback_loop
+
+
 def get_pull_backend() -> Any:
     return get_registry().pull_backend
 
@@ -231,10 +244,16 @@ def _beacon_webhook_backend_singleton() -> Any:
 
 @lru_cache(maxsize=1)
 def _beacon_decision_logger_singleton() -> Any:
+    """Phase 1 of structural rewrite (2026-04-29): pass the same embedder
+    used by foundation's DecisionLogger so PatternMatcher.find_similar()
+    covers webhook + send-stage decisions, not just foundation rows."""
     from systems.beacon.storage.decision_logger_supabase import (
         SupabaseDecisionLogger,
     )
-    return SupabaseDecisionLogger(get_supabase_client())
+    return SupabaseDecisionLogger(
+        get_supabase_client(),
+        embedder=get_registry().embedder,
+    )
 
 
 @lru_cache(maxsize=1)

@@ -24,6 +24,8 @@ from typing import Any
 from aios.foundation.autonomy import AutonomyGate
 from aios.foundation.decision_logger import DecisionLogger
 from aios.foundation.embedder import VoyageEmbedder
+from aios.foundation.employee_memory import EmployeeMemory, EmployeeMemoryPgVector
+from aios.foundation.feedback_loop import FeedbackLoop
 from aios.foundation.knowledge import KnowledgeStore
 from aios.foundation.pattern_matcher import PatternMatcher
 from aios.memory.store import MemoryStore
@@ -62,6 +64,10 @@ class SystemRegistry:
     pattern_matcher: PatternMatcher
     autonomy_gate: AutonomyGate
     embedder: VoyageEmbedder
+    # Phase 1 of structural rewrite (2026-04-29) — added for the
+    # AI-Employee + COO + decision-feedback-loop architecture.
+    employee_memory: EmployeeMemory
+    feedback_loop: FeedbackLoop
 
     # Supabase backends (11 total — 9 pipeline + 2 Trigify; cheap_resolve added 2026-04-29)
     pull_backend: SupabasePullBackend
@@ -102,6 +108,19 @@ def build_registry(
     memory_store = MemoryStore(supabase_client, embedder=embedder)
     autonomy_gate = AutonomyGate(supabase_client)
 
+    # Phase 1 of structural rewrite — Employee memory + feedback loop.
+    # employee_memory backs onto employee_memory + employee_subscriptions
+    # tables (scripts/sql/024_employee_memory_and_standup.sql).
+    # feedback_loop fans out to employee_memory + decision_logger +
+    # learning_events on every job completion / outcome arrival.
+    employee_memory = EmployeeMemoryPgVector(supabase_client, embedder=embedder)
+    feedback_loop = FeedbackLoop(
+        db=supabase_client,
+        decision_logger=decision_logger,
+        employee_memory=employee_memory,
+        embedder=embedder,
+    )
+
     # Supabase backends — every one takes just the shared client.
     # NOTE (Item 65 S4): BudgetTracker.record_spend assumes serialised
     # writes. Document here so code-search hits this file too.
@@ -124,6 +143,8 @@ def build_registry(
         pattern_matcher=pattern_matcher,
         autonomy_gate=autonomy_gate,
         embedder=embedder,
+        employee_memory=employee_memory,
+        feedback_loop=feedback_loop,
         pull_backend=pull_backend,
         cheap_resolve_backend=cheap_resolve_backend,
         score_backend=score_backend,

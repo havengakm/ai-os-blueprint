@@ -103,6 +103,9 @@ def test_get_registry_builds_all_named_fields(deps_env):
         "pattern_matcher",
         "autonomy_gate",
         "embedder",
+        # Phase 1 of structural rewrite (2026-04-29) — added.
+        "employee_memory",
+        "feedback_loop",
         "pull_backend",
         "cheap_resolve_backend",
         "score_backend",
@@ -172,6 +175,9 @@ def test_all_accessors_delegate_to_registry(deps_env):
         "pattern_matcher": deps_mod.get_pattern_matcher,
         "autonomy_gate": deps_mod.get_autonomy_gate,
         "embedder": deps_mod.get_embedder,
+        # Phase 1 of structural rewrite (2026-04-29) — added.
+        "employee_memory": deps_mod.get_employee_memory,
+        "feedback_loop": deps_mod.get_feedback_loop,
         "pull_backend": deps_mod.get_pull_backend,
         "cheap_resolve_backend": deps_mod.get_cheap_resolve_backend,
         "score_backend": deps_mod.get_score_backend,
