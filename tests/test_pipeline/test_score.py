@@ -7,7 +7,14 @@ from __future__ import annotations
 
 import pytest
 
-from systems.scout.pipeline.score import assign_tier, score_v1, score_v2
+from systems.scout.pipeline.score import (
+    _has_measurable_case_study,
+    _has_named_client,
+    _has_recent_structural_signal,
+    assign_tier,
+    score_v1,
+    score_v2,
+)
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -244,7 +251,13 @@ def test_score_v1_missing_icp_block():
 
 
 def test_score_v2_adds_intent():
-    """v2 = v1 + intent when research_data is populated."""
+    """v2 = v1 + intent when research_data is populated.
+
+    Slice 27 (2026-04-29): intent expanded from 2 binary signals to 5
+    research-derived sub-signals + 2 LinkedIn-reserved (Slice C). Full
+    intent of 30 now requires the LinkedIn signals to also fire; pre-
+    Slice-C max raw = 22 (6+5+4+4+3) which scales to 22/30 of cap.
+    """
     contact = _contact(
         industry="SaaS",
         title="CEO",
@@ -252,28 +265,83 @@ def test_score_v2_adds_intent():
         geography="United Kingdom",
         email="a@b.com",
         email_verified=True,
-        research_data={"pain_match": "pipeline", "activity_positive": True},
+        research_data={
+            "pain_match": "pipeline",
+            "activity_positive": True,
+            "citable_details": [
+                {"type": "named_client", "detail": "Stripe"},
+                {"type": "case_study", "detail": "Lifted conversion 35%"},
+            ],
+            "structural_signals": [
+                {"type": "exec_change", "recency_days": 14},
+            ],
+        },
     )
     v1 = score_v1(contact, _BASE_CONFIG)
     v2 = score_v2(contact, _BASE_CONFIG)
-    # v1 = 40 + 10 = 50 (fit + verified email); intent = 15 + 15 = 30; v2 = 80
+    # v1 = 40 + 10 = 50 (fit + verified email); intent raw 6+5+4+4+3 = 22
+    # → scaled 22/30*30 = 22; v2 = 72.
+    assert v1 == 50
+    assert v2 == 72
+
+
+def test_score_v2_full_intent_with_linkedin_signals_reserved():
+    """Slice 27: when both Slice C reserved LinkedIn flags are also set,
+    intent raw hits 30 → full cap. Verifies the reserved slots are
+    wired and ready for Slice C without further code changes."""
+    contact = _contact(
+        industry="SaaS",
+        title="CEO",
+        employees=100,
+        geography="United Kingdom",
+        email="a@b.com",
+        email_verified=True,
+        research_data={
+            "pain_match": "pipeline",
+            "activity_positive": True,
+            "citable_details": [
+                {"type": "named_client", "detail": "Stripe"},
+                {"type": "case_study", "detail": "Lifted conversion 35%"},
+            ],
+            "structural_signals": [{"type": "exec_change", "recency_days": 14}],
+            "linkedin_dm_recent_post_match": True,
+            "linkedin_company_recent_post": True,
+        },
+    )
+    v1 = score_v1(contact, _BASE_CONFIG)
+    v2 = score_v2(contact, _BASE_CONFIG)
+    # Intent raw = 30 → cap 30 → v2 = v1 + 30 = 80
     assert v1 == 50
     assert v2 == 80
 
 
 def test_score_v2_intent_capped():
-    """Custom intent cap of 10 limits intent contribution regardless of signals."""
+    """Custom intent cap of 10 limits intent contribution regardless of signals.
+
+    Slice 27 update: signal set expanded; with full firing including
+    LinkedIn-reserved flags raw = 30, scaled to cap (10). Otherwise
+    raw/raw_max ratio applies."""
     config = {
         "weights": {"fit": 40, "intent": 10, "reach": 20, "recency": 10},
         "tier_thresholds": _DEFAULT_THRESHOLDS,
         "icp": _ICP,
     }
     contact = _contact(
-        research_data={"pain_match": "churn", "activity_positive": True}
+        research_data={
+            "pain_match": "churn",
+            "activity_positive": True,
+            "citable_details": [
+                {"type": "named_client", "detail": "Acme"},
+                {"type": "case_study", "detail": "Cut churn 12%"},
+            ],
+            "structural_signals": [{"type": "funding", "recency_days": 30}],
+            "linkedin_dm_recent_post_match": True,
+            "linkedin_company_recent_post": True,
+        }
     )
     v1 = score_v1(contact, config)
     v2 = score_v2(contact, config)
-    # intent raw = 30, cap = 10 → intent contribution = 10
+    # intent raw = 30, scale to cap 10 → +10
     assert v2 == v1 + 10
 
 
@@ -447,3 +515,90 @@ def test_score_v1_custom_recency_weight():
     # recency raw = 5 + 5 = 10; default_recency_max = 10; cap = 20 → scaled = 20
     # fit = 0 (no icp); reach = 0 → total = 20
     assert score == 20
+
+
+# --------------------------------------------------------------------------- #
+# Slice 27 (2026-04-29): intent signal helpers                                 #
+# --------------------------------------------------------------------------- #
+
+
+def test_has_named_client_recognises_recognised_types():
+    """named_client / client_portfolio / case_study / project / named_project
+    types with non-empty detail count as a named-client reference."""
+    cd = [
+        {"type": "named_client", "detail": "Stripe"},
+        {"type": "year_founded", "detail": "2014"},  # marketing-copy: ignored
+    ]
+    assert _has_named_client(cd) is True
+
+
+def test_has_named_client_rejects_marketing_copy_only():
+    """Lists containing only year_founded / company_about / value_proposition
+    don't count — those are the entries the operator flagged as 'AI clutch'."""
+    cd = [
+        {"type": "year_founded", "detail": "2011"},
+        {"type": "company_about", "detail": "Are you tired of..."},
+        {"type": "value_proposition", "detail": "Top agency"},
+    ]
+    assert _has_named_client(cd) is False
+
+
+def test_has_named_client_rejects_empty_detail():
+    """Recognised type with empty detail does not count."""
+    assert _has_named_client([{"type": "named_client", "detail": ""}]) is False
+    assert _has_named_client([{"type": "named_client"}]) is False
+
+
+def test_has_named_client_handles_non_dict_entries():
+    """Robust against malformed entries (str, None, list)."""
+    assert _has_named_client(["bad", None, {"type": "named_client", "detail": "Acme"}]) is True
+    assert _has_named_client(["bad", None]) is False
+
+
+def test_has_measurable_case_study_matches_percent():
+    cd = [{"type": "case_study", "detail": "Lifted conversion 35% in 90 days."}]
+    assert _has_measurable_case_study(cd) is True
+
+
+def test_has_measurable_case_study_matches_dollar_amount():
+    cd = [{"type": "case_study", "detail": "Generated $2M in pipeline value"}]
+    assert _has_measurable_case_study(cd) is True
+
+
+def test_has_measurable_case_study_matches_multiplier():
+    cd = [{"type": "case_study", "detail": "3x growth year over year"}]
+    assert _has_measurable_case_study(cd) is True
+
+
+def test_has_measurable_case_study_rejects_no_metric():
+    """A case_study with prose but no metric doesn't count."""
+    cd = [{"type": "case_study", "detail": "Built a comprehensive brand strategy"}]
+    assert _has_measurable_case_study(cd) is False
+
+
+def test_has_measurable_case_study_rejects_wrong_type():
+    """Marketing-copy types don't count even with metrics in detail."""
+    cd = [{"type": "company_about", "detail": "We've grown 200%"}]
+    assert _has_measurable_case_study(cd) is False
+
+
+def test_has_recent_structural_signal_within_window():
+    sigs = [{"type": "exec_change", "recency_days": 14}]
+    assert _has_recent_structural_signal(sigs) is True
+
+
+def test_has_recent_structural_signal_outside_window():
+    sigs = [{"type": "exec_change", "recency_days": 200}]
+    assert _has_recent_structural_signal(sigs) is False
+
+
+def test_has_recent_structural_signal_missing_recency():
+    """Missing recency_days defaults to 'old' — only confirmed-recent counts."""
+    sigs = [{"type": "exec_change"}]
+    assert _has_recent_structural_signal(sigs) is False
+
+
+def test_has_recent_structural_signal_custom_window():
+    sigs = [{"type": "funding", "recency_days": 100}]
+    assert _has_recent_structural_signal(sigs, max_days=180) is True
+    assert _has_recent_structural_signal(sigs, max_days=60) is False

@@ -24,8 +24,15 @@ Signal point values (defaults):
     raw_data.funding_event_last_180d is True        →  5 pts
     raw_data.recent_hiring is True                  →  5 pts
   Intent (cap 30) — score_v2 only:
-    research_data.pain_match is a non-empty string  → 15 pts
-    research_data.activity_positive is True         → 15 pts
+    named clients in citable_details                  → 6 pts  (Slice 27, 2026-04-29)
+    case study with measurable result (%/$/x)         → 5 pts  (Slice 27)
+    pain_match is a non-empty string                  → 4 pts
+    structural_signal in last 90d                     → 4 pts  (Slice 27)
+    activity_positive is True                         → 3 pts
+    LinkedIn DM post on relevant topic last 30d       → 4 pts  (Slice C, reserved)
+    LinkedIn company page post last 30d               → 4 pts  (Slice C, reserved)
+
+  Pre-Slice-C max raw = 22; reserved 8 for LinkedIn lifts to 30.
 
 Category raw scores are scaled proportionally when the configured cap differs from
 the default (e.g. raising fit cap from 40 to 60 scales a perfect-fit contact
@@ -79,9 +86,52 @@ _RAW_RECENCY_FUNDING = 5
 _RAW_RECENCY_HIRING = 5
 _DEFAULT_RECENCY_RAW_MAX = _RAW_RECENCY_FUNDING + _RAW_RECENCY_HIRING  # 10
 
-_RAW_INTENT_PAIN = 15
-_RAW_INTENT_ACTIVITY = 15
-_DEFAULT_INTENT_RAW_MAX = _RAW_INTENT_PAIN + _RAW_INTENT_ACTIVITY  # 30
+# Intent signals — Slice 27 (2026-04-29) expansion. Two original
+# binary signals (pain_match + activity_positive) plus three new
+# research-derived signals from claude_deep_research output. Two
+# additional signals reserved for Slice C (LinkedIn) so the cap of
+# 30 is reachable once that ships. Pre-Slice-C max raw = 22.
+_RAW_INTENT_NAMED_CLIENTS = 6        # citable_details with type in CLIENT_TYPES
+_RAW_INTENT_CASE_STUDY_RESULT = 5    # case_study with %/$/x marker in detail
+_RAW_INTENT_PAIN = 4                 # pain_match non-empty (was 15)
+_RAW_INTENT_STRUCTURAL_RECENT = 4    # structural_signal recency_days <= 90
+_RAW_INTENT_ACTIVITY = 3             # activity_positive True (was 15)
+_RAW_INTENT_LINKEDIN_DM_POST = 4     # Slice C reserved
+_RAW_INTENT_LINKEDIN_COMPANY = 4     # Slice C reserved
+_DEFAULT_INTENT_RAW_MAX = (
+    _RAW_INTENT_NAMED_CLIENTS
+    + _RAW_INTENT_CASE_STUDY_RESULT
+    + _RAW_INTENT_PAIN
+    + _RAW_INTENT_STRUCTURAL_RECENT
+    + _RAW_INTENT_ACTIVITY
+    + _RAW_INTENT_LINKEDIN_DM_POST
+    + _RAW_INTENT_LINKEDIN_COMPANY
+)  # 30 — keeps default cap reachable once Slice C lands
+
+# citable_details types that count as named-client / project evidence.
+# Output of claude_deep_research extracts these from /clients, /work,
+# /portfolio pages. Operator pushback 2026-04-29: a citable list of
+# only "founded YYYY" + "tagline" doesn't qualify; needs a real
+# named-client or named-project reference. The validator already
+# strips tenure-only icebreakers at write time; this set keeps the
+# scoring layer in sync.
+_CLIENT_CITABLE_TYPES = frozenset({
+    "named_client",
+    "client_portfolio",
+    "case_study",
+    "project",
+    "named_project",
+})
+
+# Marker pattern for measurable results inside a case_study detail
+# string. Matches "20%", "$1.2M", "3x", "3X", "12 million" — any
+# concrete metric the icebreaker can quote back. Plain noun-strings
+# without a number are excluded.
+import re as _re
+_MEASURABLE_RESULT_RE = _re.compile(
+    r"\d+\s*(?:%|x\b|×)|\$\s*\d|\d[\d,]*\s*(?:million|billion|m\b|b\b|k\b)",
+    _re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -204,13 +254,77 @@ def _score_recency(contact: dict[str, Any], cap: int) -> int:
     return _scale(raw, _DEFAULT_RECENCY_RAW_MAX, cap)
 
 
+def _has_named_client(citable_details: list[Any]) -> bool:
+    """True if any citable_details entry references a named client/project.
+
+    A "named" reference is a dict with a recognised type AND non-empty detail.
+    Marketing-copy entries (year_founded, company_about, value_proposition)
+    don't count — they don't give the icebreaker a real surface to quote.
+    """
+    for cd in citable_details:
+        if not isinstance(cd, dict):
+            continue
+        if cd.get("type") in _CLIENT_CITABLE_TYPES and cd.get("detail"):
+            return True
+    return False
+
+
+def _has_measurable_case_study(citable_details: list[Any]) -> bool:
+    """True if any case_study detail contains a measurable marker (%/$/x/M)."""
+    for cd in citable_details:
+        if not isinstance(cd, dict):
+            continue
+        if cd.get("type") not in {"case_study", "named_project", "project"}:
+            continue
+        detail = str(cd.get("detail") or "")
+        if _MEASURABLE_RESULT_RE.search(detail):
+            return True
+    return False
+
+
+def _has_recent_structural_signal(structural_signals: list[Any], max_days: int = 90) -> bool:
+    """True if any structural_signal has recency_days <= max_days.
+
+    Missing recency_days defaults to "old" (excluded) — only confirmed-
+    recent signals count, otherwise stale data inflates the score.
+    """
+    for sig in structural_signals:
+        if not isinstance(sig, dict):
+            continue
+        rd = sig.get("recency_days")
+        if isinstance(rd, (int, float)) and rd <= max_days:
+            return True
+    return False
+
+
 def _score_intent(contact: dict[str, Any], cap: int) -> int:
     research: dict[str, Any] = contact.get("research_data") or {}
     raw = 0
+
+    citable_details = research.get("citable_details") or []
+    if _has_named_client(citable_details):
+        raw += _RAW_INTENT_NAMED_CLIENTS
+    if _has_measurable_case_study(citable_details):
+        raw += _RAW_INTENT_CASE_STUDY_RESULT
+
     if research.get("pain_match"):  # non-empty string
         raw += _RAW_INTENT_PAIN
+
+    structural_signals = research.get("structural_signals") or []
+    if _has_recent_structural_signal(structural_signals):
+        raw += _RAW_INTENT_STRUCTURAL_RECENT
+
     if research.get("activity_positive") is True:
         raw += _RAW_INTENT_ACTIVITY
+
+    # Slice C (reserved) — these read from research_data once LinkedIn
+    # adapter populates them. Until then they don't fire and the max
+    # achievable raw is 22/30.
+    if research.get("linkedin_dm_recent_post_match") is True:
+        raw += _RAW_INTENT_LINKEDIN_DM_POST
+    if research.get("linkedin_company_recent_post") is True:
+        raw += _RAW_INTENT_LINKEDIN_COMPANY
+
     return _scale(raw, _DEFAULT_INTENT_RAW_MAX, cap)
 
 
