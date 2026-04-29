@@ -58,11 +58,39 @@ _SOFT_BLOCK_STATUSES: frozenset[int] = frozenset({403})
 _DEFAULT_RETRY_BACKOFF_SECONDS: float = 5.0
 _DEFAULT_MAX_RETRIES: int = 3
 
-# Extraction patterns ported verbatim from the n8n workflow (see
-# clutch-shopify-scraper.json parse-companies node).
-_NAME_PATTERN = re.compile(r'"name"\s*:\s*"([^"]+)"')
-_PROFILE_URL_PATTERN = re.compile(r"""href=["'](https?://clutch\.co/profile/[^"']+)["']""")
-_LOCATION_PATTERN = re.compile(r"""class=["'][^"']*locality[^"']*["'][^>]*>([^<]+)<""")
+# Extraction patterns. Each company on a Clutch listing page is wrapped
+# in a div.provider.provider-row with structured Schema.org/LocalBusiness
+# microdata (<meta itemprop="addressLocality" content="...">) plus
+# data-* attributes (data-title, data-clutch-pid, data-position) on the
+# wrapper div. We parse per-block (not loose JSON regexes against the
+# whole page) so each listing's fields are bound to the correct row.
+_PROVIDER_BLOCK_PATTERN = re.compile(
+    r'<div class="provider provider-row[^"]*" data-is-list="true".*?'
+    r'(?=<div class="provider provider-row|</section)',
+    re.DOTALL,
+)
+_DATA_TITLE_PATTERN = re.compile(r'data-title="([^"]+)"')
+_DATA_PID_PATTERN = re.compile(r'data-clutch-pid="([^"]+)"')
+_PROFILE_HREF_PATTERN = re.compile(r'href="(/profile/[^"#?]+)"')
+_ADDRESS_LOCALITY_PATTERN = re.compile(
+    r'<meta[^>]*itemprop="addressLocality"[^>]*content="([^"]+)"',
+)
+_ADDRESS_REGION_PATTERN = re.compile(
+    r'<meta[^>]*itemprop="addressRegion"[^>]*content="([^"]+)"',
+)
+_ADDRESS_COUNTRY_PATTERN = re.compile(
+    r'<meta[^>]*itemprop="addressCountry"[^>]*content="([^"]+)"',
+)
+# Employees-count block contains a band like "10 - 49" or "1,000+".
+_EMPLOYEES_BAND_PATTERN = re.compile(
+    r'class="[^"]*employees-count[^"]*"[^>]*>(?:[^<]|<(?!/div))*?'
+    r'</span>\s*([0-9,+\- ]+?)\s*</div>',
+    re.DOTALL,
+)
+# Hourly rate band: "$100 - $149", "$1,000+", "$25 - $49"
+_HOURLY_RATE_PATTERN = re.compile(
+    r'\$([0-9,]+)\s*[\-–]\s*\$?([0-9,]+)|\$([0-9,]+)\+',
+)
 
 
 class ClutchSuspiciousEmptyError(Exception):
@@ -311,46 +339,37 @@ class ClutchAdapter:
             for entry in parsed:
                 if len(results) >= max_companies:
                     break
-                slug = _extract_profile_slug(entry["profile_url"]) if entry["profile_url"] else entry["name"].lower().strip()
+                profile_url = entry["profile_url"]
+                slug = (
+                    _extract_profile_slug(profile_url)
+                    if profile_url
+                    else entry["name"].lower().strip()
+                )
                 if not slug or slug in seen_slugs:
                     continue
                 seen_slugs.add(slug)
-
-                # Split location into city/state/geography best-effort.
-                # Clutch locations come as "City, ST" or "City, Country".
-                location = entry["location"]
-                city: str | None = None
-                state: str | None = None
-                geography: str | None = None
-                if "," in location:
-                    parts = [p.strip() for p in location.split(",", 1)]
-                    city = parts[0] or None
-                    tail = parts[1] if len(parts) > 1 else ""
-                    # If tail is 2-letter US state, set state; else geography
-                    if len(tail) == 2 and tail.isalpha():
-                        state = tail.upper()
-                    else:
-                        geography = tail or None
-                elif location:
-                    geography = location
 
                 results.append(
                     RawCompanyContact(
                         company=entry["name"] or slug,
                         company_domain=None,  # listing-page-only; domain resolved downstream
-                        company_website=entry["profile_url"] or None,  # Clutch profile URL
+                        company_website=profile_url,  # Clutch profile URL
                         industry=None,
-                        employees=None,
+                        employees=entry["employees"],  # parsed band upper bound
                         revenue_usd=None,
-                        city=city,
-                        state=state,
-                        geography=geography,
+                        city=entry["city"],
+                        state=entry["state"],
+                        geography=entry["country"],
                         source=self.name,
                         source_id=slug,
                         raw_data={
                             "name": entry["name"],
-                            "profile_url": entry["profile_url"],
-                            "location": entry["location"],
+                            "clutch_pid": entry["clutch_pid"],
+                            "profile_url": profile_url,
+                            "city": entry["city"],
+                            "state": entry["state"],
+                            "country": entry["country"],
+                            "employees_band_upper": entry["employees"],
                             "page": page_num,
                         },
                     )
@@ -374,28 +393,73 @@ def _extract_profile_slug(profile_url: str) -> str:
         return profile_url
 
 
-def _parse_listing_page(html: str) -> list[dict[str, str]]:
-    """Extract {name, profile_url, location} triples from a Clutch listing page.
+def _first(text: str, pattern: re.Pattern) -> str | None:
+    """First capture-group match in ``text``, stripped, or None."""
+    m = pattern.search(text)
+    return m.group(1).strip() if m else None
 
-    Pairs by index. Empty string fallback if one list is shorter (matches n8n).
-    Returns empty list if no names found.
+
+def _parse_employee_band(s: str | None) -> int | None:
+    """Map a Clutch employee band to an int upper bound for ICP scoring.
+
+    "10 - 49"  -> 49
+    "50 - 249" -> 249
+    "1,000+"   -> 1000
+    "2 - 9"    -> 9
     """
-    names = _NAME_PATTERN.findall(html)
-    profile_urls = _PROFILE_URL_PATTERN.findall(html)
-    locations = _LOCATION_PATTERN.findall(html)
+    if not s:
+        return None
+    cleaned = s.replace(",", "").replace(" ", "")
+    if "-" in cleaned:
+        parts = cleaned.split("-", 1)
+        upper = parts[1] if len(parts) > 1 else parts[0]
+        digits = re.sub(r"\D.*", "", upper)
+        return int(digits) if digits.isdigit() else None
+    if cleaned.endswith("+"):
+        digits = cleaned[:-1]
+        return int(digits) if digits.isdigit() else None
+    return int(cleaned) if cleaned.isdigit() else None
 
-    max_items = max(len(names), len(profile_urls))
-    rows: list[dict[str, str]] = []
-    for i in range(max_items):
-        name = names[i] if i < len(names) else ""
-        profile_url = profile_urls[i] if i < len(profile_urls) else ""
-        location = locations[i].strip() if i < len(locations) else ""
-        # Require at least a name OR a profile URL
-        if not name and not profile_url:
+
+def _parse_listing_page(html: str) -> list[dict[str, Any]]:
+    """Extract one row per provider listing block on a Clutch page.
+
+    Per-block extraction (not loose JSON regex over the whole page) so
+    each company's fields are correctly bound to that company. Returns:
+
+        {
+            "name":         str,           # data-title
+            "clutch_pid":   str | None,    # data-clutch-pid (stable Clutch ID)
+            "profile_url":  str | None,    # absolute https URL to /profile/<slug>
+            "city":         str | None,    # addressLocality
+            "state":        str | None,    # addressRegion (e.g. "PA", "GB-LDN")
+            "country":      str | None,    # addressCountry (ISO-2 like "US")
+            "employees":    int | None,    # parsed upper bound of band
+        }
+
+    Returns an empty list when no provider blocks are found — caller
+    treats that as either "end of listings" (page>0) or
+    ``ClutchSuspiciousEmptyError`` (page 0).
+    """
+    rows: list[dict[str, Any]] = []
+    for block_match in _PROVIDER_BLOCK_PATTERN.finditer(html):
+        block = block_match.group(0)
+        name = _first(block, _DATA_TITLE_PATTERN)
+        if not name:
             continue
+        profile_path = _first(block, _PROFILE_HREF_PATTERN)
+        profile_url = (
+            CLUTCH_BASE_URL + profile_path if profile_path else None
+        )
         rows.append({
             "name": name,
+            "clutch_pid": _first(block, _DATA_PID_PATTERN),
             "profile_url": profile_url,
-            "location": location,
+            "city": _first(block, _ADDRESS_LOCALITY_PATTERN),
+            "state": _first(block, _ADDRESS_REGION_PATTERN),
+            "country": _first(block, _ADDRESS_COUNTRY_PATTERN),
+            "employees": _parse_employee_band(
+                _first(block, _EMPLOYEES_BAND_PATTERN),
+            ),
         })
     return rows

@@ -34,14 +34,25 @@ def _response(text: str, status_code: int = 200):
     return resp
 
 
-def test_parse_listing_extracts_names_urls_locations():
+def test_parse_listing_extracts_rich_fields_per_block():
+    """v2 parser: per-block extraction via Schema.org/LocalBusiness microdata
+    + data-* attributes. Each provider listing card produces a dict with
+    name, clutch_pid, profile_url, city, state, country, employees."""
     html = _load("clutch_shopify_page0.html")
     rows = _parse_listing_page(html)
-    # 3 JSON-LD names + 3 href profile-URLs + 3 locality spans
     assert len(rows) == 3
-    assert rows[0]["name"] == "FocusCFO"
-    assert rows[0]["profile_url"] == "https://clutch.co/profile/focuscfo"
-    assert rows[0]["location"] == "Columbus, OH"
+    # First row: WebFX
+    assert rows[0]["name"] == "WebFX"
+    assert rows[0]["clutch_pid"] == "33049"
+    assert rows[0]["profile_url"] == "https://clutch.co/profile/webfx"
+    assert rows[0]["city"] == "Harrisburg"
+    assert rows[0]["state"] == "PA"
+    assert rows[0]["country"] == "US"
+    assert rows[0]["employees"] == 999  # parsed from "250 - 999"
+    # Second row: Disruptive Advertising
+    assert rows[1]["name"] == "Disruptive Advertising"
+    assert rows[1]["state"] == "UT"
+    assert rows[1]["employees"] == 249  # parsed from "50 - 249"
 
 
 def test_parse_listing_empty_page_returns_empty():
@@ -59,15 +70,18 @@ async def test_clutch_adapter_pulls_single_page():
         throttle_seconds=0,
     )
     rows = await adapter.pull(client_id="clymb", max_companies=10)
-    # 3 unique profiles on the first page. Second page fetch returns empty
-    # in this test (AsyncMock reuses the same response), so let's assert 3.
+    # 3 unique provider blocks on the first page. Second page fetch returns
+    # the same response (AsyncMock reuses it), so its 3 entries dedupe.
     assert len(rows) >= 3
-    assert rows[0].company == "FocusCFO"
+    assert rows[0].company == "WebFX"
     assert rows[0].source == "clutch:developers/shopify"
-    assert rows[0].source_id == "focuscfo"
-    assert rows[0].city == "Columbus"
-    assert rows[0].state == "OH"
+    assert rows[0].source_id == "webfx"
+    assert rows[0].city == "Harrisburg"
+    assert rows[0].state == "PA"
+    assert rows[0].geography == "US"
+    assert rows[0].employees == 999  # parsed upper bound of "250 - 999"
     assert rows[0].company_domain is None  # listing-page-only
+    assert rows[0].raw_data["clutch_pid"] == "33049"
 
 
 @pytest.mark.asyncio
