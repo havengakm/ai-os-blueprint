@@ -673,4 +673,15 @@ def _validate(icebreaker: str, *, tier: int) -> str | None:
         if m:
             return f"anti_stalker:{m.group(0)}"
 
+    # Global writing guardrails — em-dash, AI-clichés, buzzwords, filler.
+    # This is the post-2026-04-29 fail-closed safety net for the AI-speak
+    # that slipped past the prompt's own rules. Source of truth:
+    # rules/global-writing-guardrails.md, validator at
+    # systems/scout/outreach/writing_validator.py.
+    from systems.scout.outreach.writing_validator import validate_writing
+    result = validate_writing(icebreaker)
+    if not result.passed:
+        first = result.violations[0]
+        return f"writing_rule:{first.rule}"
+
     return None

@@ -219,11 +219,18 @@ class Composer:
         *,
         epsilon: float = DEFAULT_EPSILON,
         rng: random.Random | None = None,
+        validate_writing: bool = True,
     ) -> None:
+        """``validate_writing`` defaults True (production safety net per
+        Slice 21 of 2026-04-29 — em-dashes / AI-cliches / buzzwords fail
+        the draft closed). Unit tests use legacy fixtures that don't pass
+        the validator yet; pass ``validate_writing=False`` in those tests.
+        Updating the fixtures is its own follow-up slice."""
         self._storage = storage
         self._research = research_selector
         self._epsilon = epsilon
         self._rng = rng or random.Random()
+        self._validate_writing = validate_writing
 
     async def compose(
         self,
@@ -343,6 +350,51 @@ class Composer:
         fills_missing = _dedup_preserve_order(fills_missing)
 
         component_selections = {t: v.variant_key for t, v in selections.items()}
+
+        # Fail-closed writing-rule check on the rendered body. Catches the
+        # AI-speak / em-dash / buzzword class of bug the operator caught
+        # 2026-04-29 (Slice 21). If the body fails the writing guardrails,
+        # log a decision and SKIP persistence — caller treats this contact
+        # as "not drafted" so it remains eligible for re-render once the
+        # underlying template / icebreaker source is fixed.
+        from systems.scout.outreach.writing_validator import (
+            validate_writing as _validate_writing_fn,
+        )
+        body_validation = (
+            _validate_writing_fn(body, context="cold_email")
+            if self._validate_writing
+            else None
+        )
+        if body_validation is not None and not body_validation.passed:
+            await self._emit_decision(
+                client_id,
+                decision_type="render_draft",
+                decision=(
+                    f"render_draft:skip:{contact_id}:writing_validation_failed"
+                ),
+                reasoning=(
+                    f"Composer skipped persist: {body_validation.violation_summary}"
+                ),
+                context={
+                    "contact_id": contact_id,
+                    "violations": [
+                        {"rule": v.rule, "offending_text": v.offending_text}
+                        for v in body_validation.violations[:5]
+                    ],
+                    "subject_preview": subject[:_DECISION_SUBJECT_PREVIEW],
+                },
+            )
+            return ComposerSkip(
+                contact_id=contact_id,
+                reason="writing_validation_failed",
+                details={
+                    "violations": [
+                        {"rule": v.rule, "offending_text": v.offending_text}
+                        for v in body_validation.violations[:5]
+                    ],
+                    "subject_preview": subject[:_DECISION_SUBJECT_PREVIEW],
+                },
+            )
 
         persisted_id: str | None = None
         if not dry_run:

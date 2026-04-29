@@ -1,4 +1,4 @@
-You are writing a multi-sentence icebreaker to a creative/branding agency founder, as if messaging a friend. The prospect recently posted something frustrated — a competitor rage post, an SDR burnout post, a tool complaint, industry frustration. Reference the TOPIC in their own words. Casual. Warm. Non-transactional.
+You are writing one short opening line to a creative or branding agency founder, like an email to a friend you met once. The prospect recently posted something specific (frustration, opinion, announcement, observation). Reference the TOPIC in their own words. Casual. Warm. Non-transactional.
 
 ## Prospect
 
@@ -6,7 +6,7 @@ Company: {company}
 First name: {first_name}
 Short company name: {short_company_name}
 
-## The frustrated post (MUST reference verbatim content from here)
+## The post (MUST reference verbatim content from here)
 
 Source: {frustrated_post_source}
 Text:
@@ -14,9 +14,9 @@ Text:
 
 ## Truth-gating rule (HARD)
 
-Only reference things that appear VERBATIM in the frustrated-post text above.
+Only reference things that appear VERBATIM in the post text above.
 
-Do NOT invent podcasts, awards, clients, campaigns, projects, metrics, locations, event names, or any other specific detail. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the frustrated-post text above. NO invention.
+Do NOT invent podcasts, awards, clients, campaigns, projects, metrics, locations, event names, or any other specific detail. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the post text above. NO invention.
 
 If the post text is empty, vague, or gives you nothing specific to reference, return:
 
@@ -24,72 +24,57 @@ If the post text is empty, vague, or gives you nothing specific to reference, re
 
 An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length.
 
-## Voice rules (hard constraints)
+## Shape
 
-- Tone: casual, warm, non-transactional. Creative and branding agencies, not corporate.
-- Contractions always. Lowercase is fine. Slang is welcome: ngl, tbh, lol, genuinely, properly, stuck in my head, pretty wild, a big one.
-- Warm, genuine endings like "Really sharp work." are ALLOWED — not flippant if the rest of the icebreaker is substantive.
-- NEVER reference the act of engagement: no "you liked", no "you commented", no "you engaged", no "your post". Reference the TOPIC, not the behavior.
+ONE specific reference to the post topic in the prospect's own words. Optionally followed by a SHORT reaction sentence (5-8 words). Total 15-45 words.
 
-### The "no analyze" rule (strict)
+Don't use the formula "Two things jumped out", "Two things stuck with me", or "X and Y" patterns. Just one observation. NEVER reference the act of engagement (no "you posted", "you commented", "your post"). Reference the TOPIC, not the behavior.
 
-- DO state facts from the source material above using simple observational language.
-- DO add ONE short warm reaction sentence: "Always a good sign", "Big shift", "Sharp move", "Rare to see", "That lands", "That's a big one".
+## Voice rules (HARD)
+
+- Tone: casual, warm, non-transactional. Like an email to a friend you met once.
+- Contractions OK. Lowercase OK. Plain language.
+- DO state the topic from the post using simple observational language.
 - DON'T interpret, diagnose, predict, or infer strategic intent.
-- DON'T add "which signals X" / "which means Y" / "driver behind" / "cited as" commentary.
-- The second sentence is a HUMAN REACTION to the fact. It is NOT a strategy analysis and NOT a second fabricated fact.
+- DON'T add "which signals X" / "which means Y" / "cited as" commentary.
+- DON'T reference engagement behavior. Reference the TOPIC.
 
-### Opening verb — STRICT whitelist
+## Banned words (HARD — output will be rejected if any appear)
 
-The icebreaker MUST start with one of: `Saw`, `Ngl saw`, `Noticed`, `Read`, `Caught`, `Spent the morning with`, `Spent time on`, `Came across`.
+Em-dashes (— or –). Use a period, comma, or "and"/"but" to join clauses.
 
-No other openers. No "At", "When", "Inkblot", "PR Worx", or any company name as the first word. Period.
+The following AI-cliché phrases (the writing validator rejects these):
+ngl, tbh, sharp positioning, sharp move, sharp work, two things stuck with me, two things jumped out, came across your, came across the, spent the morning with, jumped out, stuck in my head, properly big, saw that you, loved your, that lands, big shift, that's a big one, genuinely impressive.
 
-## Banned words (do NOT use any of these)
+Corporate words: leverage, optimize, synergy, streamline, robust, seamless, unlock, empower, transform, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape, headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
-headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, solution, synergy, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape.
+Diagnostic phrases: usually means, typically, which suggests, points to, indicates, feels like, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
 
-Also avoid these as vague/corporate usages (allowed in narrow, specific cases): engagement (OK in "engagement rates"), positioning (OK in "brand positioning" if from the scraped content), space (OK only as literal room/venue), entering, penetrating, stretching into.
+## Opening verb — STRICT whitelist
 
-(mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous. lead gen — prefer "growth systems" or similar.)
-
-## Banned phrases (do NOT use any of these)
-
-usually means, typically, which suggests, points to, indicates, feels like, the gap between, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
-
-No "this says what everyone's feeling" style pontification beyond the one allowed form in the example below.
-
-## BANNED vs ALLOWED — concrete examples
-
-BANNED (consultant voice — do NOT produce):
-
-- "Inkblot Design joined the Stellenbosch Network (member profile active ~1 month ago), signalling formal local ecosystem engagement."
-- "PR Worx is pursuing continental and international expansion into high-growth markets abroad, cited as driver behind the new MD appointment."
-- "XYZ's positioning in the premium segment indicates strong brand equity."
-- "The new partnership signals uniquely positioned market entry."
-
-ALLOWED (warm observational voice):
-
-- "Saw the rant about Salesforce crashing mid-demo. That one's been making the rounds — genuinely hear that complaint a lot."
-- "Ngl your post last week on clients ghosting mid-project said out loud what I think everyone's feeling."
-- "Noticed the thread about SDR burnout. Feels like that's the topic of the quarter."
-
-## Banned fragments
-
-http, calendly, .com/
+The icebreaker MUST start with one of: `Saw`, `Noticed`, `Read`, `Caught`. Nothing else. No "Came across", no "Spent the morning with".
 
 ## Output format
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<multi-line content>"}}
+{{"icebreaker": "<single-line content>"}}
 
-Preferred: 2 sentences, total 20-60 words. If the source material only gives ONE verifiable fact, 1 sentence is acceptable — DO NOT fabricate a second fact to pad length. The second sentence (when present) is a warm HUMAN reaction to the first, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). DO NOT use em dashes (—). Use a comma, period, or "and"/"but" to join clauses.
+15-45 words. Use a period or comma to join clauses. NEVER an em-dash.
 
-(The format spec still announces 2-3 sentences / 40-70 words as the historical target; the looser bound above takes precedence when only one fact is available.)
+## BANNED vs ALLOWED — concrete examples
 
-Example (Tier 1 style — use the shape, not the words):
+Examples (Tier 1 style — mirror simplicity, not words):
 
-{{"icebreaker": "Ngl your post last week on the Salesforce demo thing said out loud what I think everyone in this space is feeling. The whole thing about tools that were meant to help the team just getting in their way, that one stuck."}}
+ALLOWED:
+{{"icebreaker": "Saw the Salesforce demo crashing rant. That one's been making the rounds, hear that complaint a lot."}}
 
-If nothing in the post text above gives you a verbatim topic to reference, return {{"icebreaker": ""}} instead.
+{{"icebreaker": "Noticed the thread about clients ghosting mid-project. Felt like that said out loud what everyone in the space was thinking."}}
+
+{{"icebreaker": "Read the SDR burnout post. Topic of the quarter, genuinely."}}
+
+BANNED (will be rejected):
+- "Ngl your post last week on clients ghosting said out loud what I think everyone's feeling — sharp positioning."
+- "Came across your post about Salesforce. Two things stuck with me, ngl."
+
+If nothing in the post text gives you a verbatim topic to reference, return {{"icebreaker": ""}} instead.

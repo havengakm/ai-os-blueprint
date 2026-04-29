@@ -1,4 +1,4 @@
-You are writing a multi-sentence icebreaker to a creative/branding agency founder, as if messaging a friend. A structural event just hit the prospect's company — a major contract win, a new-leadership announcement, or a funding round. Name it plainly. Casual. Warm. Non-transactional.
+You are writing one short opening line to a creative or branding agency founder, like an email to a friend you met once. A structural event just hit the prospect's company. A major contract win, a new-leadership announcement, or a funding round. Name it plainly. Casual. Warm. Non-transactional.
 
 ## Prospect
 
@@ -15,83 +15,64 @@ Summary:
 
 ## Truth-gating rule (HARD)
 
-Only reference the exact item in the signal summary above — the named client in the win, the named executive in the hire, the named round in the funding event.
+Only reference items that appear VERBATIM in the signal summary above. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the signal summary above. NO invention.
 
-Do NOT invent client names, executive names, funding amounts, dates, or implications. Every specific claim (named client, project, executive, round) MUST appear verbatim in the signal summary above. NO invention.
+Do NOT invent clients, projects, awards, metrics, campaigns, locations, or testimonials. Do NOT infer things that aren't literally in the signal text.
 
-Signal type MUST be one of: major_contract_win, new_leadership (executive news), funding_round. Hiring signals do NOT qualify here — too generic. If the signal_type above is anything else (hiring spike, generic expansion, office opens), return:
+If the signal summary is empty, vague, or gives you nothing concrete to reference, return:
 
 {{"icebreaker": ""}}
 
-Hiring signals specifically do NOT qualify here — too generic. Return an empty string and let Python fall through to Tier 4.
+An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length.
 
-If the signal_summary is vague, missing the key name, or doesn't give you a specific item to point at, also return {{"icebreaker": ""}}.
+## Shape
 
-An empty string is a valid, expected answer. DO NOT fabricate a reference.
+ONE specific reference to the structural event in plain language. Optionally followed by a SHORT reaction sentence (5-8 words). Total 15-45 words.
 
-## Voice rules (hard constraints)
+Don't use the formula "Two things jumped out", "Two things stuck with me", or "X and Y" patterns. Just one observation.
 
-- Tone: casual, warm, non-transactional. Creative and branding agencies, not corporate.
-- Contractions always. Lowercase is fine. Slang is welcome: ngl, tbh, lol, genuinely, properly, stuck in my head, pretty wild, a big one.
-- Warm, genuine endings like "Really sharp work." or "That's a big one." are ALLOWED — not flippant if the rest of the icebreaker is substantive.
-- Do NOT write the implication. Name the event plainly and stop.
+## Voice rules (HARD)
 
-### The "no analyze" rule (strict)
-
-- DO state the event plainly using language from the signal_summary above. "Saw the new MD appointment." "Saw the Series B land last week."
-- DO add ONE short warm reaction sentence: "That's a big shift", "Big one", "Always a good sign", "Sharp move", "Rare to see".
+- Tone: casual, warm, non-transactional. Like an email to a friend you met once.
+- Contractions OK. Lowercase OK. Plain language.
+- DO name the event using THEIR OWN words from the signal summary.
 - DON'T interpret, diagnose, predict, or infer strategic intent.
-- DON'T add "which signals X" / "which means Y" / "driver behind" / "cited as" commentary.
-- The second sentence is a HUMAN REACTION to the event. It is NOT a strategy analysis and NOT a second fabricated fact.
+- DON'T add "which signals X" / "which means Y" / "cited as" commentary.
 
-### Opening verb — STRICT whitelist
+## Banned words (HARD — output will be rejected if any appear)
 
-The icebreaker MUST start with one of: `Saw`, `Ngl saw`, `Noticed`, `Read`, `Caught`, `Spent the morning with`, `Spent time on`, `Came across`.
+Em-dashes (— or –). Use a period, comma, or "and"/"but" to join clauses.
 
-No other openers. No company name or proper noun as the first word (no "Inkblot...", no "PR Worx..."). Period.
+The following AI-cliché phrases (the writing validator rejects these):
+ngl, tbh, sharp positioning, sharp move, sharp work, two things stuck with me, two things jumped out, came across your, came across the, spent the morning with, jumped out, stuck in my head, properly big, saw that you, loved your, that lands, big shift, that's a big one, genuinely impressive.
 
-## Banned words (do NOT use any of these)
+Corporate words: leverage, optimize, synergy, streamline, robust, seamless, unlock, empower, transform, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape, headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
-headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, leverage, optimize, solution, synergy, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape.
+Diagnostic phrases: usually means, typically, which suggests, points to, indicates, feels like, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
 
-Also avoid these as vague/corporate usages (allowed in narrow, specific cases): engagement (OK in "engagement rates"), positioning (OK in "brand positioning" if from the scraped content), space (OK only as literal room/venue), entering, penetrating, stretching into.
+## Opening verb — STRICT whitelist
 
-(mood-board and craft — because you are NOT writing as a creative peer; that framing reads as presumptuous. lead gen — prefer "growth systems" or similar.)
-
-## Banned phrases (do NOT use any of these)
-
-usually means, typically, which suggests, points to, indicates, feels like, the gap between, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
-
-## BANNED vs ALLOWED — concrete examples
-
-BANNED (consultant voice — do NOT produce):
-
-- "PR Worx is pursuing continental and international expansion into high-growth markets abroad, cited as driver behind the new MD appointment."
-- "Inkblot Design joined the Stellenbosch Network (member profile active ~1 month ago), signalling formal local ecosystem engagement."
-- "The Series B positions XYZ uniquely for market expansion across the ecosystem."
-
-ALLOWED (warm observational voice):
-
-- "Saw the new MD appointment tied to the Africa and international move. That's a big shift."
-- "Saw the MiBlok win — one of the more interesting rollouts named this quarter. That's a big one."
-- "Noticed the Series B landed last week. Always a good sign when the round comes together fast."
-
-## Banned fragments
-
-http, calendly, .com/
+The icebreaker MUST start with one of: `Saw`, `Noticed`, `Read`, `Caught`. Nothing else. No "Came across", no "Spent the morning with".
 
 ## Output format
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<multi-line content>"}}
+{{"icebreaker": "<single-line content>"}}
 
-Preferred: 2 sentences, total 20-60 words. If the signal_summary only gives ONE verifiable fact, 1 sentence is acceptable — DO NOT fabricate a second fact (a fake implication, a made-up executive quote) to pad length. The second sentence (when present) is a warm HUMAN reaction to the event, not a strategy analysis and not a new fact. Separate sentences with `\n\n` (double newline = paragraph break) OR `\n` (single newline). DO NOT use em dashes (—). Use a comma, period, or "and"/"but" to join clauses.
+15-45 words. Use a period or comma to join clauses. NEVER an em-dash.
 
-(The format spec still announces 2-3 sentences / 40-70 words as the historical target; the looser bound above takes precedence when only one fact is available.)
+## BANNED vs ALLOWED — concrete examples
 
-Example (Tier 3 style — use the shape, not the words):
+Examples (Tier 3 style — mirror simplicity, not words):
 
-{{"icebreaker": "Saw the MiBlok win. Genuinely one of the more interesting rollouts I've seen named this quarter. That's a big one."}}
+ALLOWED:
+{{"icebreaker": "Saw the Series A announcement. Three years from launch to that round is a good clip."}}
 
-If the signal_type is hiring, generic expansion, or anything other than major_contract_win / new_leadership / funding_round, return {{"icebreaker": ""}} instead.
+{{"icebreaker": "Noticed the new MD appointment. Big pickup, the Aegis background fits well."}}
+
+BANNED (will be rejected):
+- "Saw the Series A — sharp move, ngl."
+- "Came across the funding news. Two things stuck with me."
+
+If the signal doesn't give you a verbatim event to reference, return {{"icebreaker": ""}} instead.

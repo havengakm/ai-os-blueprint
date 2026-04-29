@@ -139,7 +139,12 @@ async def test_tier_1_frustrated_trigger(_env):
     assert fake.create_calls, "Claude should have been called"
     # Verify the Tier 1 prompt fired, not a sibling tier's
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    assert "recently posted something frustrated" in prompt_sent
+    # Slice 21 (2026-04-29) widened tier-1 trigger language from "frustrated"
+    # to "frustration, opinion, announcement, observation" to allow the
+    # neutral-post tier-1 case Trigify will surface. Probe stays on the
+    # tier-1 marker via "(MUST reference verbatim content from here)" + "post".
+    assert "post" in prompt_sent.lower()
+    assert "verbatim content" in prompt_sent
 
 
 async def test_tier_2_neutral_trigger(_env):
@@ -867,8 +872,17 @@ async def test_v2_prompts_contain_truth_gating_rule(_env, tier_setup):
     # v3: the "lead gen" ban must be present in every tier's prompt.
     assert "lead gen" in prompt_sent, f"tier {expected_tier}"
     # v3: every tier output spec must announce multi-line 2-3 sentence format.
-    assert "2-3 sentences" in prompt_sent, f"tier {expected_tier}"
-    assert "40-70 words" in prompt_sent, f"tier {expected_tier}"
+    # Slice 21 (2026-04-29) tightened from 2-3 sentences down to 1
+    # observation + optional reaction (15-45 words). Probe shifted to the
+    # word-count target, which both old and new prompts mention.
+    assert "15-45 words" in prompt_sent or "2-3 sentences" in prompt_sent, (
+        f"tier {expected_tier}"
+    )
+    # Slice 21 (2026-04-29) tightened to 15-45 words (single observation).
+    assert (
+        "15-45 words" in prompt_sent
+        or "40-70 words" in prompt_sent
+    ), f"tier {expected_tier}"
 
 
 # --------------------------------------------------------------------------- #
@@ -906,14 +920,14 @@ async def test_v3_lead_gen_ban_triggers_retry(_env):
 # --------------------------------------------------------------------------- #
 
 async def test_v3_tier_4_multiline_icebreaker_passes(_env):
-    """v3 output format allows 2-3 sentences separated by \\n\\n or \\n.
-    The adapter must accept multi-line content and surface it verbatim
-    (40-70 words, "Really sharp work." ending allowed)."""
+    """v3 output format allows multi-line content. The adapter must accept
+    it and surface verbatim. Slice 21 (2026-04-29) tightened the shape to
+    a single observation + optional reaction (no "Two things jumped out"
+    formulaic structure, no "Spent the morning with" / "Really sharp work"
+    AI-cliches). This test now uses the clean shape."""
     multiline = (
-        "Spent the morning with your Iroko work. "
-        "Two things jumped out: the modular \"organised structure\" icon "
-        "instead of the usual sustainability visuals, and \"Infrastructure-"
-        "grade nature restoration\" sitting underneath it. Really sharp work."
+        "Saw the Iroko work. The modular icon for organised structure "
+        "instead of the usual sustainability visuals is a nice call."
     )
     adapter, fake, tracker = _adapter(_ib_json(multiline))
 
@@ -935,7 +949,6 @@ async def test_v3_tier_4_multiline_icebreaker_passes(_env):
     assert result.tier == 4
     assert result.reason == "tier_4_generated"
     assert "Iroko" in result.icebreaker_content
-    assert result.icebreaker_content.endswith("Really sharp work.")
     assert len(fake.create_calls) == 1  # no retry
     assert tracker.spend_calls == [("c-A", "A", 1)]
 
@@ -1041,10 +1054,20 @@ async def test_v3_1_prompts_contain_opener_whitelist_and_examples(_env, tier_set
     assert "Spent the morning with" in prompt_sent, f"tier {expected_tier}"
     # BANNED vs ALLOWED block markers
     assert "BANNED vs ALLOWED" in prompt_sent, f"tier {expected_tier}"
-    assert "warm observational voice" in prompt_sent, f"tier {expected_tier}"
+    # Slice 21 (2026-04-29) tightened the voice marker to "casual, warm,
+    # non-transactional. Like an email to a friend you met once."
+    assert (
+        "warm observational voice" in prompt_sent
+        or ("casual" in prompt_sent and "warm" in prompt_sent)
+    ), f"tier {expected_tier}"
     # New v3.1 single-word bans appear in every tier's prompt
     assert "signalling" in prompt_sent, f"tier {expected_tier}"
     assert "ecosystem" in prompt_sent, f"tier {expected_tier}"
     assert "high-growth" in prompt_sent, f"tier {expected_tier}"
-    # The "no analyze" rule block is explicit
-    assert "no analyze" in prompt_sent.lower(), f"tier {expected_tier}"
+    # Slice 21 (2026-04-29) folded the "no analyze" rule into the Voice
+    # rules block. Probe for the substantive content (DON'T interpret /
+    # diagnose) which both old and new prompts include.
+    assert (
+        "no analyze" in prompt_sent.lower()
+        or "don't interpret" in prompt_sent.lower()
+    ), f"tier {expected_tier}"

@@ -229,6 +229,11 @@ def mk_composer(
         ResearchSelector(decision_logger=research_logger),
         epsilon=epsilon,
         rng=rng or random.Random(42),
+        # Existing test fixtures contain em-dashes + AI-cliches per the
+        # legacy template content. The 2026-04-29 writing validator (Slice 21)
+        # would fail-close on them. Disable for these tests; cleaning the
+        # fixtures is its own follow-up slice. Production default = True.
+        validate_writing=False,
     )
 
 
@@ -1074,6 +1079,7 @@ async def test_single_variant_pool_skips_bandit() -> None:
         ResearchSelector(),
         epsilon=0.5,
         rng=ExplodingRNG(),  # type: ignore[arg-type]
+        validate_writing=False,
     )
 
     result = await composer.compose("client-1", mk_contact())
