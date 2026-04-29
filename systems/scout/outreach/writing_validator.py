@@ -80,6 +80,26 @@ _BUZZWORD_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\btransform\b", re.I), "transform"),
 ]
 
+# Founding-year / company-tenure references. Operator-flagged 2026-04-29
+# (Slice 23) after three Tier-4 icebreakers all opened with founding year
+# ("founded in 2011", "been at this since 2011", "decade-plus run in this
+# space"). Tenure is the laziest concrete fact the LLM can grab when
+# citable_details is thin, so it became the default fallback. Reads as AI;
+# no human opens an email by quoting the year a company was founded.
+# See ``memory/feedback_no_founding_year_in_icebreakers.md``.
+_TENURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bfounded in \d{4}\b", re.I), "founded in YYYY"),
+    (re.compile(r"\bfounded \d{4}\b", re.I), "founded YYYY"),
+    (re.compile(r"\bsince \d{4}\b", re.I), "since YYYY"),
+    (re.compile(r"\bbeen at (?:this|it)\b", re.I), "been at this / been at it"),
+    (re.compile(r"\bbeen (?:in|doing) (?:this|the) (?:game|business|industry|space|room)\b", re.I), "been in this space / room / game"),
+    (re.compile(r"\bbeen in the room (?:long enough|for)\b", re.I), "been in the room"),
+    (re.compile(r"\bdecade[- ]plus\b", re.I), "decade-plus"),
+    (re.compile(r"\bdecade[- ]long\b", re.I), "decade-long"),
+    (re.compile(r"\b(?:over |for over )?a decade\b", re.I), "a decade / over a decade"),
+    (re.compile(r"\bdecades? in (?:this|the)\b", re.I), "decades in this/the"),
+]
+
 # Filler phrases.
 _FILLER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bjust checking in\b", re.I), "just checking in"),
@@ -171,6 +191,16 @@ def validate_writing(
             violations.append(
                 Violation(
                     rule=f"buzzword:{label}",
+                    offending_text=m.group(0),
+                )
+            )
+
+    # --- founding-year / company-tenure references ---
+    for pattern, label in _TENURE_PATTERNS:
+        for m in pattern.finditer(text):
+            violations.append(
+                Violation(
+                    rule=f"tenure:{label}",
                     offending_text=m.group(0),
                 )
             )

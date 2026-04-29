@@ -122,6 +122,89 @@ def test_just_checking_in_is_banned():
     assert result.passed is False
 
 
+# --- founding year / tenure (Slice 23, 2026-04-29) -------------------------
+
+
+def test_founded_in_yyyy_is_banned():
+    """Operator-flagged 2026-04-29: 'DO NOT mention founding year. That is
+    very disingenuous and screams of AI!!! No person speaks like this'."""
+    text = "Noticed LYFE Marketing was founded in 2011. That hits."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any("founded in YYYY" in v.rule for v in result.violations)
+
+
+def test_since_yyyy_is_banned():
+    text = "Noticed Social House has been at this since 2011."
+    result = validate_writing(text)
+    assert result.passed is False
+    rules = {v.rule for v in result.violations}
+    assert any("since YYYY" in r for r in rules)
+    assert any("been at this" in r for r in rules)
+
+
+def test_decade_plus_run_is_banned():
+    text = "Noticed Fresh Content Society. A decade-plus run in this space says something."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any("decade-plus" in v.rule for v in result.violations)
+
+
+def test_over_a_decade_to_learn_is_banned():
+    text = "That's over a decade to learn what actually works."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any("a decade" in v.rule for v in result.violations)
+
+
+def test_been_in_the_room_long_enough_is_banned():
+    text = "When you've been in the room long enough you see the pattern."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any("been in the room" in v.rule for v in result.violations)
+
+
+def test_lyfe_marketing_slice_23_founding_year_icebreaker_fails():
+    """The actual Tier-4 icebreaker the operator caught on 2026-04-29
+    Slice 23 — opens with founding year, screams of AI."""
+    text = (
+        "Noticed LYFE Marketing was founded in 2011. That line about being "
+        "tired of unsatisfying results from social media strategy hits "
+        "different when you've been in the room long enough to see the "
+        "pattern repeat."
+    )
+    result = validate_writing(text)
+    assert result.passed is False
+    rules = {v.rule for v in result.violations}
+    assert any("founded in YYYY" in r for r in rules)
+    assert any("been in the room" in r for r in rules)
+
+
+def test_social_house_slice_23_tenure_icebreaker_fails():
+    text = (
+        "Noticed Social House has been at this since 2011. That's over a "
+        "decade to learn what actually works."
+    )
+    result = validate_writing(text)
+    assert result.passed is False
+    rules = {v.rule for v in result.violations}
+    assert any("since YYYY" in r for r in rules)
+    assert any("been at this" in r for r in rules)
+    assert any("a decade" in r for r in rules)
+
+
+def test_fresh_content_society_slice_23_decade_icebreaker_fails():
+    text = (
+        "Noticed Fresh Content Society was founded in 2014. A decade-plus "
+        "run in this space says something about what actually sticks."
+    )
+    result = validate_writing(text)
+    assert result.passed is False
+    rules = {v.rule for v in result.violations}
+    assert any("founded in YYYY" in r for r in rules)
+    assert any("decade-plus" in r for r in rules)
+
+
 # --- composition: real failure case from 2026-04-29 -------------------------
 
 

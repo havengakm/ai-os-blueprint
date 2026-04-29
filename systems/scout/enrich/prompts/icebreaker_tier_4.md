@@ -22,6 +22,12 @@ If the citable details section is empty, says "(none)", or only contains vague t
 
 An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length. No "your portfolio looks great" filler.
 
+## NO founding year, NO tenure (HARD)
+
+NEVER reference founding year, anniversary year, or company tenure of any kind. Even if the citable details list it, do NOT use it. Banned shapes: "founded in YYYY", "founded YYYY", "since YYYY", "been at this since/for", "X+ years in this space", "decade-plus", "decade-long", "over a decade in this space", "been in the room long enough". Tenure is not an icebreaker — no human opens an email by quoting the year a company was founded.
+
+If the only specific thing in the citable details is the founding year or a tenure reference, return {{"icebreaker": ""}}. Empty is the correct answer.
+
 ## Shape
 
 ONE specific observation about a named client, project, or craft choice from the citable details. Optionally followed by a SHORT reaction sentence (5-8 words). Total 15-45 words.

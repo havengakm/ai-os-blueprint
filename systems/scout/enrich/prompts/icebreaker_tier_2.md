@@ -24,6 +24,10 @@ If the engaged-content text is empty, vague, or gives you nothing specific to re
 
 An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length.
 
+## NO founding year, NO tenure (HARD)
+
+NEVER reference founding year, anniversary year, or company tenure. Banned shapes: "founded in YYYY", "since YYYY", "been at this for X years", "decade-plus", "over a decade in this space". Tenure is not an icebreaker.
+
 ## Shape
 
 ONE specific reference to a moment, quote, or topic from the engaged content. Optionally followed by a SHORT reaction sentence (5-8 words). Total 15-45 words.
