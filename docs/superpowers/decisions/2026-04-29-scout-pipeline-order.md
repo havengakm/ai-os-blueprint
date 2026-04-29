@@ -1,7 +1,7 @@
 # Decision: Scout pipeline order — cheap-resolve before score, expensive-resolve after
 
 **Date:** 2026-04-29
-**Status:** Proposed
+**Status:** Accepted (2026-04-29)
 **Decider:** Kirsten
 **Drafted by:** Claude (AIOS agent) during Slice 15 of 2026-04-29
 **Affects:** `aios/daemon/client_worker.py::STAGE_ORDER`, `systems/scout/identity/orchestrator.py` (split into two stages), score_v1 weights, AdapterFactory wiring, `client_config.active_directories` per-source ICP filters, Clutch employee-band parsing, `feedback_enrichment_tiers` memory.
