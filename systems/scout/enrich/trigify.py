@@ -43,6 +43,14 @@ MAX_EVENTS = 20
 DETAIL_CHAR_LIMIT = 160
 MIN_COMPANY_NAME_LEN = 4  # guard against spurious substring matches on short names
 
+# Slice C (2026-04-29): recency window for the two reserved LinkedIn intent
+# signals consumed by score._score_intent. Operator's signal table specifies
+# "last 30d" for both decision-maker post and company-page post relevance.
+# Hardcoded here for now; per-client override via
+# client_config.tier_thresholds.linkedin_recency_days is a backlog item only
+# worth wiring once we see live data demanding a different window.
+LINKEDIN_RECENCY_DAYS = 30
+
 
 class TrigifyAdapter:
     """Trigify behavioral-signal adapter. name='trigify'."""
@@ -176,13 +184,33 @@ class TrigifyAdapter:
 
         reason = "behavioral_signals_found" if events else "no_signals_matched"
 
+        # --- Slice C: derive reserved LinkedIn intent flags ---
+        # score._score_intent reads two booleans for 4+4 = 8 reserved
+        # intent points. Trigify monitor config IS the topic filter
+        # (operators set up keyword watchers on relevant topics), so a
+        # matched recent LinkedIn event is by definition topic-relevant.
+        # No runtime topic-check needed.
+        linkedin_dm_recent = _has_recent_linkedin_event(
+            events,
+            match_keys={"profile"},
+            max_days=LINKEDIN_RECENCY_DAYS,
+        )
+        linkedin_company_recent = _has_recent_linkedin_event(
+            events,
+            match_keys={"domain", "name"},
+            max_days=LINKEDIN_RECENCY_DAYS,
+        )
+
         logger.info(
-            "trigify contact_id=%s monitors=%d scanned=%d matched=%d reason=%s",
+            "trigify contact_id=%s monitors=%d scanned=%d matched=%d reason=%s "
+            "linkedin_dm_recent=%s linkedin_company_recent=%s",
             contact_id,
             len(search_ids),
             total_results_scanned,
             len(matched_events),
             reason,
+            linkedin_dm_recent,
+            linkedin_company_recent,
         )
 
         return EnrichResult(
@@ -193,6 +221,8 @@ class TrigifyAdapter:
                 "monitors_queried": list(search_ids),
                 "total_results_scanned": total_results_scanned,
                 "matched_count": len(matched_events),
+                "linkedin_dm_recent_post_match": linkedin_dm_recent,
+                "linkedin_company_recent_post": linkedin_company_recent,
             },
             cost_cents=0,
             reason=reason,
@@ -262,6 +292,32 @@ def _engagement_sum(event: dict[str, Any]) -> int:
     """Sum likes + comments + shares for sorting; None values treated as 0."""
     eng = event.get("engagement") or {}
     return (eng.get("likes") or 0) + (eng.get("comments") or 0) + (eng.get("shares") or 0)
+
+
+def _has_recent_linkedin_event(
+    events: list[dict[str, Any]],
+    *,
+    match_keys: set[str],
+    max_days: int,
+) -> bool:
+    """True if any event is on linkedin, matched on ``match_keys``, and recent.
+
+    ``recency_days=None`` (unparseable timestamp) is treated as "old" — we don't
+    fire the signal off undated content. Mirrors the conservative stance in
+    ``systems.scout.pipeline.score._has_recent_structural_signal``.
+
+    Slice C (2026-04-29): used to derive the two reserved LinkedIn intent
+    booleans consumed by ``score._score_intent``.
+    """
+    for ev in events:
+        if ev.get("platform") != "linkedin":
+            continue
+        if ev.get("match_key") not in match_keys:
+            continue
+        rd = ev.get("recency_days")
+        if isinstance(rd, (int, float)) and rd <= max_days:
+            return True
+    return False
 
 
 def _compute_recency(published_at: str | None) -> int | None:
