@@ -122,7 +122,7 @@ class ScoutSystem(BaseSystem):
             autonomy_gate=registry.autonomy_gate,
             knowledge_store=registry.knowledge_store,
             pull_stage_factory=lambda: PullOrchestrator(
-                adapters=[], storage=registry.pull_backend,
+                adapters={}, storage=registry.pull_backend,
             ),
             score_stage_factory=lambda: ScoreStage(storage=registry.score_backend),
             screen_stage_factory=lambda: ScreenStage(storage=registry.screen_backend),
@@ -180,23 +180,30 @@ class ScoutSystem(BaseSystem):
         *,
         dry_run: bool = False,
         limit: int | None = None,
+        max_companies_per_source: int | None = None,
     ) -> Any:
         """Dispatch the pull stage with the mandatory foundation loop.
 
         The ``limit`` parameter is accepted for API parity with other
         stages but NOT forwarded: ``PullOrchestrator.run`` does not
-        accept ``limit``. Use ``max_companies_per_source`` on the
-        orchestrator instead (daemon path) to cap the batch size. When
-        a caller passes ``limit``, a debug log surfaces the silent-drop
-        so it isn't mistaken for an enforced cap.
+        accept ``limit``. Use ``max_companies_per_source`` instead to
+        cap per-source batch size. When a caller passes ``limit``, a
+        debug log surfaces the silent-drop so it isn't mistaken for an
+        enforced cap.
+
+        ``max_companies_per_source`` (when set) forwards directly to
+        the orchestrator. None = orchestrator's own default applies.
         """
         if limit is not None:
             logger.debug(
                 "run_pull received limit=%s but PullOrchestrator doesn't accept limit; "
-                "use source-level `max_companies_per_source` to cap batch size",
+                "use `max_companies_per_source` to cap batch size",
                 limit,
             )
-        logger.info("scout.run_pull start client=%s dry_run=%s", client_id, dry_run)
+        logger.info(
+            "scout.run_pull start client=%s dry_run=%s max_per_source=%s",
+            client_id, dry_run, max_companies_per_source,
+        )
         await self._prime_foundation(
             client_id,
             task_query="pull stage — discover new contacts",
@@ -204,7 +211,10 @@ class ScoutSystem(BaseSystem):
             context_label="pull stage run",
         )
         stage = self._pull_factory()
-        return await stage.run(client_id, dry_run=dry_run)
+        kwargs: dict[str, Any] = {"dry_run": dry_run}
+        if max_companies_per_source is not None:
+            kwargs["max_companies_per_source"] = max_companies_per_source
+        return await stage.run(client_id, **kwargs)
 
     async def run_score(
         self,

@@ -79,8 +79,14 @@ class AdapterFactory:
 
     def build_pull_adapters(
         self, client_config: dict[str, Any],
-    ) -> list["CompanySourceAdapter"]:
+    ) -> dict[str, "CompanySourceAdapter"]:
         """Build the source adapters named in ``active_directories``.
+
+        Returns a ``dict[routing_key, adapter]`` where the routing_key is
+        the EXACT name from ``active_directories`` — this is what the
+        orchestrator dispatches on. The adapter's own ``.name`` may differ
+        (e.g. ``ClutchAdapter`` self-reports as ``clutch:{category_path}``);
+        keep the routing key separate so lookups don't drift.
 
         Unknown names are logged and skipped. Adapters requiring an API key
         that isn't set are also logged + skipped — the stage can still run
@@ -91,13 +97,13 @@ class AdapterFactory:
             logger.info(
                 "pull: active_directories empty for client — stage will no-op",
             )
-            return []
+            return {}
 
-        adapters: list[CompanySourceAdapter] = []
+        adapters: dict[str, CompanySourceAdapter] = {}
         for name in active:
             adapter = self._build_pull_adapter(name)
             if adapter is not None:
-                adapters.append(adapter)
+                adapters[name] = adapter
         return adapters
 
     def _build_pull_adapter(self, name: str) -> "CompanySourceAdapter | None":

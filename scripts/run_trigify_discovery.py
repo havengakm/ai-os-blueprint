@@ -292,7 +292,12 @@ def main(argv: list[str] | None = None) -> int:
 
     def orchestrator_factory(adapter: CompanySourceAdapter) -> PullOrchestrator:
         pull_storage = SupabasePullBackend(supabase)
-        return PullOrchestrator(adapters=[adapter], storage=pull_storage)
+        # Single-adapter route: use the adapter's self-reported name as the
+        # routing key — keeps run_trigify_discovery's stand-alone path intact
+        # without touching client_config.
+        return PullOrchestrator(
+            adapters={adapter.name: adapter}, storage=pull_storage,
+        )
 
     try:
         return asyncio.run(_run(

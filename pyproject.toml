@@ -24,6 +24,8 @@ dependencies = [
 
     # Headless browser for identity-scraper fallback (Task 9.5c)
     "playwright>=1.48.0",
+    # Stealth patches to bypass Cloudflare IUAM (Clutch + similar)
+    "playwright-stealth>=2.0.0",
 
     # Config
     "pydantic>=2.8.0",

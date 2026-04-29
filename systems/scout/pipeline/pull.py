@@ -101,17 +101,25 @@ class StorageBackend(Protocol):
 class PullOrchestrator:
     """Dispatches source adapters in priority order, dedups, persists.
 
-    Priority is the order in which adapters are passed to the constructor
-    (NOT a priority field on the adapter itself — keeps adapters stateless).
+    Priority is the dict iteration order (Python preserves insertion order),
+    NOT a priority field on the adapter itself — keeps adapters stateless.
+
+    Naming contract: the dict KEY is the routing key — it matches what the
+    operator puts in ``client_config.active_directories``. The adapter's
+    own ``.name`` is self-description (used in the contact ``source`` field
+    + log lines) and may differ from the routing key. Example:
+    ``{"clutch_agencies": ClutchAdapter(category_path="agencies/digital-marketing")}``
+    routes by ``"clutch_agencies"`` while the adapter self-reports as
+    ``"clutch:agencies/digital-marketing"``.
     """
 
     def __init__(
         self,
-        adapters: list[CompanySourceAdapter],
+        adapters: dict[str, CompanySourceAdapter],
         storage: StorageBackend,
     ) -> None:
-        self._adapters_by_name = {a.name: a for a in adapters}
-        self._ordered_names = [a.name for a in adapters]
+        self._adapters_by_name: dict[str, CompanySourceAdapter] = dict(adapters)
+        self._ordered_names: list[str] = list(adapters)
         self._storage = storage
 
     async def run(

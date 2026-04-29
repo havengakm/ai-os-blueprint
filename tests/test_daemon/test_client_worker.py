@@ -229,3 +229,38 @@ async def test_run_client_cycle_default_stages_include_all_seven():
     assert [r.stage for r in result.stages_run] == list(STAGE_ORDER)
     assert sum(1 for r in result.stages_run if r.ok) == 7
     assert not result.errors
+
+
+@pytest.mark.asyncio
+async def test_run_client_cycle_forwards_max_companies_to_pull_only():
+    """When set, max_companies_per_source threads to run_pull. Other
+    stages don't receive it."""
+    scout = _build_scout_mock()
+
+    await run_client_cycle(
+        scout, "c1",
+        dry_run=False,
+        stages=("pull", "score_v1", "screen"),
+        max_companies_per_source=5,
+    )
+
+    assert scout.run_pull.await_args.kwargs["max_companies_per_source"] == 5
+    # Other stages don't accept / receive the kwarg.
+    assert "max_companies_per_source" not in scout.run_score.await_args.kwargs
+    assert "max_companies_per_source" not in scout.run_screen.await_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_run_client_cycle_omits_max_companies_when_none():
+    """Default None means the kwarg is NOT passed — orchestrator's own
+    default applies. Avoids accidentally pinning the cap to None."""
+    scout = _build_scout_mock()
+
+    await run_client_cycle(
+        scout, "c1",
+        dry_run=False,
+        stages=("pull",),
+        max_companies_per_source=None,
+    )
+
+    assert "max_companies_per_source" not in scout.run_pull.await_args.kwargs

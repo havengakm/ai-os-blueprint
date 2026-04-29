@@ -67,6 +67,13 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--json", action="store_true",
         help="Emit the ClientCycleResult as JSON on stdout.",
     )
+    parser.add_argument(
+        "--max-companies-per-source", type=int, default=None,
+        help=(
+            "Cap pull batch size per source adapter. None = "
+            "orchestrator's default (50). Use to throttle debug runs."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -105,7 +112,10 @@ def _print_summary(result: ClientCycleResult) -> None:
 
 
 async def _run(
-    client_id: str, dry_run: bool, stages: tuple[str, ...] | None,
+    client_id: str,
+    dry_run: bool,
+    stages: tuple[str, ...] | None,
+    max_companies_per_source: int | None = None,
 ) -> ClientCycleResult | None:
     from api.deps import get_registry
     from config.settings import get_settings
@@ -123,6 +133,7 @@ async def _run(
         scout, client_id,
         dry_run=dry_run, stages=stages,
         composer_backend=registry.composer_backend,
+        max_companies_per_source=max_companies_per_source,
     )
 
 
@@ -135,7 +146,10 @@ def main(argv: list[str] | None = None) -> int:
     stages = _parse_stages(args.stages)
 
     try:
-        result = asyncio.run(_run(args.client_id, args.dry_run, stages))
+        result = asyncio.run(_run(
+            args.client_id, args.dry_run, stages,
+            args.max_companies_per_source,
+        ))
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
         return 1

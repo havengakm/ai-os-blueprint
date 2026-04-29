@@ -51,6 +51,16 @@ def _adapter(name: str, rows: list[RawCompanyContact]):
     return mock
 
 
+def _by_name(*adapters):
+    """Build the routing-key dict the orchestrator expects, using each
+    adapter's own ``.name`` as the key. Matches what these tests' fake
+    ``_FakeStorage(active=[...])`` references — adapter.name and the
+    routing key are intentionally identical in the unit tests; production
+    factory code is the path that decouples them (see
+    ``test_build_pull_adapters_clutch_routing_key_separate_from_adapter_name``)."""
+    return {a.name: a for a in adapters}
+
+
 def _row(company, *, source, source_id, domain=None):
     return RawCompanyContact(
         company=company,
@@ -67,7 +77,7 @@ async def test_orchestrator_dispatches_only_active_adapters():
     clutch = _adapter("clutch:developers/shopify", [_row("C", source="clutch:developers/shopify", source_id="c", domain="c.com")])
 
     storage = _FakeStorage(active=["csv_ingest", "apollo_company"])  # clutch not active
-    orch = PullOrchestrator([csv_adapter, apollo, clutch], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter, apollo, clutch), storage)
     result = await orch.run("clymb")
 
     assert result.total_inserted == 2  # csv + apollo; clutch skipped
@@ -80,7 +90,7 @@ async def test_orchestrator_respects_construction_order():
     csv_adapter = _adapter("csv_ingest", [])
     apollo = _adapter("apollo_company", [])
     storage = _FakeStorage(active=["apollo_company", "csv_ingest"])  # storage lists apollo first
-    orch = PullOrchestrator([csv_adapter, apollo], storage)  # construction order: csv first
+    orch = PullOrchestrator(_by_name(csv_adapter, apollo), storage)  # construction order: csv first
     result = await orch.run("clymb")
 
     # per_source order follows construction order, not storage order
@@ -93,7 +103,7 @@ async def test_orchestrator_dedups_by_domain_across_sources():
     apollo = _adapter("apollo_company", [_row("Acme", source="apollo_company", source_id="org-2", domain="acme.com")])
 
     storage = _FakeStorage(active=["csv_ingest", "apollo_company"])
-    orch = PullOrchestrator([csv_adapter, apollo], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter, apollo), storage)
     result = await orch.run("clymb")
 
     # Both adapters pulled 1, but apollo's row should be deduped by domain
@@ -110,7 +120,7 @@ async def test_orchestrator_dedups_against_existing_contacts():
         active=["csv_ingest"],
         existing_contacts=[("csv_ingest", "1", "acme.com")],  # already in DB
     )
-    orch = PullOrchestrator([csv_adapter], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter), storage)
     result = await orch.run("clymb")
 
     assert result.total_inserted == 0
@@ -121,7 +131,7 @@ async def test_orchestrator_dedups_against_existing_contacts():
 async def test_orchestrator_dry_run_does_not_persist():
     csv_adapter = _adapter("csv_ingest", [_row("Acme", source="csv_ingest", source_id="1", domain="acme.com")])
     storage = _FakeStorage(active=["csv_ingest"])
-    orch = PullOrchestrator([csv_adapter], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter), storage)
     result = await orch.run("clymb", dry_run=True)
 
     assert result.dry_run is True
@@ -136,7 +146,7 @@ async def test_orchestrator_source_filter_narrows_active_set():
     csv_adapter = _adapter("csv_ingest", [])
     apollo = _adapter("apollo_company", [])
     storage = _FakeStorage(active=["csv_ingest", "apollo_company"])
-    orch = PullOrchestrator([csv_adapter, apollo], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter, apollo), storage)
 
     await orch.run("clymb", source_filter=["csv_ingest"])
     assert csv_adapter.pull.await_count == 1
@@ -147,7 +157,7 @@ async def test_orchestrator_source_filter_narrows_active_set():
 async def test_orchestrator_forwards_adapter_kwargs():
     csv_adapter = _adapter("csv_ingest", [])
     storage = _FakeStorage(active=["csv_ingest"])
-    orch = PullOrchestrator([csv_adapter], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter), storage)
 
     await orch.run(
         "clymb",
@@ -163,7 +173,7 @@ async def test_orchestrator_forwards_adapter_kwargs():
 @pytest.mark.asyncio
 async def test_orchestrator_logs_when_adapter_not_registered():
     storage = _FakeStorage(active=["ghost_adapter"])
-    orch = PullOrchestrator([], storage)
+    orch = PullOrchestrator({}, storage)
     result = await orch.run("clymb")
 
     assert result.total_inserted == 0
@@ -180,7 +190,7 @@ async def test_orchestrator_captures_adapter_errors_and_continues():
     ok = _adapter("apollo_company", [_row("ok", source="apollo_company", source_id="1", domain="ok.com")])
 
     storage = _FakeStorage(active=["csv_ingest", "apollo_company"])
-    orch = PullOrchestrator([failing, ok], storage)
+    orch = PullOrchestrator(_by_name(failing, ok), storage)
     result = await orch.run("clymb")
 
     failing_summary = next(s for s in result.per_source if s.adapter_name == "csv_ingest")
@@ -193,7 +203,7 @@ async def test_orchestrator_captures_adapter_errors_and_continues():
 async def test_orchestrator_logs_summary_decision_per_source():
     csv_adapter = _adapter("csv_ingest", [_row("Acme", source="csv_ingest", source_id="1", domain="acme.com")])
     storage = _FakeStorage(active=["csv_ingest"])
-    orch = PullOrchestrator([csv_adapter], storage)
+    orch = PullOrchestrator(_by_name(csv_adapter), storage)
 
     await orch.run("clymb")
 
@@ -214,7 +224,7 @@ async def test_orchestrator_dedups_null_domain_rows_with_same_company():
         _row("Acme Co", source="clutch:developers/wordpress", source_id="wp-acme", domain=None),
     ])
     storage = _FakeStorage(active=["clutch:developers/shopify", "clutch:developers/wordpress"])
-    orch = PullOrchestrator([clutch_a, clutch_b], storage)
+    orch = PullOrchestrator(_by_name(clutch_a, clutch_b), storage)
     result = await orch.run("clymb")
 
     assert result.total_pulled == 2

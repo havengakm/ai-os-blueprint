@@ -17,11 +17,21 @@ Plan 2 Task 2.0.5 hardening (2026-04-27):
     ``decision_type='source_selection'`` decision_log row with reasoning
     set to ``scout.source.empty_first_page`` so the operator sees the
     distinction.
+
+2026-04-29 Cloudflare bypass: Clutch is now behind Cloudflare IUAM (the
+"Just a moment..." JS challenge). Plain httpx requests get HTTP 403 even
+with full Chrome-like headers — the challenge requires a real browser
+TLS fingerprint + JS execution. Production now uses Playwright with the
+``playwright-stealth`` patches and HEADED mode (``headless=False``);
+this matches the proven pattern in the standalone clutch.co-scraper
+project. The httpx code path is preserved as a test-injection seam so
+existing parsing tests stay fast and offline.
 """
 from __future__ import annotations
 
 import asyncio
 import re
+from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import urlparse
 
@@ -87,19 +97,34 @@ class ClutchAdapter:
         throttle_seconds: float = THROTTLE_SECONDS,
         retry_backoff_seconds: float = _DEFAULT_RETRY_BACKOFF_SECONDS,
         max_retries: int = _DEFAULT_MAX_RETRIES,
+        playwright_headless: bool = False,
+        playwright_challenge_wait_ms: int = 5_000,
     ) -> None:
         """category_path: e.g. 'developers/shopify' (no leading/trailing slash).
         http_client: inject a mock in tests to avoid real HTTP calls.
+            When provided, the httpx code path runs (legacy + offline tests).
+            When None, the Playwright + stealth path runs (production).
         throttle_seconds: pause between pages; tests pass 0 to skip waits.
         retry_backoff_seconds: base backoff before retrying transient errors.
             Tests pass 0 to skip waits.
         max_retries: how many times to retry 429/503/5xx before raising.
+        playwright_headless: production path only. Default False — the
+            working clutch.co-scraper uses HEADED mode to bypass
+            Cloudflare ("Just a moment..." JS challenge). Set True only
+            when a virtual display is available (e.g. xvfb-run on a
+            server) AND stealth alone is sufficient to pass the challenge.
+        playwright_challenge_wait_ms: how long to wait for Cloudflare's JS
+            challenge to resolve after each navigation. 5s is the
+            empirically-validated minimum; bump to 10-15s if pages keep
+            landing on the challenge.
         """
         self.category_path = category_path.strip("/")
         self._http_client = http_client
         self._throttle_seconds = throttle_seconds
         self._retry_backoff_seconds = retry_backoff_seconds
         self._max_retries = max(0, max_retries)
+        self._playwright_headless = playwright_headless
+        self._playwright_challenge_wait_ms = playwright_challenge_wait_ms
 
     @property
     def name(self) -> str:
@@ -151,101 +176,192 @@ class ClutchAdapter:
 
         In dry_run mode: no HTTP calls; returns [].
 
+        Branches on ``http_client``:
+          * provided (test/legacy seam) → httpx fetch
+          * not provided (production)  → Playwright + stealth + headed Chrome
+            to pass Cloudflare IUAM.
+
         Raises:
             ClutchSuspiciousEmptyError: page 0 parsed to zero entries.
-            httpx.HTTPStatusError: HTTP error after all retries exhausted.
+            httpx.HTTPStatusError: HTTP error after all retries (httpx path).
         """
         if dry_run:
             return []
 
+        if self._http_client is not None:
+            return await self._pull_via_httpx(max_companies, max_pages)
+        return await self._pull_via_playwright(max_companies, max_pages)
+
+    # ------------------------------------------------------------------ #
+    # httpx path (test seam, kept for offline parsing tests)              #
+    # ------------------------------------------------------------------ #
+
+    async def _pull_via_httpx(
+        self, max_companies: int, max_pages: int,
+    ) -> list[RawCompanyContact]:
         client_provided = self._http_client is not None
         client = self._http_client or httpx.AsyncClient(
             timeout=REQUEST_TIMEOUT,
             headers={"User-Agent": USER_AGENT},
         )
         try:
-            results: list[RawCompanyContact] = []
-            seen_slugs: set[str] = set()
-
-            for page_num in range(max_pages):
-                if len(results) >= max_companies:
-                    break
-
-                url = f"{CLUTCH_BASE_URL}/{self.category_path}?page={page_num}"
-                response = await self._fetch_with_retry(client, url)
-                html = response.text
-
-                parsed = _parse_listing_page(html)
-                if not parsed:
-                    if page_num == 0:
-                        # Suspicious: 200 OK + zero entries on the first page.
-                        # Could be CAPTCHA, soft-block, or a layout change.
-                        # Don't treat as a clean empty pull.
-                        raise ClutchSuspiciousEmptyError(
-                            f"Clutch first-page extraction yielded 0 entries "
-                            f"for {self.name} — likely CAPTCHA interstitial, "
-                            f"soft-block page, or a Clutch layout change. "
-                            f"URL: {url}"
-                        )
-                    break  # genuine end of listings
-
-                for entry in parsed:
-                    if len(results) >= max_companies:
-                        break
-                    slug = _extract_profile_slug(entry["profile_url"]) if entry["profile_url"] else entry["name"].lower().strip()
-                    if not slug or slug in seen_slugs:
-                        continue
-                    seen_slugs.add(slug)
-
-                    # Split location into city/state/geography best-effort.
-                    # Clutch locations come as "City, ST" or "City, Country".
-                    location = entry["location"]
-                    city: str | None = None
-                    state: str | None = None
-                    geography: str | None = None
-                    if "," in location:
-                        parts = [p.strip() for p in location.split(",", 1)]
-                        city = parts[0] or None
-                        tail = parts[1] if len(parts) > 1 else ""
-                        # If tail is 2-letter US state, set state; else geography
-                        if len(tail) == 2 and tail.isalpha():
-                            state = tail.upper()
-                        else:
-                            geography = tail or None
-                    elif location:
-                        geography = location
-
-                    results.append(
-                        RawCompanyContact(
-                            company=entry["name"] or slug,
-                            company_domain=None,  # listing-page-only; domain resolved downstream
-                            company_website=entry["profile_url"] or None,  # Clutch profile URL
-                            industry=None,
-                            employees=None,
-                            revenue_usd=None,
-                            city=city,
-                            state=state,
-                            geography=geography,
-                            source=self.name,
-                            source_id=slug,
-                            raw_data={
-                                "name": entry["name"],
-                                "profile_url": entry["profile_url"],
-                                "location": entry["location"],
-                                "page": page_num,
-                            },
-                        )
-                    )
-
-                # Throttle between pages (except after last fetched page)
-                if len(results) < max_companies and page_num < max_pages - 1:
-                    if self._throttle_seconds > 0:
-                        await asyncio.sleep(self._throttle_seconds)
-
-            return results
+            async def fetch_html(url: str) -> str:
+                resp = await self._fetch_with_retry(client, url)
+                return resp.text
+            return await self._collect_listings(
+                max_companies, max_pages, fetch_html,
+            )
         finally:
             if not client_provided:
                 await client.aclose()
+
+    # ------------------------------------------------------------------ #
+    # Playwright path (production — bypasses Cloudflare IUAM)             #
+    # ------------------------------------------------------------------ #
+
+    async def _pull_via_playwright(
+        self, max_companies: int, max_pages: int,
+    ) -> list[RawCompanyContact]:
+        # Imported lazily so offline parsing tests don't need Playwright
+        # browsers installed.
+        from playwright.async_api import async_playwright
+        from playwright_stealth import Stealth
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=self._playwright_headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                ],
+            )
+            try:
+                context = await browser.new_context(
+                    viewport={"width": 1920, "height": 1080},
+                    user_agent=USER_AGENT,
+                )
+                await Stealth().apply_stealth_async(context)
+                page = await context.new_page()
+
+                async def fetch_html(url: str) -> str:
+                    return await self._fetch_via_playwright(page, url)
+
+                return await self._collect_listings(
+                    max_companies, max_pages, fetch_html,
+                )
+            finally:
+                await browser.close()
+
+    async def _fetch_via_playwright(self, page: Any, url: str) -> str:
+        """Navigate ``page`` to ``url``, wait for Cloudflare to resolve,
+        return the rendered HTML. Mirrors the proven pattern in the
+        clutch.co-scraper ``clutch_stealth.py``."""
+        await page.goto(url, wait_until="networkidle", timeout=30_000)
+        # Initial wait for Cloudflare's JS challenge to compute + redirect.
+        await page.wait_for_timeout(self._playwright_challenge_wait_ms)
+        title = await page.title()
+        # If still on the challenge page, wait longer once before giving up.
+        if "Just a moment" in title or "challenge" in title.lower():
+            await page.wait_for_timeout(self._playwright_challenge_wait_ms * 2)
+            title = await page.title()
+            if "Just a moment" in title:
+                # Final wait pinned to category-path navigation.
+                try:
+                    await page.wait_for_url(
+                        f"**/{self.category_path}**", timeout=20_000,
+                    )
+                except Exception:
+                    pass  # fall through; collect_listings will detect via empty parse
+        return await page.content()
+
+    # ------------------------------------------------------------------ #
+    # Shared listing-page loop                                            #
+    # ------------------------------------------------------------------ #
+
+    async def _collect_listings(
+        self,
+        max_companies: int,
+        max_pages: int,
+        fetch_html: "Callable[[str], Awaitable[str]]",
+    ) -> list[RawCompanyContact]:
+        results: list[RawCompanyContact] = []
+        seen_slugs: set[str] = set()
+
+        for page_num in range(max_pages):
+            if len(results) >= max_companies:
+                break
+
+            url = f"{CLUTCH_BASE_URL}/{self.category_path}?page={page_num}"
+            html = await fetch_html(url)
+
+            parsed = _parse_listing_page(html)
+            if not parsed:
+                if page_num == 0:
+                    # Suspicious: 200 OK + zero entries on the first page.
+                    # Could be CAPTCHA, soft-block, or a layout change.
+                    # Don't treat as a clean empty pull.
+                    raise ClutchSuspiciousEmptyError(
+                        f"Clutch first-page extraction yielded 0 entries "
+                        f"for {self.name} — likely CAPTCHA interstitial, "
+                        f"soft-block page, or a Clutch layout change. "
+                        f"URL: {url}"
+                    )
+                break  # genuine end of listings
+
+            for entry in parsed:
+                if len(results) >= max_companies:
+                    break
+                slug = _extract_profile_slug(entry["profile_url"]) if entry["profile_url"] else entry["name"].lower().strip()
+                if not slug or slug in seen_slugs:
+                    continue
+                seen_slugs.add(slug)
+
+                # Split location into city/state/geography best-effort.
+                # Clutch locations come as "City, ST" or "City, Country".
+                location = entry["location"]
+                city: str | None = None
+                state: str | None = None
+                geography: str | None = None
+                if "," in location:
+                    parts = [p.strip() for p in location.split(",", 1)]
+                    city = parts[0] or None
+                    tail = parts[1] if len(parts) > 1 else ""
+                    # If tail is 2-letter US state, set state; else geography
+                    if len(tail) == 2 and tail.isalpha():
+                        state = tail.upper()
+                    else:
+                        geography = tail or None
+                elif location:
+                    geography = location
+
+                results.append(
+                    RawCompanyContact(
+                        company=entry["name"] or slug,
+                        company_domain=None,  # listing-page-only; domain resolved downstream
+                        company_website=entry["profile_url"] or None,  # Clutch profile URL
+                        industry=None,
+                        employees=None,
+                        revenue_usd=None,
+                        city=city,
+                        state=state,
+                        geography=geography,
+                        source=self.name,
+                        source_id=slug,
+                        raw_data={
+                            "name": entry["name"],
+                            "profile_url": entry["profile_url"],
+                            "location": entry["location"],
+                            "page": page_num,
+                        },
+                    )
+                )
+
+            # Throttle between pages (except after last fetched page)
+            if len(results) < max_companies and page_num < max_pages - 1:
+                if self._throttle_seconds > 0:
+                    await asyncio.sleep(self._throttle_seconds)
+
+        return results
 
 
 def _extract_profile_slug(profile_url: str) -> str:

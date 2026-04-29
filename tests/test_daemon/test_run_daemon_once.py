@@ -102,3 +102,30 @@ def test_run_daemon_once_json_output_contains_client_id(capsys):
         run_daemon_once.main(["--client-id", "c1", "--json"])
     captured = capsys.readouterr()
     assert '"client_id": "c1"' in captured.out
+
+
+def test_run_daemon_once_forwards_max_companies_per_source():
+    """``--max-companies-per-source N`` reaches _run as the 4th positional."""
+    ok_result = _fake_cycle_result(ok=True)
+    mock_run = AsyncMock(return_value=ok_result)
+    with patch("run_daemon_once._run", new=mock_run):
+        run_daemon_once.main([
+            "--client-id", "c1",
+            "--stages", "pull",
+            "--max-companies-per-source", "5",
+        ])
+
+    args = mock_run.await_args
+    # Positional args: (client_id, dry_run, stages, max_companies_per_source)
+    assert args.args[3] == 5
+
+
+def test_run_daemon_once_max_companies_default_none():
+    """When the flag is omitted, _run gets None (orchestrator default)."""
+    ok_result = _fake_cycle_result(ok=True)
+    mock_run = AsyncMock(return_value=ok_result)
+    with patch("run_daemon_once._run", new=mock_run):
+        run_daemon_once.main(["--client-id", "c1"])
+
+    args = mock_run.await_args
+    assert args.args[3] is None

@@ -118,8 +118,11 @@ def _patch_deps(
     # Capture orchestrator instances so tests can assert on them.
     created: list[_FakeOrchestrator] = []
 
-    def _factory(adapters: list[Any], storage: Any) -> _FakeOrchestrator:
-        o = orchestrator or _FakeOrchestrator(adapters[0])
+    def _factory(adapters: dict[str, Any], storage: Any) -> _FakeOrchestrator:
+        # PullOrchestrator now takes a dict[routing_key, adapter]; the
+        # production caller in run_trigify_discovery.py passes one entry.
+        first_adapter = next(iter(adapters.values()))
+        o = orchestrator or _FakeOrchestrator(first_adapter)
         created.append(o)
         return o
 

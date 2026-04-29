@@ -65,8 +65,8 @@ def test_build_pull_adapters_apollo_with_key():
         _build_settings(apollo="test-key"), _build_registry(),
     )
     adapters = factory.build_pull_adapters({"active_directories": ["apollo"]})
-    assert len(adapters) == 1
-    assert isinstance(adapters[0], ApolloCompanyAdapter)
+    assert list(adapters.keys()) == ["apollo"]
+    assert isinstance(adapters["apollo"], ApolloCompanyAdapter)
 
 
 def test_build_pull_adapters_apollo_without_key_skipped(caplog):
@@ -75,7 +75,7 @@ def test_build_pull_adapters_apollo_without_key_skipped(caplog):
         adapters = factory.build_pull_adapters(
             {"active_directories": ["apollo"]}
         )
-    assert adapters == []
+    assert adapters == {}
     assert any("APOLLO_API_KEY" in rec.getMessage() for rec in caplog.records)
 
 
@@ -84,8 +84,8 @@ def test_build_pull_adapters_clutch():
     adapters = factory.build_pull_adapters(
         {"active_directories": ["clutch_agencies"]}
     )
-    assert len(adapters) == 1
-    assert isinstance(adapters[0], ClutchAdapter)
+    assert list(adapters.keys()) == ["clutch_agencies"]
+    assert isinstance(adapters["clutch_agencies"], ClutchAdapter)
 
 
 def test_build_pull_adapters_trigify_discovery_with_key():
@@ -95,8 +95,8 @@ def test_build_pull_adapters_trigify_discovery_with_key():
     adapters = factory.build_pull_adapters(
         {"active_directories": ["trigify_discovery"]}
     )
-    assert len(adapters) == 1
-    assert isinstance(adapters[0], TrigifyDiscoverySource)
+    assert list(adapters.keys()) == ["trigify_discovery"]
+    assert isinstance(adapters["trigify_discovery"], TrigifyDiscoverySource)
 
 
 def test_build_pull_adapters_unknown_name_skipped(caplog):
@@ -105,7 +105,7 @@ def test_build_pull_adapters_unknown_name_skipped(caplog):
         adapters = factory.build_pull_adapters(
             {"active_directories": ["totally_made_up"]}
         )
-    assert adapters == []
+    assert adapters == {}
     assert any(
         "totally_made_up" in rec.getMessage() for rec in caplog.records
     )
@@ -115,7 +115,27 @@ def test_build_pull_adapters_empty_active_directories(caplog):
     factory = AdapterFactory(_build_settings(), _build_registry())
     with caplog.at_level(logging.INFO):
         adapters = factory.build_pull_adapters({"active_directories": []})
-    assert adapters == []
+    assert adapters == {}
+
+
+def test_build_pull_adapters_clutch_routing_key_separate_from_adapter_name():
+    """Regression: ``clutch_agencies`` is the routing key (matches
+    ``client_config.active_directories``); the ClutchAdapter's own ``.name``
+    self-reports as ``clutch:agencies/digital-marketing``. The two must not
+    drift — orchestrator dispatches by routing key, not adapter name.
+    Pre-fix bug: factory stored adapters in a list keyed by ``adapter.name``,
+    so the orchestrator's lookup of the routing key always missed."""
+    factory = AdapterFactory(_build_settings(), _build_registry())
+    adapters = factory.build_pull_adapters(
+        {"active_directories": ["clutch_agencies"]}
+    )
+    assert "clutch_agencies" in adapters
+    clutch = adapters["clutch_agencies"]
+    assert isinstance(clutch, ClutchAdapter)
+    # The adapter's self-reported name differs from the routing key — that's
+    # the whole point of this contract.
+    assert clutch.name != "clutch_agencies"
+    assert clutch.name.startswith("clutch:")
 
 
 def test_build_pull_orchestrator_returns_real_orchestrator():

@@ -78,12 +78,20 @@ async def _run_one_stage(
     *,
     dry_run: bool,
     composer_backend: "ComposerStorageBackend | None",
+    max_companies_per_source: int | None = None,
 ) -> StageRun:
-    """Run one stage, capture outcome + timing. Never raises."""
+    """Run one stage, capture outcome + timing. Never raises.
+
+    ``max_companies_per_source`` (when set) is forwarded only to the
+    pull stage; other stages ignore it.
+    """
     started = _now_iso()
     try:
         if stage == "pull":
-            await scout.run_pull(client_id, dry_run=dry_run)
+            pull_kwargs: dict[str, Any] = {"dry_run": dry_run}
+            if max_companies_per_source is not None:
+                pull_kwargs["max_companies_per_source"] = max_companies_per_source
+            await scout.run_pull(client_id, **pull_kwargs)
         elif stage == "score_v1":
             await scout.run_score(client_id, dry_run=dry_run, phase="v1")
         elif stage == "screen":
@@ -136,6 +144,7 @@ async def run_client_cycle(
     dry_run: bool = False,
     stages: tuple[str, ...] | None = None,
     composer_backend: "ComposerStorageBackend | None" = None,
+    max_companies_per_source: int | None = None,
 ) -> ClientCycleResult:
     """Run the nightly pipeline for one client.
 
@@ -150,6 +159,10 @@ async def run_client_cycle(
     ``composer_backend`` is required iff the ``compose`` stage is selected.
     Threaded through explicitly (rather than fished out of the ScoutSystem)
     so stage handlers stay independent of Scout's construction details.
+
+    ``max_companies_per_source`` (when set) caps the per-adapter pull
+    batch size. None = orchestrator's own default applies. Useful for
+    debug runs and cost-bounded smoke tests.
     """
     selected = stages if stages is not None else STAGE_ORDER
     # Validate up-front so a typo surfaces before any work happens.
@@ -159,8 +172,8 @@ async def run_client_cycle(
 
     started = _now_iso()
     logger.info(
-        "client cycle start client=%s dry_run=%s stages=%s",
-        client_id, dry_run, list(selected),
+        "client cycle start client=%s dry_run=%s stages=%s max_per_source=%s",
+        client_id, dry_run, list(selected), max_companies_per_source,
     )
 
     result = ClientCycleResult(
@@ -172,6 +185,7 @@ async def run_client_cycle(
         run = await _run_one_stage(
             scout, stage, client_id,
             dry_run=dry_run, composer_backend=composer_backend,
+            max_companies_per_source=max_companies_per_source,
         )
         result.stages_run.append(run)
         if not run.ok:
