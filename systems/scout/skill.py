@@ -67,6 +67,7 @@ class ScoutSystem(BaseSystem):
         autonomy_gate=None,
         knowledge_store=None,
         pull_stage_factory: Callable[[], Any] | None = None,
+        cheap_resolve_stage_factory: Callable[[], Any] | None = None,
         score_stage_factory: Callable[[], Any] | None = None,
         screen_stage_factory: Callable[[], Any] | None = None,
         identity_stage_factory: Callable[[], Any] | None = None,
@@ -86,6 +87,7 @@ class ScoutSystem(BaseSystem):
             knowledge_store=knowledge_store,
         )
         self._pull_factory = pull_stage_factory
+        self._cheap_resolve_factory = cheap_resolve_stage_factory
         self._score_factory = score_stage_factory
         self._screen_factory = screen_stage_factory
         self._identity_factory = identity_stage_factory
@@ -109,6 +111,7 @@ class ScoutSystem(BaseSystem):
         from systems.scout.identity.orchestrator import IdentityOrchestrator
         from systems.scout.outreach.composer import Composer
         from systems.scout.outreach.research import ResearchSelector
+        from systems.scout.pipeline.cheap_resolve import CheapResolveStage
         from systems.scout.pipeline.enrich import EnrichStage
         from systems.scout.pipeline.identity import IdentityStage
         from systems.scout.pipeline.pull import PullOrchestrator
@@ -123,6 +126,9 @@ class ScoutSystem(BaseSystem):
             knowledge_store=registry.knowledge_store,
             pull_stage_factory=lambda: PullOrchestrator(
                 adapters={}, storage=registry.pull_backend,
+            ),
+            cheap_resolve_stage_factory=lambda: CheapResolveStage(
+                adapters=[], storage=registry.cheap_resolve_backend,
             ),
             score_stage_factory=lambda: ScoreStage(storage=registry.score_backend),
             screen_stage_factory=lambda: ScreenStage(storage=registry.screen_backend),
@@ -215,6 +221,33 @@ class ScoutSystem(BaseSystem):
         if max_companies_per_source is not None:
             kwargs["max_companies_per_source"] = max_companies_per_source
         return await stage.run(client_id, **kwargs)
+
+    async def run_cheap_resolve(
+        self,
+        client_id: str,
+        *,
+        dry_run: bool = False,
+        limit: int | None = None,
+    ) -> Any:
+        """Dispatch the cheap-resolve stage with the foundation loop.
+
+        Per the 2026-04-29 Pattern C decision doc: fills company-level
+        fields (especially company_domain) BEFORE score_v1 so scoring
+        can fairly evaluate fit + the downstream identity stage has a
+        domain to query.
+        """
+        logger.info(
+            "scout.run_cheap_resolve start client=%s dry_run=%s",
+            client_id, dry_run,
+        )
+        await self._prime_foundation(
+            client_id,
+            task_query="cheap-resolve stage — fill company domain + industry pre-score",
+            decision_type="source_selection",
+            context_label="cheap-resolve stage run",
+        )
+        stage = self._cheap_resolve_factory()
+        return await stage.run(client_id, dry_run=dry_run, limit=limit)
 
     async def run_score(
         self,

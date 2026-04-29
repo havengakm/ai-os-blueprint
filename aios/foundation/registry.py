@@ -29,6 +29,7 @@ from aios.foundation.pattern_matcher import PatternMatcher
 from aios.memory.store import MemoryStore
 from systems.scout.supabase_backends import (
     SupabaseBudgetTracker,
+    SupabaseCheapResolveBackend,
     SupabaseComponentStoreBackend,
     SupabaseComposerBackend,
     SupabaseDiscoveryStorage,
@@ -62,8 +63,9 @@ class SystemRegistry:
     autonomy_gate: AutonomyGate
     embedder: VoyageEmbedder
 
-    # Supabase backends (10 total — 8 pipeline + 2 Trigify, per Task 16b Step 1 + 1.5.9c)
+    # Supabase backends (11 total — 9 pipeline + 2 Trigify; cheap_resolve added 2026-04-29)
     pull_backend: SupabasePullBackend
+    cheap_resolve_backend: SupabaseCheapResolveBackend
     score_backend: SupabaseScoreBackend
     screen_backend: SupabaseScreenBackend
     identity_backend: SupabaseIdentityBackend
@@ -104,6 +106,7 @@ def build_registry(
     # NOTE (Item 65 S4): BudgetTracker.record_spend assumes serialised
     # writes. Document here so code-search hits this file too.
     pull_backend = SupabasePullBackend(supabase_client)
+    cheap_resolve_backend = SupabaseCheapResolveBackend(supabase_client)
     score_backend = SupabaseScoreBackend(supabase_client)
     screen_backend = SupabaseScreenBackend(supabase_client)
     identity_backend = SupabaseIdentityBackend(supabase_client)
@@ -122,6 +125,7 @@ def build_registry(
         autonomy_gate=autonomy_gate,
         embedder=embedder,
         pull_backend=pull_backend,
+        cheap_resolve_backend=cheap_resolve_backend,
         score_backend=score_backend,
         screen_backend=screen_backend,
         identity_backend=identity_backend,

@@ -117,9 +117,25 @@ class AdapterFactory:
             return ApolloCompanyAdapter()
 
         if name == "clutch_agencies":
-            # MVP: default subcategory. A richer factory would read a
-            # per-client override from client_config.config.
+            # Backward-compat shorthand → default sub-category. Prefer the
+            # explicit ``clutch:<category_path>`` form (below) for new wiring
+            # so each client picks the sub-category that matches its ICP.
             return ClutchAdapter(category_path=_DEFAULT_CLUTCH_CATEGORY)
+
+        if name.startswith("clutch:"):
+            # Explicit Clutch sub-category routing. Format:
+            # ``clutch:<category_path>`` (e.g. ``clutch:agencies/branding``,
+            # ``clutch:developers/shopify``). The category_path is forwarded
+            # verbatim to ClutchAdapter; tweak per-client by setting
+            # ``client_config.active_directories`` accordingly.
+            category_path = name.removeprefix("clutch:").strip("/")
+            if not category_path:
+                logger.warning(
+                    "pull adapter %r has empty category after 'clutch:' "
+                    "prefix; skipping", name,
+                )
+                return None
+            return ClutchAdapter(category_path=category_path)
 
         if name == "trigify_discovery":
             if not self._settings.trigify_api_key:
@@ -144,6 +160,23 @@ class AdapterFactory:
             adapters=adapters,
             storage=self._registry.pull_backend,
         )
+
+    # ------------------------------------------------------------------ #
+    # Cheap-resolve (Pattern C — fills domain/industry pre-score_v1)      #
+    # ------------------------------------------------------------------ #
+
+    def build_cheap_resolve_adapters(
+        self, client_config: dict[str, Any],  # noqa: ARG002 — reserved for per-client overrides
+    ) -> list[Any]:
+        """Build the cheap-tier resolvers. Each resolver's ``applies_to``
+        filter handles per-source eligibility, so we register every
+        available resolver. Adding a new resolver = appending here.
+        """
+        from systems.scout.identity.clutch_profile_resolver import (
+            ClutchProfileResolver,
+        )
+
+        return [ClutchProfileResolver()]
 
     # ------------------------------------------------------------------ #
     # Identity                                                             #

@@ -60,6 +60,7 @@ def _build_scout_for_client(
     from systems.scout.enrich.icebreaker_adapter import IcebreakerAdapter
     from systems.scout.outreach.composer import Composer
     from systems.scout.outreach.research import ResearchSelector
+    from systems.scout.pipeline.cheap_resolve import CheapResolveStage
     from systems.scout.pipeline.enrich import EnrichStage
     from systems.scout.pipeline.identity import IdentityStage
     from systems.scout.pipeline.score_stage import ScoreStage
@@ -73,6 +74,10 @@ def _build_scout_for_client(
         autonomy_gate=registry.autonomy_gate,
         knowledge_store=registry.knowledge_store,
         pull_stage_factory=lambda: factory.build_pull_orchestrator(client_config),
+        cheap_resolve_stage_factory=lambda: CheapResolveStage(
+            adapters=factory.build_cheap_resolve_adapters(client_config),
+            storage=registry.cheap_resolve_backend,
+        ),
         score_stage_factory=lambda: ScoreStage(storage=registry.score_backend),
         screen_stage_factory=lambda: ScreenStage(storage=registry.screen_backend),
         identity_stage_factory=lambda: IdentityStage(

@@ -118,6 +118,18 @@ def test_build_pull_adapters_empty_active_directories(caplog):
     assert adapters == {}
 
 
+def test_build_pull_adapter_clutch_explicit_category():
+    """clutch:<category_path> form lets a client pick a non-default sub-category."""
+    factory = AdapterFactory(_build_settings(), _build_registry())
+    adapters = factory.build_pull_adapters(
+        {"active_directories": ["clutch:agencies/branding"]}
+    )
+    assert "clutch:agencies/branding" in adapters
+    clutch = adapters["clutch:agencies/branding"]
+    assert isinstance(clutch, ClutchAdapter)
+    assert clutch.category_path == "agencies/branding"
+
+
 def test_build_pull_adapters_clutch_routing_key_separate_from_adapter_name():
     """Regression: ``clutch_agencies`` is the routing key (matches
     ``client_config.active_directories``); the ClutchAdapter's own ``.name``

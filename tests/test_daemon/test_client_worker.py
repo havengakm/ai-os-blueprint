@@ -14,6 +14,7 @@ from aios.daemon.client_worker import (
 def _build_scout_mock() -> MagicMock:
     scout = MagicMock()
     scout.run_pull = AsyncMock(return_value={"ok": True})
+    scout.run_cheap_resolve = AsyncMock(return_value={"ok": True})
     scout.run_score = AsyncMock(return_value={"ok": True})
     scout.run_screen = AsyncMock(return_value={"ok": True})
     scout.run_identity = AsyncMock(return_value={"ok": True})
@@ -109,7 +110,7 @@ async def test_run_client_cycle_isolates_per_stage_failures():
     )
 
     # All seven stages have a record, one of them failed.
-    assert len(result.stages_run) == 7
+    assert len(result.stages_run) == len(STAGE_ORDER)
     ok_map = {r.stage: r.ok for r in result.stages_run}
     assert ok_map["pull"] is True
     assert ok_map["score_v1"] is True
@@ -214,9 +215,11 @@ async def test_run_client_cycle_rejects_unknown_stage():
 
 
 @pytest.mark.asyncio
-async def test_run_client_cycle_default_stages_include_all_seven():
+async def test_run_client_cycle_default_stages_include_all_eight():
     """Without ``stages=`` arg, every stage in STAGE_ORDER runs green when
-    a composer_backend is supplied."""
+    a composer_backend is supplied. As of 2026-04-29 (Pattern C), the
+    pipeline has 8 stages — pull, cheap_resolve, score_v1, screen,
+    identity, enrich, score_v2, compose."""
     scout = _build_scout_mock()
     composer_backend = _build_composer_backend_mock(
         contacts=[{"contact_id": "u1", "niche": "n"}],
@@ -227,7 +230,7 @@ async def test_run_client_cycle_default_stages_include_all_seven():
     )
 
     assert [r.stage for r in result.stages_run] == list(STAGE_ORDER)
-    assert sum(1 for r in result.stages_run if r.ok) == 7
+    assert sum(1 for r in result.stages_run if r.ok) == len(STAGE_ORDER)
     assert not result.errors
 
 

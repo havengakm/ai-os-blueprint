@@ -113,6 +113,10 @@ def get_pull_backend() -> Any:
     return get_registry().pull_backend
 
 
+def get_cheap_resolve_backend() -> Any:
+    return get_registry().cheap_resolve_backend
+
+
 def get_score_backend() -> Any:
     return get_registry().score_backend
 

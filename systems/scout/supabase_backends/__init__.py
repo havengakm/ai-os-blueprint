@@ -13,6 +13,9 @@ statistics. See the class docstring for the allow-list invariant.
 """
 from __future__ import annotations
 
+from systems.scout.supabase_backends.cheap_resolve import (
+    SupabaseCheapResolveBackend,
+)
 from systems.scout.supabase_backends.component_store import (
     SupabaseComponentStoreBackend,
 )
@@ -32,6 +35,7 @@ from systems.scout.supabase_backends.trigify import (
 
 __all__ = [
     "SupabaseBudgetTracker",
+    "SupabaseCheapResolveBackend",
     "SupabaseComponentStoreBackend",
     "SupabaseComposerBackend",
     "SupabaseDiscoveryStorage",

@@ -28,8 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 # Pipeline stage order. score runs twice: v1 before screen, v2 after enrich.
+# cheap_resolve runs between pull and score_v1 — fills company-level fields
+# (domain, industry) so score_v1 can evaluate fit AND identity stage has a
+# domain to query (Apollo + Hunter both REQUIRE a domain). Pattern C per
+# docs/superpowers/decisions/2026-04-29-scout-pipeline-order.md.
 STAGE_ORDER: tuple[str, ...] = (
     "pull",
+    "cheap_resolve",
     "score_v1",
     "screen",
     "identity",
@@ -92,6 +97,8 @@ async def _run_one_stage(
             if max_companies_per_source is not None:
                 pull_kwargs["max_companies_per_source"] = max_companies_per_source
             await scout.run_pull(client_id, **pull_kwargs)
+        elif stage == "cheap_resolve":
+            await scout.run_cheap_resolve(client_id, dry_run=dry_run)
         elif stage == "score_v1":
             await scout.run_score(client_id, dry_run=dry_run, phase="v1")
         elif stage == "screen":
