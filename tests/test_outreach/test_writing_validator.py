@@ -290,22 +290,29 @@ def test_genuinely_impressive_is_banned():
     assert result.passed is False
 
 
-def test_situation_connect_passes():
-    """The 'good' shape from the operator's framing should NOT trip the
-    compliment validator — naming a constraint, friction, or trade-off
-    in the work, not praising the work."""
+def test_slice_35_situation_connect_now_fails_via_diagnostic_class():
+    """Slice 36 (2026-04-30) — the 'situation-connect' example I drafted
+    in Slice 35 was operator-rejected as 'critique disguised as
+    research'. The new ``diagnostic`` validator class correctly catches
+    it via 'the hard part is' + 'is usually [verbing]' patterns.
+    Originally this test asserted it PASSED; the operator's pointer to
+    icebreaker-framework.md surfaced this as the exact failure mode the
+    framework explicitly bans ('Diagnosis disguised as research')."""
     text = (
         "Noticed the followers-to-leads framing on your page. The hard "
         "part is usually proving which post drove which call, most "
         "attribution stops at the platform boundary."
     )
     result = validate_writing(text)
-    assert result.passed is True, [v.rule for v in result.violations]
+    assert result.passed is False
+    rules = {v.rule for v in result.violations}
+    assert any("the hard part" in r for r in rules)
+    assert any("is usually" in r for r in rules)
 
 
 def test_situation_connect_iroko_passes():
-    """Second example from the conversation — translating a brief into
-    a visual identity. Names a constraint, no praise. Should pass."""
+    """The 'specific + grounded' shape from the operator's framework —
+    naming a constraint without diagnostic-pundit framing. Should pass."""
     text = (
         "Saw the Iroko work. Translating an infrastructure-grade-nature "
         "brief into something that doesn't look like every other "
@@ -313,6 +320,89 @@ def test_situation_connect_iroko_passes():
     )
     result = validate_writing(text)
     assert result.passed is True, [v.rule for v in result.violations]
+
+
+# --- Slice 36 rollback regressions ----------------------------------------
+# These phrasings appear in icebreaker-framework.md "Words that sound human"
+# list and were over-banned by Slice 35. They should now PASS the validator.
+
+
+def test_stuck_with_me_passes():
+    """Framework example: 'the line about [phrase] stuck with me'."""
+    text = "Read your post on agency burnout. The line about boundary-saying stuck with me."
+    result = validate_writing(text)
+    assert result.passed is True, [v.rule for v in result.violations]
+
+
+def test_stuck_in_my_head_passes():
+    """Framework example: 'Your post has been stuck in my head since Tuesday'."""
+    text = "Your post about pricing has been stuck in my head this week."
+    result = validate_writing(text)
+    assert result.passed is True, [v.rule for v in result.violations]
+
+
+def test_smart_move_passes():
+    """Framework's 'Words that sound human' includes 'smart move'."""
+    text = "Saw the rebrand for the wellness brand. Pulling away from the typical sustainability palette was a smart move for that category."
+    result = validate_writing(text)
+    assert result.passed is True, [v.rule for v in result.violations]
+
+
+def test_stood_out_passes():
+    """Framework example: 'The [project] for [client] stood out'."""
+    text = "Looked at your portfolio. The work for Iroko stood out, especially the typography choices."
+    result = validate_writing(text)
+    assert result.passed is True, [v.rule for v in result.violations]
+
+
+# --- Slice 36 diagnostic class regressions --------------------------------
+
+
+def test_the_hard_part_is_banned():
+    """Operator-flagged 2026-04-30: 'the hard part is' is critique
+    disguised as research. Tells the prospect what is hard about their
+    job. Presumptuous."""
+    text = "Saw the work. The hard part is usually proving attribution."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any(v.rule.startswith("diagnostic:") for v in result.violations)
+
+
+def test_most_agencies_cant_is_banned():
+    """Broad-strokes generalization that lectures."""
+    text = "Saw the work. Most agencies can't pull this off."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any("most" in v.rule for v in result.violations)
+
+
+def test_have_you_tried_is_banned():
+    """Socratic-gotcha advice shape from a stranger."""
+    text = "Have you tried looking at it from the attribution angle?"
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_your_agency_doesnt_seem_to_have_is_banned():
+    """Framework-flagged exact shape: 'I noticed your agency doesn't
+    seem to have an outbound system' — diagnosis disguised as research."""
+    text = "Looked at the site, your agency doesn't seem to have a programmatic outbound layer."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_you_might_want_to_consider_is_banned():
+    """Unsolicited advice."""
+    text = "Saw the work. You might want to consider rethinking the social-attribution piece."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_the_real_question_is_banned():
+    """Socratic-gotcha shape."""
+    text = "Saw the case study. The real question is whether attribution survives a longer sales cycle."
+    result = validate_writing(text)
+    assert result.passed is False
 
 
 # --- composition: real failure case from 2026-04-29 -------------------------

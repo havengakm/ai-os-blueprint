@@ -100,53 +100,90 @@ _TENURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdecades? in (?:this|the)\b", re.I), "decades in this/the"),
 ]
 
-# Compliment shapes — Slice 35 (2026-04-30). Operator-flagged after the
-# Chatterkick run produced "is a clean way to stack the actual outcomes
-# people care about" — passed every other validator class but read as
-# disingenuous flattery. The icebreaker's payload sentence (when present)
-# must demonstrate situation-connection (a constraint, friction, trade-
-# off in the work) NOT praise. These regex catch the most common AI
-# compliment fallbacks. Prompt-level rules cover the structural ask.
-# See ``memory/sessions/2026-04-30.md`` (4th addendum).
+# Compliment shapes — Slice 35 narrowed in Slice 36 (2026-04-30) after
+# operator-pointer to icebreaker-framework.md surfaced over-corrections.
+# Slice 35's broad "is a [praise] [noun]" + "stuck with me" + "stands out"
+# bans were catching framework-approved phrasings. Rolled back to:
+# (a) operator's exact-flagged shapes from the Chatterkick failure
+# (b) AI-default shapes that the framework's "Banned words" list also
+#     rejects (impressed, remarkable, etc — already covered elsewhere)
+# (c) the high-AI-tell phrases that almost-always read as flattery
+#     across human + AI writing alike.
+# See skills/cold-email/references/icebreaker-framework.md as canonical.
 _COMPLIMENT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # "is a [praise] [noun]" / "such a [praise] [noun]" — the dominant shape
-    (
-        re.compile(
-            r"\b(?:is|are|was|were|that's)\s+(?:a|an)\s+(?:clean|nice|smart|sharp|solid|good|great|brilliant|elegant|clever|interesting|impressive|powerful|strong|beautiful|striking|striking)\s+(?:way|call|move|take|framing|approach|one|signal|read|catch)\b",
-            re.I,
-        ),
-        "compliment shape: 'is a [praise] [noun]'",
-    ),
-    (
-        re.compile(
-            r"\b(?:such|so|really|quite)\s+(?:a|an)?\s*(?:clean|nice|smart|sharp|solid|good|great|brilliant|elegant|clever|impressive|powerful|strong|beautiful)\s+(?:way|call|move|take|framing|approach|one|signal|read|catch|piece)\b",
-            re.I,
-        ),
-        "compliment shape: 'such/really a [praise] [noun]'",
-    ),
-    # Specific phrases that pattern-match disingenuous flattery
+    # Operator's exact-flagged shapes from the Slice 35 Chatterkick
+    # failure — these stay, they're verbatim what the operator caught.
+    (re.compile(r"\bis a clean way to\b", re.I), "is a clean way to"),
+    (re.compile(r"\bstack the (?:real|actual) outcomes\b", re.I), "stack the actual outcomes"),
+    (re.compile(r"\bhighlight (?:the )?key points people care about\b", re.I), "highlight key points people care about"),
+    (re.compile(r"\b(?:the (?:real|actual) )?outcomes (?:that )?people care about\b", re.I), "outcomes people care about"),
+    # High-AI-tell phrases. Framework's banned-words list also rejects
+    # these or close cousins.
     (re.compile(r"\bdoes a lot of work\b", re.I), "does a lot of work"),
     (re.compile(r"\bactually sells itself\b", re.I), "actually sells itself"),
     (re.compile(r"\bactually made me rethink\b", re.I), "actually made me rethink"),
     (re.compile(r"\bhits different\b", re.I), "hits different"),
     (re.compile(r"\bthat lands\b", re.I), "that lands"),
     (re.compile(r"\bthat's the move\b", re.I), "that's the move"),
-    (re.compile(r"\breal talent\b", re.I), "real talent"),
-    (re.compile(r"\bgenuinely (?:impressive|sharp|good|brilliant|powerful)\b", re.I), "genuinely [praise]"),
-    (re.compile(r"\bproperly (?:good|sharp|brilliant|big|impressive)\b", re.I), "properly [praise]"),
-    (re.compile(r"\b(?:totally|absolutely)\s+(?:agree|brilliant|sharp|on point|nailed)\b", re.I), "totally/absolutely [praise]"),
     (re.compile(r"\bnailed\s+(?:it|that|this)\b", re.I), "nailed it"),
     (re.compile(r"\bspot on\b", re.I), "spot on"),
     (re.compile(r"\bon point\b", re.I), "on point"),
-    (re.compile(r"\b(?:big|huge) (?:fan|move|deal|pickup|catch)\b", re.I), "big/huge [praise-noun]"),
-    (re.compile(r"\bstands out\b", re.I), "stands out"),
-    (re.compile(r"\b(?:jumped out|stuck with me|stuck in my head)\b", re.I), "jumped out / stuck with me"),
-    # "stack the [real|actual] outcomes" — operator's exact flagged shape
-    (re.compile(r"\bstack the (?:real|actual) outcomes\b", re.I), "stack the actual outcomes"),
-    # "highlight key points people care about" — operator's exact flagged shape
-    (re.compile(r"\bhighlight (?:the )?key points people care about\b", re.I), "highlight key points people care about"),
-    # "people care about" + "actually [adverb]" / praise-y modifiers
-    (re.compile(r"\b(?:the (?:real|actual) )?outcomes (?:that )?people care about\b", re.I), "outcomes people care about"),
+    (re.compile(r"\bgenuinely (?:impressive|brilliant)\b", re.I), "genuinely impressive/brilliant"),
+    (re.compile(r"\bproperly (?:big|impressive)\b", re.I), "properly big/impressive"),
+    (re.compile(r"\b(?:totally|absolutely)\s+(?:brilliant|nailed)\b", re.I), "totally/absolutely [praise]"),
+    # Specific phrases the framework's "Banned words" + tone-scale lists
+    # treat as flat AI-praise. Kept narrow — exact phrases only.
+    (re.compile(r"\bis a nice call\b", re.I), "is a nice call"),
+    (re.compile(r"\breal talent\b", re.I), "real talent"),
+    # Slice 36 rollbacks (REMOVED — operator-approved per
+    # icebreaker-framework.md "Words that sound human" list):
+    #   stuck with me / stuck in my head / jumped out
+    #   stands out (and "stood out" past tense)
+    #   broad "is a [praise] [noun]" pattern (catches "is a smart move" etc.)
+    #   broad "such/really a [praise] [noun]" pattern
+    #   real talent
+    #   big fan / big move / big pickup / big catch / big deal
+]
+
+
+# Diagnostic / pundit shapes — Slice 36 (2026-04-30). The framework
+# explicitly names this failure mode: "Diagnosis disguised as research:
+# 'I noticed your agency doesn't seem to have an outbound system...' —
+# puts them on the defensive." Operator-named pattern after the Slice 35
+# example I drafted ("the hard part is usually proving which post drove
+# which call — most attribution stops at the platform boundary") drifted
+# into critique. These regex catch the consultant-paraphrase / unsolicited-
+# advice / Socratic-gotcha shapes the LLM reaches for when steered away
+# from compliments.
+_DIAGNOSTIC_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # Operator-flagged: "the hard part is", "the trick is"
+    (re.compile(r"\bthe hard part (?:is|with that|of that)\b", re.I), "the hard part is"),
+    (re.compile(r"\bthe (?:trick|key|secret) (?:is|with that|of that)\b", re.I), "the trick is"),
+    (re.compile(r"\bthe tricky part\b", re.I), "the tricky part"),
+    # Diagnostic / consultant-paraphrase
+    (re.compile(r"\busually means\b", re.I), "usually means"),
+    (re.compile(r"\busually results in\b", re.I), "usually results in"),
+    (re.compile(r"\busually looks like\b", re.I), "usually looks like"),
+    (re.compile(r"\busually (?:gets|breaks|stops|fails)\b", re.I), "usually [verb]s"),
+    # "Most teams/agencies/companies can't/don't/won't" — broad-strokes
+    # generalization that comes across as lecturing.
+    (re.compile(r"\bmost (?:teams|agencies|companies|founders|operators) (?:can't|don't|won't|miss|fail|stop|hit|stumble)\b", re.I), "most [teams] can't/don't"),
+    # "Where most teams fail/struggle" — Socratic gotcha
+    (re.compile(r"\bwhere most (?:teams|agencies|companies|founders) (?:fail|struggle|hit a wall|stop|stumble|miss)\b", re.I), "where most teams fail"),
+    # "Stops at" — the exact phrase from my Slice 35 example
+    (re.compile(r"\bstops at the (?:platform|client|attribution|funnel) boundary\b", re.I), "stops at the X boundary"),
+    # "I noticed X, which means/suggests Y problem" — diagnosis disguised
+    (re.compile(r"\bwhich (?:means|suggests|tells me|points to)\b", re.I), "which means/suggests"),
+    # Operator's framework-flagged: "the agency doesn't seem to have"
+    (re.compile(r"\b(?:your|the) (?:agency|company|team|business) (?:doesn't|does not) (?:seem to have|appear to have)\b", re.I), "your agency doesn't seem to have"),
+    # "You might want to / could want to" — unsolicited advice
+    (re.compile(r"\byou (?:might|could|may) want to (?:try|consider|look at|think about)\b", re.I), "you might want to try/consider"),
+    # "Have you tried / have you considered" — Socratic
+    (re.compile(r"\bhave you (?:tried|considered|thought about)\b", re.I), "have you tried/considered"),
+    # "The (real|actual) (question|issue|problem) is" — Socratic gotcha
+    (re.compile(r"\bthe (?:real|actual) (?:question|issue|problem|challenge) is\b", re.I), "the real question is"),
+    # "Is usually [verbing]" — broad lecturing shape
+    (re.compile(r"\bis usually (?:proving|getting|convincing|figuring|deciding|knowing)\b", re.I), "is usually [lecturing-verb]"),
 ]
 
 # Filler phrases.
@@ -254,12 +291,22 @@ def validate_writing(
                 )
             )
 
-    # --- compliment shapes (Slice 35) ---
+    # --- compliment shapes (Slice 35, narrowed Slice 36) ---
     for pattern, label in _COMPLIMENT_PATTERNS:
         for m in pattern.finditer(text):
             violations.append(
                 Violation(
                     rule=f"compliment:{label}",
+                    offending_text=m.group(0),
+                )
+            )
+
+    # --- diagnostic / pundit shapes (Slice 36) ---
+    for pattern, label in _DIAGNOSTIC_PATTERNS:
+        for m in pattern.finditer(text):
+            violations.append(
+                Violation(
+                    rule=f"diagnostic:{label}",
                     offending_text=m.group(0),
                 )
             )

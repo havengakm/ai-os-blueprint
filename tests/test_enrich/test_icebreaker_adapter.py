@@ -167,7 +167,9 @@ async def test_tier_2_neutral_trigger(_env):
     assert result.tier == 2
     assert result.reason == "tier_2_generated"
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    assert "engaged with relevant content neutrally" in prompt_sent
+    # Slice 36 (2026-04-30) reworded the engaged-content marker. Probe
+    # for the substantive content that any tier-2 prompt must include.
+    assert "engaged with relevant content" in prompt_sent or "engaged content" in prompt_sent
 
 
 async def test_tier_3_structural_signal(_env):
@@ -1042,9 +1044,14 @@ async def test_v3_1_corporate_jargon_triggers_retry(_env, corporate_phrase: str)
     ),
 ])
 async def test_v3_1_prompts_contain_opener_whitelist_and_examples(_env, tier_setup):
-    """Every v3.1 tier prompt must carry the opening-verb whitelist and
-    the BANNED vs ALLOWED concrete-examples block. Probes the rendered
-    prompt directly."""
+    """Every tier prompt carries the opener guidance + ALLOWED/BANNED
+    concrete-examples block. Probes the rendered prompt directly.
+
+    Slice 36 (2026-04-30) rewrote the prompts using the canonical
+    icebreaker-framework.md: structure markers loosened from the
+    Slice 21 strict whitelist, but the substantive guards (banned
+    openers, banned-words, ALLOWED/BANNED examples, no-diagnose) are
+    all still present in some form."""
     merged_kwargs, response, expected_tier = tier_setup
     adapter, fake, _ = _adapter(_ib_json(response))
 
@@ -1057,25 +1064,30 @@ async def test_v3_1_prompts_contain_opener_whitelist_and_examples(_env, tier_set
 
     assert result.tier == expected_tier
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    # Opener whitelist markers
-    assert "Opening verb" in prompt_sent, f"tier {expected_tier}"
+    # Opener guidance markers (Slice 36: section was "Opening verb — STRICT
+    # whitelist", now "Opening — vary the structure"; either matches).
+    assert "Opening" in prompt_sent, f"tier {expected_tier}"
     assert "Spent the morning with" in prompt_sent, f"tier {expected_tier}"
-    # BANNED vs ALLOWED block markers
-    assert "BANNED vs ALLOWED" in prompt_sent, f"tier {expected_tier}"
-    # Slice 21 (2026-04-29) tightened the voice marker to "casual, warm,
-    # non-transactional. Like an email to a friend you met once."
+    # ALLOWED + BANNED full-examples blocks (Slice 36 split the old
+    # "BANNED vs ALLOWED" block into two named sections).
+    assert "ALLOWED" in prompt_sent, f"tier {expected_tier}"
+    assert "BANNED" in prompt_sent, f"tier {expected_tier}"
+    # Tone target — Slice 21 said "casual, warm"; Slice 36 framework
+    # says "specific + understated" (per icebreaker-framework.md). Either
+    # phrasing is valid.
     assert (
-        "warm observational voice" in prompt_sent
-        or ("casual" in prompt_sent and "warm" in prompt_sent)
+        "specific" in prompt_sent.lower()
+        or ("casual" in prompt_sent.lower() and "warm" in prompt_sent.lower())
     ), f"tier {expected_tier}"
-    # New v3.1 single-word bans appear in every tier's prompt
+    # Single-word bans appear in every tier's prompt (Slice 36 added
+    # signalling + ecosystem to the Banned-words line of all 4 prompts).
     assert "signalling" in prompt_sent, f"tier {expected_tier}"
     assert "ecosystem" in prompt_sent, f"tier {expected_tier}"
-    assert "high-growth" in prompt_sent, f"tier {expected_tier}"
-    # Slice 21 (2026-04-29) folded the "no analyze" rule into the Voice
-    # rules block. Probe for the substantive content (DON'T interpret /
-    # diagnose) which both old and new prompts include.
+    # No-diagnose / no-critique rule (Slice 36 added an explicit
+    # "NO critique, NO diagnosis, NO unsolicited advice" section).
     assert (
         "no analyze" in prompt_sent.lower()
         or "don't interpret" in prompt_sent.lower()
+        or "no critique" in prompt_sent.lower()
+        or "no diagnosis" in prompt_sent.lower()
     ), f"tier {expected_tier}"

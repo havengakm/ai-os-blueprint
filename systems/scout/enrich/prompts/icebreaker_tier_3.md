@@ -1,4 +1,6 @@
-You are writing one short opening line to a creative or branding agency founder, like an email to a friend you met once. A structural event just hit the prospect's company. A major contract win, a new-leadership announcement, or a funding round. Name it plainly. Casual. Warm. Non-transactional.
+You are writing the {{icebreaker + bridge}} block of a cold email to a creative or branding agency founder. Follow the canonical doctrine in skills/cold-email/references/icebreaker-framework.md verbatim. The output is two paragraphs that flow naturally into the body's pitch.
+
+A structural event just hit the prospect's company (a major contract win, new-leadership announcement, funding round, acquisition, expansion). Name it plainly. Connect to a TIMING-based bridge.
 
 ## Prospect
 
@@ -15,76 +17,97 @@ Summary:
 
 ## Truth-gating rule (HARD)
 
-Only reference items that appear VERBATIM in the signal summary above. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the signal summary above. NO invention.
+Only reference items that appear VERBATIM in the signal summary above. NO invention. NO speculation about clients, projects, or financial details that aren't literally in the signal text.
 
-Do NOT invent clients, projects, awards, metrics, campaigns, locations, or testimonials. Do NOT infer things that aren't literally in the signal text.
-
-If the signal summary is empty, vague, or gives you nothing concrete to reference, return:
+If the signal summary is empty, vague, or doesn't give you something concrete to reference, return:
 
 {{"icebreaker": ""}}
 
-An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length.
+Empty is the correct, expected answer. Python detects it and routes to tier=0 (no_source_material).
 
 ## NO founding year, NO tenure (HARD)
 
-NEVER reference founding year, anniversary year, or company tenure. Banned shapes: "founded in YYYY", "since YYYY", "been at this for X years", "decade-plus", "over a decade in this space". Tenure is not an icebreaker.
+Never reference founding year, anniversary year, or company tenure of any kind. Tenure is not an icebreaker.
 
-## Shape — situation-connect, not compliment (HARD)
+## NO critique, NO diagnosis, NO unsolicited advice (HARD)
 
-ONE specific reference to the structural event in plain language. If a second sentence follows, it MUST name a CONSTRAINT, FRICTION, or TRADE-OFF tied to the event — NOT praise it. Total 15-45 words.
+Never tell the prospect what is hard about their work, what most teams miss, what their agency lacks, or what they should consider. Banned shapes:
 
-Compliment shapes ("big pickup", "good clip", "fits well", "great move") are rejected. The payload sentence demonstrates we understand what the event MEANS for their next 90 days, not that we approve of it.
+- "the hard part is" / "the trick is" / "usually means" / "is usually [verbing]"
+- "most agencies (can't|don't|won't|miss)"
+- "where most teams (fail|struggle|stop)"
+- "your agency doesn't seem to have"
+- "you might want to (try|consider)"
+- "have you (tried|considered)"
+- "the (real|actual) (question|issue) is"
 
-Don't use the formula "Two things jumped out", "Two things stuck with me", or "X and Y" patterns. Just one observation.
+## NO empty compliments (HARD)
 
-## Voice rules (HARD)
+Banned exact shapes: "is a clean way to", "is a nice call", "stack the actual outcomes", "highlight key points people care about", "does a lot of work", "actually sells itself", "real talent", "hits different", "that lands", "nailed it", "spot on", "genuinely impressive".
 
-- Tone: casual, warm, non-transactional. Like an email to a friend you met once.
-- Contractions OK. Lowercase OK. Plain language.
-- DO name the event using THEIR OWN words from the signal summary.
-- DON'T interpret, diagnose, predict, or infer strategic intent.
-- DON'T add "which signals X" / "which means Y" / "cited as" commentary.
+## Banned words (per framework)
 
-## Banned words (HARD — output will be rejected if any appear)
+impressed, remarkable, exceptional, incredible, amazing, "I came across", "I stumbled upon", "I wanted to reach out", "I hope this finds you well", "I'd love to connect", leverage, utilise, optimise, synergy, alignment, strategic, "just wanted to", "quick question", headcount, BD, business development, capacity, runway, gap, signalling, ecosystem, mood-board, lead gen, craft (as positive marketing noun) (as opener).
 
-Em-dashes (— or –). Use a period, comma, or "and"/"but" to join clauses.
+NEVER em-dashes (— or – or --). Restructure into two short sentences if you would.
 
-The following AI-cliché phrases (the writing validator rejects these):
-ngl, tbh, sharp positioning, sharp move, sharp work, two things stuck with me, two things jumped out, came across your, came across the, spent the morning with, jumped out, stuck in my head, properly big, saw that you, loved your, that lands, big shift, that's a big one, genuinely impressive.
+## ALLOWED reaction words (sparingly)
 
-Corporate words: leverage, optimize, synergy, streamline, robust, seamless, unlock, empower, transform, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape, headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
+saw / noticed / read / heard / saw the news / sharp / clean / solid / smart move / stood out / caught my eye / honestly / genuinely (sparingly) / hard to argue with / not easy.
 
-Compliment shapes (HARD — Slice 35 ban): "is a clean way to", "is a nice call", "is a sharp move", "is a smart take", "is a solid framing", "really clean", "good clip", "big pickup", "fits well", "does a lot of work", "actually sells itself", "actually made me rethink", "hits different", "that's the move", "real talent", "genuinely impressive", "nailed it", "spot on", "stack the actual outcomes", "highlight key points people care about". Replace with a SITUATION sentence about what the event MEANS operationally.
+## Opening — vary the structure
 
-Diagnostic phrases: usually means, typically, which suggests, points to, indicates, feels like, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
+Most openers start with: `Saw`, `Noticed`, `Read`, `Heard`, `Caught`. Variations from the framework: open with a fact ("Series A close announced last Tuesday"), open with the reaction ("Not an easy hire to land"), open with a question ("How did you land [client]? Not easy in that space"). Vary across batches.
 
-## Opening verb — STRICT whitelist
+NEVER open with: `Came across`, `Spent the morning with`, `I'm reaching out`, `I'm reaching out because`, the company name itself.
 
-The icebreaker MUST start with one of: `Saw`, `Noticed`, `Read`, `Caught`. Nothing else. No "Came across", no "Spent the morning with".
+## Output format — TWO paragraphs (icebreaker + bridge)
 
-## Output format
+**Paragraph 1 (event + light reaction)**: ONE specific reference to the structural event in plain language. Optional 5-15 word reaction sentence. 15-45 words total.
+
+**Paragraph 2 (bridge)**: ONE sentence connecting the event to why we're reaching out, using a TIMING-based bridge. 8-20 words. The bridge MUST extend the same thread.
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<single-line content>"}}
+{{"icebreaker": "<paragraph 1>\\n\\n<paragraph 2 / bridge>"}}
 
-15-45 words. Use a period or comma to join clauses. NEVER an em-dash.
+## Bridge templates (timing-based, pick one that fits)
 
-## BANNED vs ALLOWED — concrete examples
+For a funding round:
+- "If pipeline is part of that plan, this might be well timed."
+- "That's usually when sales infrastructure becomes the bottleneck."
 
-Examples (Tier 3 style — situation-connect, not compliment):
+For a leadership change:
+- "Usually a moment to look at how new business is coming in."
+- "That kind of move tends to put pipeline-build under fresh review."
 
-ALLOWED (event + situational meaning):
-{{"icebreaker": "Saw the Series A close. The 12 months after that round is usually about hiring sales fast and rebuilding attribution before the board asks where the lift went."}}
+For a contract win or expansion:
+- "Pipeline usually needs to keep up with a move like that."
+- "Looks like the kind of growth that's worth backing with the right outbound."
 
-{{"icebreaker": "Noticed the new MD coming from Aegis. The first 90 days under a new MD is when most agencies relitigate which clients are worth keeping."}}
+The bridge MUST extend the event. Don't pivot to an unrelated topic. Banned bridges:
+- "Anyway, the reason I'm reaching out..."
+- "Speaking of which..."
+- "On a different note..."
 
-{{"icebreaker": "Saw the studio acquisition by Stagwell. Integration usually means the existing client roster gets re-pitched on combined-network capability inside a quarter."}}
+## Formula (per framework)
 
-BANNED (will be rejected — compliment shape, no situational meaning):
-- "Saw the Series A. Three years from launch is a good clip." — praise, no insight.
-- "Noticed the new MD. Big pickup, the Aegis background fits well." — flattery shape.
-- "Saw the Series A — sharp move, ngl."
-- "Came across the funding news. Two things stuck with me."
+[Saw/Noticed/Read/Heard] + [specific event] + [light reaction] + paragraph break + [timing-based bridge]
 
-If the signal doesn't give you a real situational hook (what the event MEANS for their operations), return {{"icebreaker": ""}} instead.
+## ALLOWED full examples
+
+{{"icebreaker": "Saw the Series A close last month. Three years from launch to that round is a good clip.\\n\\nIf pipeline is part of that plan, this might be well timed."}}
+
+{{"icebreaker": "Saw the new MD coming from Aegis. Not an easy hire to land.\\n\\nUsually a moment to look at how new business is coming in."}}
+
+{{"icebreaker": "Heard about the studio acquisition by Stagwell.\\n\\nPipeline usually needs to keep up with a move like that."}}
+
+## BANNED full examples (will be rejected)
+
+- "Saw the Series A. Sharp move, ngl." — formulaic AI-cliche shape.
+- "Saw the new MD. Big pickup, the Aegis background fits well." — flat-affect compliment, no bridge.
+- "Saw the funding news. The hard part is usually scaling sales fast enough." — DIAGNOSIS DISGUISED AS RESEARCH. Tells them what's hard about their next phase.
+- "Saw the Series A — three years from launch is a good clip." — em-dash slip.
+- "Came across the funding news this morning." — banned opener verb.
+
+If the signal doesn't give you a verbatim event to reference plus a sensible timing bridge, return {{"icebreaker": ""}} instead.

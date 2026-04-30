@@ -1,4 +1,8 @@
-You are writing one short opening line to a creative or branding agency founder, like an email to a friend you met once. The prospect recently posted something specific (frustration, opinion, announcement, observation). Reference the TOPIC in their own words. Casual. Warm. Non-transactional.
+You are writing the {{icebreaker + bridge}} block of a cold email to a creative or branding agency founder. Follow the canonical doctrine in skills/cold-email/references/icebreaker-framework.md verbatim. The output is two paragraphs that flow naturally into the body's pitch.
+
+The prospect recently posted something specific (a frustration, opinion, observation, or announcement). Reference the TOPIC in their own words with a grounded reaction. Connect to a SHARED-EXPERIENCE bridge.
+
+Per the framework: this is the STRONGEST tier. The signal does most of the work — paragraph 1 can be ONE sentence. Paragraph 2 answers "why now" not "why you." No compliment needed.
 
 ## Prospect
 
@@ -14,78 +18,96 @@ Text:
 
 ## Truth-gating rule (HARD)
 
-Only reference things that appear VERBATIM in the post text above.
-
-Do NOT invent podcasts, awards, clients, campaigns, projects, metrics, locations, event names, or any other specific detail. Every specific claim (named client, project, craft decision, quote) MUST appear verbatim in the post text above. NO invention.
+Only reference things that appear VERBATIM in the post text above. Every specific claim MUST appear verbatim. NO invention.
 
 If the post text is empty, vague, or gives you nothing specific to reference, return:
 
 {{"icebreaker": ""}}
 
-An empty string is a valid, expected answer. Python detects it and routes to tier=0 (no_source_material). DO NOT fabricate a reference to hit a minimum length.
+Empty is the correct, expected answer.
+
+NEVER reference the act of posting (no "you posted", "you commented", "your post"). Reference the TOPIC, not the behavior.
 
 ## NO founding year, NO tenure (HARD)
 
-NEVER reference founding year, anniversary year, or company tenure. Banned shapes: "founded in YYYY", "since YYYY", "been at this for X years", "decade-plus", "over a decade in this space". Tenure is not an icebreaker.
+Banned: "founded in YYYY", "since YYYY", "been at this for X years".
 
-## Shape — situation-connect, not compliment (HARD)
+## NO critique, NO diagnosis, NO unsolicited advice (HARD)
 
-ONE specific reference to the post topic in the prospect's own words. If a second sentence follows, it MUST extend the topic with a real-world CONSTRAINT, FRICTION, or shared OBSERVATION — NOT praise the post or speaker. Total 15-45 words.
+Even though the prospect named a problem in their post, do NOT diagnose THEM further. Match their statement; don't extend it into critique.
 
-Compliment shapes ("genuinely sharp", "topic of the quarter", "really hit", "stands out") are rejected. The payload sentence should sound like another founder's reply, not a fan's. Showing we live the same problem, not that we admired the post.
+Banned shapes:
 
-Don't use the formula "Two things jumped out", "Two things stuck with me", or "X and Y" patterns. Just one observation. NEVER reference the act of engagement (no "you posted", "you commented", "your post"). Reference the TOPIC, not the behavior.
+- "the hard part is" / "the trick is" / "usually means" / "is usually [verbing]"
+- "most (agencies|founders) (can't|don't|won't|miss)"
+- "where most teams (fail|struggle|stop)"
+- "you might want to (try|consider)"
+- "have you (tried|considered)"
+- "the (real|actual) (question|issue) is"
 
-## Voice rules (HARD)
+## NO empty compliments (HARD)
 
-- Tone: casual, warm, non-transactional. Like an email to a friend you met once.
-- Contractions OK. Lowercase OK. Plain language.
-- DO state the topic from the post using simple observational language.
-- DON'T interpret, diagnose, predict, or infer strategic intent.
-- DON'T add "which signals X" / "which means Y" / "cited as" commentary.
-- DON'T reference engagement behavior. Reference the TOPIC.
+Banned exact shapes: "is a clean way to", "is a nice call", "stack the actual outcomes", "highlight key points people care about", "does a lot of work", "actually sells itself", "real talent", "hits different", "that lands", "nailed it", "spot on", "topic of the quarter".
 
-## Banned words (HARD — output will be rejected if any appear)
+## Banned words (per framework)
 
-Em-dashes (— or –). Use a period, comma, or "and"/"but" to join clauses.
+impressed, remarkable, exceptional, incredible, amazing (without specifics), "I came across", "I stumbled upon", "I wanted to reach out", "I hope this finds you well", "I'd love to connect", leverage, utilise, optimise, synergy, alignment, strategic, "just wanted to", "quick question", headcount, BD, business development, capacity, runway, gap, signalling, ecosystem, mood-board, lead gen, craft (as positive marketing noun) (as opener).
 
-The following AI-cliché phrases (the writing validator rejects these):
-ngl, tbh, sharp positioning, sharp move, sharp work, two things stuck with me, two things jumped out, came across your, came across the, spent the morning with, jumped out, stuck in my head, properly big, saw that you, loved your, that lands, big shift, that's a big one, genuinely impressive.
+NEVER em-dashes (— or – or --). Restructure into two short sentences.
 
-Corporate words: leverage, optimize, synergy, streamline, robust, seamless, unlock, empower, transform, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape, headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
+## ALLOWED reaction words (sparingly)
 
-Compliment shapes (HARD — Slice 35 ban): "is a clean way to", "is a nice call", "is a sharp move", "really clean", "actually made me rethink", "hits different", "that lands", "does a lot of work", "actually sells itself", "real talent", "genuinely impressive", "stands out", "spot on", "nailed it", "topic of the quarter". The second sentence (when present) sounds like another founder's reply, not a fan's reaction.
+saw / noticed / read / loved / really liked / stuck with me / stuck in my head / got me thinking / hit close to home / could have written that myself / I've caught myself [doing X] / sharp / clean / solid / honest / refreshingly honest / hard to argue with / annoyingly accurate.
 
-Diagnostic phrases: usually means, typically, which suggests, points to, indicates, feels like, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
+## Opening — vary the structure
 
-## Opening verb — STRICT whitelist
+Most openers start with: `Saw`, `Noticed`, `Read`, `Caught`. Variations from the framework: open with the reaction ("Could have written that myself"), open with the moment ("The line about [phrase] hit close to home"). Vary across batches.
 
-The icebreaker MUST start with one of: `Saw`, `Noticed`, `Read`, `Caught`. Nothing else. No "Came across", no "Spent the morning with".
+NEVER open with: `Came across`, `Spent the morning with`, `Saw your post` (act-of-engagement reference), `I'm reaching out`, the company name itself.
 
-## Output format
+## Output format — TWO paragraphs (icebreaker + bridge)
+
+**Paragraph 1 (topic from post, in their words)**: ONE specific reference to the post topic, often one sentence. Optional 5-15 word reaction. 15-45 words total.
+
+**Paragraph 2 (bridge)**: ONE sentence connecting the topic to why we're reaching out, via SHARED-EXPERIENCE framing. 8-20 words.
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<single-line content>"}}
+{{"icebreaker": "<paragraph 1>\\n\\n<paragraph 2 / bridge>"}}
 
-15-45 words. Use a period or comma to join clauses. NEVER an em-dash.
+## Bridge templates (shared-experience, pick one that fits)
 
-## BANNED vs ALLOWED — concrete examples
+When the post named a problem we recognize:
+- "That's exactly why I built this."
+- "That's the problem I'm solving now."
 
-Examples (Tier 1 style — situation-connect, not compliment):
+When the post matches our own past experience:
+- "I could have written that myself when I was running my agency."
+- "Honestly that's the same conversation we keep having with the founders we work with."
 
-ALLOWED (topic + shared friction or counter-observation):
-{{"icebreaker": "Saw the Salesforce demo-crashing rant. The CRM demo failure usually isn't the seat count — it's the integration list growing past what the SE can hold in their head."}}
+When the post calls out a frustration we share:
+- "That kind of thing is exactly what we ended up building around."
 
-{{"icebreaker": "Noticed the thread about clients ghosting mid-project. Mid-project ghosting almost always traces back to the original scope being signed off the wrong stakeholder, not anything on the agency side."}}
+The bridge MUST flow from the topic. Banned bridges:
+- "Anyway, the reason I'm reaching out..."
+- "Speaking of which..."
+- "On a different note..."
 
-{{"icebreaker": "Read the post about SDR burnout. The burnout cycle usually accelerates when activity targets get raised before the lead source ROI gets re-tested."}}
+## ALLOWED full examples
 
-BANNED (will be rejected — compliment shape):
-- "Saw the Salesforce rant. Topic of the quarter, genuinely." — fan reaction.
-- "Noticed the post about clients ghosting. Said out loud what everyone was thinking." — flattery.
-- "Read the SDR burnout post. Hits different." — empty praise.
-- "Ngl your post last week on clients ghosting said out loud what I think everyone's feeling — sharp positioning."
-- "Came across your post about Salesforce. Two things stuck with me, ngl."
+{{"icebreaker": "Saw your post about the pipeline rollercoaster. The line about 'best month ever followed by two months of nothing' hit close to home.\\n\\nThat's exactly why I built this."}}
 
-If you can't extend the topic with a real friction or counter-observation (just react to it), return {{"icebreaker": ""}} instead.
+{{"icebreaker": "Saw your post about clients ghosting mid-project.\\n\\nHonestly that's the same conversation we keep having with the founders we work with."}}
+
+{{"icebreaker": "Read your thread on the SDR-burnout cycle. Annoyingly accurate.\\n\\nThat's the problem I'm solving now."}}
+
+## BANNED full examples (will be rejected)
+
+- "Ngl your post last week on clients ghosting said out loud what I think everyone's feeling. Sharp positioning." — AI-cliche shape, formulaic.
+- "Saw the post about Salesforce demo crashes. Topic of the quarter, genuinely." — empty reaction shape.
+- "Read the SDR burnout post. Hits different." — empty praise shape.
+- "Saw the post about clients ghosting. The hard part is usually getting the original scope signed off the right stakeholder." — DIAGNOSIS shape. Even though the prospect raised the topic, lecturing extends it the wrong way.
+- "Saw your post — really hit close to home." — em-dash slip.
+- "Came across your post about Salesforce." — banned opener.
+
+If the post doesn't give you a verbatim topic plus a sensible shared-experience bridge, return {{"icebreaker": ""}} instead.
