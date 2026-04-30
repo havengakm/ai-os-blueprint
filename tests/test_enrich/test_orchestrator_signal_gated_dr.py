@@ -366,6 +366,31 @@ async def test_dr_runs_when_no_client_config_supplied():
     assert dr.enrich_calls == 1
 
 
+async def test_dr_runs_when_icp_is_empty_dict():
+    """Regression for 2026-04-30 issue: deployments with empty/unset
+    client_config['icp'] would have fit=0 → fit-floor gate would block DR
+    on every contact, including good-fit ones. The gate now skips itself
+    when no ICP is configured (signal-gate still applies)."""
+    zb = FakeAdapter("zerobounce", data={})
+    trigify = FakeAdapter("trigify", data={})
+    web_triggers = FakeAdapter("claude_web_triggers", data={})
+    apollo = FakeAdapter("apollo_enrich", data={})
+    dr = FakeAdapter("claude_deep_research", data={"citable_details": ["x"]})
+
+    contact = {
+        "contact_id": "u1",
+        "industry": "marketing",
+        "title": "founder",
+        "employees": 25,
+    }
+    config_no_icp = {"icp": {}}  # empty
+    orch = _make_orch_with_config(
+        [zb, trigify, web_triggers, apollo, dr], config_no_icp,
+    )
+    await orch.enrich_contact(client_id="c1", contact=contact, tier="A")
+    assert dr.enrich_calls == 1
+
+
 async def test_dr_skipped_when_fit_floor_overridden_higher():
     """Per-client tier_thresholds.research_fit_floor override is respected."""
     zb = FakeAdapter("zerobounce", data={})

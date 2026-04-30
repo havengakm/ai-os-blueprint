@@ -99,13 +99,21 @@ def _should_run_deep_research(
     if contact is not None and client_config is not None:
         from systems.scout.pipeline.score import _score_fit  # local import to avoid cycle
         icp = client_config.get("icp") or {}
-        fit = _score_fit(contact, icp, cap=40)
-        floor = (
-            client_config.get("tier_thresholds", {}).get("research_fit_floor")
-            or _DEFAULT_RESEARCH_FIT_FLOOR
-        )
-        if fit < floor:
-            return False
+        # Skip the gate entirely when no ICP is configured. _score_fit
+        # returns 0 for an empty ICP regardless of how good the contact is,
+        # which would falsely block DR on every contact for any deployment
+        # that hasn't populated client_config['icp'] yet (caught 2026-04-30
+        # on kirsten-client-zero — see memory/sessions/2026-04-30.md).
+        # The signal-gate above still applies. The fit-floor gate is a
+        # cost guard that only makes sense when fit can actually be scored.
+        if icp:
+            fit = _score_fit(contact, icp, cap=40)
+            floor = (
+                client_config.get("tier_thresholds", {}).get("research_fit_floor")
+                or _DEFAULT_RESEARCH_FIT_FLOOR
+            )
+            if fit < floor:
+                return False
 
     return True
 
