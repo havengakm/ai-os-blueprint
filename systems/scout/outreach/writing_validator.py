@@ -100,6 +100,55 @@ _TENURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdecades? in (?:this|the)\b", re.I), "decades in this/the"),
 ]
 
+# Compliment shapes — Slice 35 (2026-04-30). Operator-flagged after the
+# Chatterkick run produced "is a clean way to stack the actual outcomes
+# people care about" — passed every other validator class but read as
+# disingenuous flattery. The icebreaker's payload sentence (when present)
+# must demonstrate situation-connection (a constraint, friction, trade-
+# off in the work) NOT praise. These regex catch the most common AI
+# compliment fallbacks. Prompt-level rules cover the structural ask.
+# See ``memory/sessions/2026-04-30.md`` (4th addendum).
+_COMPLIMENT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # "is a [praise] [noun]" / "such a [praise] [noun]" — the dominant shape
+    (
+        re.compile(
+            r"\b(?:is|are|was|were|that's)\s+(?:a|an)\s+(?:clean|nice|smart|sharp|solid|good|great|brilliant|elegant|clever|interesting|impressive|powerful|strong|beautiful|striking|striking)\s+(?:way|call|move|take|framing|approach|one|signal|read|catch)\b",
+            re.I,
+        ),
+        "compliment shape: 'is a [praise] [noun]'",
+    ),
+    (
+        re.compile(
+            r"\b(?:such|so|really|quite)\s+(?:a|an)?\s*(?:clean|nice|smart|sharp|solid|good|great|brilliant|elegant|clever|impressive|powerful|strong|beautiful)\s+(?:way|call|move|take|framing|approach|one|signal|read|catch|piece)\b",
+            re.I,
+        ),
+        "compliment shape: 'such/really a [praise] [noun]'",
+    ),
+    # Specific phrases that pattern-match disingenuous flattery
+    (re.compile(r"\bdoes a lot of work\b", re.I), "does a lot of work"),
+    (re.compile(r"\bactually sells itself\b", re.I), "actually sells itself"),
+    (re.compile(r"\bactually made me rethink\b", re.I), "actually made me rethink"),
+    (re.compile(r"\bhits different\b", re.I), "hits different"),
+    (re.compile(r"\bthat lands\b", re.I), "that lands"),
+    (re.compile(r"\bthat's the move\b", re.I), "that's the move"),
+    (re.compile(r"\breal talent\b", re.I), "real talent"),
+    (re.compile(r"\bgenuinely (?:impressive|sharp|good|brilliant|powerful)\b", re.I), "genuinely [praise]"),
+    (re.compile(r"\bproperly (?:good|sharp|brilliant|big|impressive)\b", re.I), "properly [praise]"),
+    (re.compile(r"\b(?:totally|absolutely)\s+(?:agree|brilliant|sharp|on point|nailed)\b", re.I), "totally/absolutely [praise]"),
+    (re.compile(r"\bnailed\s+(?:it|that|this)\b", re.I), "nailed it"),
+    (re.compile(r"\bspot on\b", re.I), "spot on"),
+    (re.compile(r"\bon point\b", re.I), "on point"),
+    (re.compile(r"\b(?:big|huge) (?:fan|move|deal|pickup|catch)\b", re.I), "big/huge [praise-noun]"),
+    (re.compile(r"\bstands out\b", re.I), "stands out"),
+    (re.compile(r"\b(?:jumped out|stuck with me|stuck in my head)\b", re.I), "jumped out / stuck with me"),
+    # "stack the [real|actual] outcomes" — operator's exact flagged shape
+    (re.compile(r"\bstack the (?:real|actual) outcomes\b", re.I), "stack the actual outcomes"),
+    # "highlight key points people care about" — operator's exact flagged shape
+    (re.compile(r"\bhighlight (?:the )?key points people care about\b", re.I), "highlight key points people care about"),
+    # "people care about" + "actually [adverb]" / praise-y modifiers
+    (re.compile(r"\b(?:the (?:real|actual) )?outcomes (?:that )?people care about\b", re.I), "outcomes people care about"),
+]
+
 # Filler phrases.
 _FILLER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bjust checking in\b", re.I), "just checking in"),
@@ -201,6 +250,16 @@ def validate_writing(
             violations.append(
                 Violation(
                     rule=f"tenure:{label}",
+                    offending_text=m.group(0),
+                )
+            )
+
+    # --- compliment shapes (Slice 35) ---
+    for pattern, label in _COMPLIMENT_PATTERNS:
+        for m in pattern.finditer(text):
+            violations.append(
+                Violation(
+                    rule=f"compliment:{label}",
                     offending_text=m.group(0),
                 )
             )

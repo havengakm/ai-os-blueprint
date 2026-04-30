@@ -21,9 +21,15 @@ def test_empty_text_passes():
 
 
 def test_clean_text_passes():
-    text = "Saw the Iroko work. The modular icon is a nice call."
+    """Updated 2026-04-30 (Slice 35): the previous fixture 'is a nice
+    call' is now banned as a compliment shape. New fixture demonstrates
+    a situation-connect: names a constraint without praising the work."""
+    text = (
+        "Saw the Iroko work. Translating an infrastructure-grade brief "
+        "into something visually distinct is a real constraint."
+    )
     result = validate_writing(text)
-    assert result.passed is True
+    assert result.passed is True, [v.rule for v in result.violations]
     assert result.violations == []
 
 
@@ -203,6 +209,110 @@ def test_fresh_content_society_slice_23_decade_icebreaker_fails():
     rules = {v.rule for v in result.violations}
     assert any("founded in YYYY" in r for r in rules)
     assert any("decade-plus" in r for r in rules)
+
+
+# --- compliment shapes (Slice 35, 2026-04-30) -------------------------------
+
+
+def test_chatterkick_slice_35_compliment_shape_fails():
+    """Operator-flagged 2026-04-30: 'is a clean way to stack the actual
+    outcomes people care about' passed every other validator class but
+    read as disingenuous flattery. The icebreaker's payload sentence
+    must show situation-connection, not praise."""
+    text = (
+        "Noticed the mission on your LinkedIn. 'Turn followers into "
+        "superfans, likes into leads, clicks into conversations' is a "
+        "clean way to stack the actual outcomes people care about."
+    )
+    result = validate_writing(text)
+    assert result.passed is False
+    rules = {v.rule for v in result.violations}
+    assert any("compliment" in r for r in rules)
+    assert any("clean way" in v.offending_text for v in result.violations)
+
+
+def test_is_a_nice_call_is_banned():
+    """'The X is a nice call' — generic praise shape."""
+    text = "Saw the Iroko work. The modular icon for organised structure is a nice call."
+    result = validate_writing(text)
+    assert result.passed is False
+    assert any(v.rule.startswith("compliment:") for v in result.violations)
+
+
+def test_is_a_clean_way_to_X_is_banned():
+    """'is a clean way to [verb]' — operator's exact flagged shape."""
+    text = "Noticed your mission. That's a clean way to highlight the key points people care about."
+    result = validate_writing(text)
+    assert result.passed is False
+    rules = " ".join(v.rule for v in result.violations)
+    assert "compliment" in rules
+
+
+def test_does_a_lot_of_work_is_banned():
+    text = "Read the bit about infrastructure-grade nature restoration. That phrase does a lot of work."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_actually_sells_itself_is_banned():
+    text = "The 3x pipeline framing with the client quote underneath actually sells itself."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_hits_different_is_banned():
+    text = "Read the post about pricing. The framing hits different."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_nailed_it_is_banned():
+    text = "Saw the rebrand. You nailed it."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_spot_on_is_banned():
+    text = "Saw the framework. Spot on."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_real_talent_is_banned():
+    text = "Saw the design. Real talent on the team."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_genuinely_impressive_is_banned():
+    text = "Saw the rebrand. Genuinely impressive work."
+    result = validate_writing(text)
+    assert result.passed is False
+
+
+def test_situation_connect_passes():
+    """The 'good' shape from the operator's framing should NOT trip the
+    compliment validator — naming a constraint, friction, or trade-off
+    in the work, not praising the work."""
+    text = (
+        "Noticed the followers-to-leads framing on your page. The hard "
+        "part is usually proving which post drove which call, most "
+        "attribution stops at the platform boundary."
+    )
+    result = validate_writing(text)
+    assert result.passed is True, [v.rule for v in result.violations]
+
+
+def test_situation_connect_iroko_passes():
+    """Second example from the conversation — translating a brief into
+    a visual identity. Names a constraint, no praise. Should pass."""
+    text = (
+        "Saw the Iroko work. Translating an infrastructure-grade-nature "
+        "brief into something that doesn't look like every other "
+        "sustainability brand is a real constraint."
+    )
+    result = validate_writing(text)
+    assert result.passed is True, [v.rule for v in result.violations]
 
 
 # --- composition: real failure case from 2026-04-29 -------------------------

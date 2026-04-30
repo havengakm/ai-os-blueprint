@@ -204,8 +204,14 @@ async def test_tier_3_structural_signal(_env):
 
 
 async def test_tier_4_citable_fallback(_env):
-    """No triggers, no structural signals, but citable_details → Tier 4."""
-    adapter, fake, _ = _adapter(_ib_json("Read the piece on the Ravenna engagement, that one jumped out."))
+    """No triggers, no structural signals, but citable_details → Tier 4.
+    Slice 35 (2026-04-30): fixture updated to a situation-connect shape
+    (the previous 'jumped out' phrasing now trips the compliment validator)."""
+    adapter, fake, _ = _adapter(_ib_json(
+        "Read the Ravenna case study. Getting a client to attribute a 3x "
+        "revenue lift correctly months later is the hard part most agencies "
+        "underestimate."
+    ))
     merged = _merged(
         citable_details=[
             {"type": "case_study", "detail": "Ravenna AI 3x pipeline in 90 days", "source": "case_studies"},
@@ -922,12 +928,14 @@ async def test_v3_lead_gen_ban_triggers_retry(_env):
 async def test_v3_tier_4_multiline_icebreaker_passes(_env):
     """v3 output format allows multi-line content. The adapter must accept
     it and surface verbatim. Slice 21 (2026-04-29) tightened the shape to
-    a single observation + optional reaction (no "Two things jumped out"
-    formulaic structure, no "Spent the morning with" / "Really sharp work"
-    AI-cliches). This test now uses the clean shape."""
+    a single observation + optional reaction. Slice 35 (2026-04-30)
+    further banned compliment shapes — the previous fixture 'is a nice
+    call' now trips the compliment validator. New fixture uses a
+    situation-connect shape."""
     multiline = (
-        "Saw the Iroko work. The modular icon for organised structure "
-        "instead of the usual sustainability visuals is a nice call."
+        "Saw the Iroko work. Translating an infrastructure-grade-nature "
+        "brief into something that doesn't look like every other "
+        "sustainability brand is a real constraint."
     )
     adapter, fake, tracker = _adapter(_ib_json(multiline))
 

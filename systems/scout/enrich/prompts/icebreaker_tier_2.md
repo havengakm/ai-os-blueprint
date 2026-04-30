@@ -28,9 +28,11 @@ An empty string is a valid, expected answer. Python detects it and routes to tie
 
 NEVER reference founding year, anniversary year, or company tenure. Banned shapes: "founded in YYYY", "since YYYY", "been at this for X years", "decade-plus", "over a decade in this space". Tenure is not an icebreaker.
 
-## Shape
+## Shape — situation-connect, not compliment (HARD)
 
-ONE specific reference to a moment, quote, or topic from the engaged content. Optionally followed by a SHORT reaction sentence (5-8 words). Total 15-45 words.
+ONE specific reference to a moment, quote, or topic from the engaged content. If a second sentence follows, it MUST connect that topic to a real-world CONSTRAINT, FRICTION, or TRADE-OFF — NOT praise the speaker or content. Total 15-45 words.
+
+Compliment shapes ("actually made me rethink", "hits different", "that lands", "really clean") are rejected. The payload sentence demonstrates we understood the underlying problem the topic was about, not that the speaker was eloquent.
 
 Don't use the formula "Two things jumped out", "Two things stuck with me", or "X and Y" patterns. Just one observation. NEVER reference the act of engagement (no "you liked", "you commented", "you engaged"). Reference the TOPIC.
 
@@ -52,6 +54,8 @@ ngl, tbh, sharp positioning, sharp move, sharp work, two things stuck with me, t
 
 Corporate words: leverage, optimize, synergy, streamline, robust, seamless, unlock, empower, transform, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape, headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
+Compliment shapes (HARD — Slice 35 ban): "is a clean way to", "is a nice call", "is a sharp move", "really clean", "actually made me rethink", "hits different", "that lands", "does a lot of work", "actually sells itself", "real talent", "genuinely impressive", "stands out", "spot on", "nailed it". Replace with a sentence about the underlying problem the topic was addressing.
+
 Diagnostic phrases: usually means, typically, which suggests, points to, indicates, feels like, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
 
 ## Opening verb — STRICT whitelist
@@ -68,15 +72,19 @@ Strict JSON, no prose, no code fences:
 
 ## BANNED vs ALLOWED — concrete examples
 
-Examples (Tier 2 style — mirror simplicity, not words):
+Examples (Tier 2 style — situation-connect, not compliment):
 
-ALLOWED:
-{{"icebreaker": "Caught the Lenny's Podcast episode on agency pricing. The 'value-based pricing isn't a pricing model' framing actually made me rethink our retainer setup."}}
+ALLOWED (topic + underlying-problem connection):
+{{"icebreaker": "Caught the agency-pricing episode. Value-based pricing only really works when you can name the value upfront — most agencies can't, which is why hourly retains its grip."}}
 
-{{"icebreaker": "Noticed the article on creative directors burning out. Hit harder than I expected."}}
+{{"icebreaker": "Noticed the article on creative directors burning out. The burnout pattern usually starts when CDs stop saying no to scope creep, not when the workload spikes."}}
 
-BANNED (will be rejected):
+{{"icebreaker": "Read the piece on agency-side AI tooling. The hardest part is convincing the team that the time saved on first drafts has to go somewhere — usually it just gets absorbed back into the day."}}
+
+BANNED (will be rejected — compliment shape, no insight):
+- "Caught the podcast on agency pricing. The 'value-based' framing actually made me rethink." — flattery.
+- "Noticed the article on burnout. Hit harder than I expected." — empty reaction.
 - "Ngl saw your engagement on Lenny's podcast — sharp positioning."
 - "Two things stuck with me from the engaged content."
 
-If nothing in the content gives you a verbatim topic to reference, return {{"icebreaker": ""}} instead.
+If you can't connect the topic to a real-world problem (not just admire the speaker), return {{"icebreaker": ""}} instead.

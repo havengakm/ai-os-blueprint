@@ -29,9 +29,11 @@ An empty string is a valid, expected answer. Python detects it and routes to tie
 
 NEVER reference founding year, anniversary year, or company tenure. Banned shapes: "founded in YYYY", "since YYYY", "been at this for X years", "decade-plus", "over a decade in this space". Tenure is not an icebreaker.
 
-## Shape
+## Shape — situation-connect, not compliment (HARD)
 
-ONE specific reference to the structural event in plain language. Optionally followed by a SHORT reaction sentence (5-8 words). Total 15-45 words.
+ONE specific reference to the structural event in plain language. If a second sentence follows, it MUST name a CONSTRAINT, FRICTION, or TRADE-OFF tied to the event — NOT praise it. Total 15-45 words.
+
+Compliment shapes ("big pickup", "good clip", "fits well", "great move") are rejected. The payload sentence demonstrates we understand what the event MEANS for their next 90 days, not that we approve of it.
 
 Don't use the formula "Two things jumped out", "Two things stuck with me", or "X and Y" patterns. Just one observation.
 
@@ -52,6 +54,8 @@ ngl, tbh, sharp positioning, sharp move, sharp work, two things stuck with me, t
 
 Corporate words: leverage, optimize, synergy, streamline, robust, seamless, unlock, empower, transform, signalling, signaling, ecosystem, high-growth, formal, formally, pursuing, establishing, establishment, evolution, landscape, headcount, BD, business development, capacity, inbound, outrun, scaling, operations, runway, growth metrics, gap, mood-board, craft, pipeline (as marketing noun), operating system, autonomous, workflow, lead gen, impressed, remarkable.
 
+Compliment shapes (HARD — Slice 35 ban): "is a clean way to", "is a nice call", "is a sharp move", "is a smart take", "is a solid framing", "really clean", "good clip", "big pickup", "fits well", "does a lot of work", "actually sells itself", "actually made me rethink", "hits different", "that's the move", "real talent", "genuinely impressive", "nailed it", "spot on", "stack the actual outcomes", "highlight key points people care about". Replace with a SITUATION sentence about what the event MEANS operationally.
+
 Diagnostic phrases: usually means, typically, which suggests, points to, indicates, feels like, this tells me, that tends to, which means, cited as, driver behind, member profile active, uniquely positioned, transformation journey, pursuing expansion, market entry, market expansion.
 
 ## Opening verb — STRICT whitelist
@@ -68,15 +72,19 @@ Strict JSON, no prose, no code fences:
 
 ## BANNED vs ALLOWED — concrete examples
 
-Examples (Tier 3 style — mirror simplicity, not words):
+Examples (Tier 3 style — situation-connect, not compliment):
 
-ALLOWED:
-{{"icebreaker": "Saw the Series A announcement. Three years from launch to that round is a good clip."}}
+ALLOWED (event + situational meaning):
+{{"icebreaker": "Saw the Series A close. The 12 months after that round is usually about hiring sales fast and rebuilding attribution before the board asks where the lift went."}}
 
-{{"icebreaker": "Noticed the new MD appointment. Big pickup, the Aegis background fits well."}}
+{{"icebreaker": "Noticed the new MD coming from Aegis. The first 90 days under a new MD is when most agencies relitigate which clients are worth keeping."}}
 
-BANNED (will be rejected):
+{{"icebreaker": "Saw the studio acquisition by Stagwell. Integration usually means the existing client roster gets re-pitched on combined-network capability inside a quarter."}}
+
+BANNED (will be rejected — compliment shape, no situational meaning):
+- "Saw the Series A. Three years from launch is a good clip." — praise, no insight.
+- "Noticed the new MD. Big pickup, the Aegis background fits well." — flattery shape.
 - "Saw the Series A — sharp move, ngl."
 - "Came across the funding news. Two things stuck with me."
 
-If the signal doesn't give you a verbatim event to reference, return {{"icebreaker": ""}} instead.
+If the signal doesn't give you a real situational hook (what the event MEANS for their operations), return {{"icebreaker": ""}} instead.
