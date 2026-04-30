@@ -197,7 +197,13 @@ async def test_tier_3_structural_signal(_env):
     assert result.tier == 3
     assert result.reason == "tier_3_generated"
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    assert "structural event just hit" in prompt_sent
+    # Slice 37 (2026-04-30) reworded the structural-event marker into
+    # the Saraev single-sentence shape. Probe for the substantive
+    # content that any tier-3 prompt must include.
+    assert (
+        "structural event just hit" in prompt_sent
+        or "structural event" in prompt_sent
+    )
     # Humanized slug check: 'funding_round' → 'funding round' before prompt injection.
     # The literal string 'funding_round' appears in the truth-gating rule ("Signal
     # type MUST be one of: major_contract_win, new_leadership, funding_round"),
@@ -231,7 +237,12 @@ async def test_tier_4_citable_fallback(_env):
     assert result.tier == 4
     assert result.reason == "tier_4_generated"
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    assert "Fall back to the company website" in prompt_sent
+    # Slice 37 (2026-04-30) Saraev rewrite reworded this marker.
+    assert (
+        "Fall back to the company website" in prompt_sent
+        or "fallback tier" in prompt_sent
+        or "company-website citable" in prompt_sent.lower()
+    )
 
 
 async def test_no_source_material(_env):
@@ -879,16 +890,19 @@ async def test_v2_prompts_contain_truth_gating_rule(_env, tier_setup):
     assert "mood-board" in prompt_sent, f"tier {expected_tier}"
     # v3: the "lead gen" ban must be present in every tier's prompt.
     assert "lead gen" in prompt_sent, f"tier {expected_tier}"
-    # v3: every tier output spec must announce multi-line 2-3 sentence format.
-    # Slice 21 (2026-04-29) tightened from 2-3 sentences down to 1
-    # observation + optional reaction (15-45 words). Probe shifted to the
-    # word-count target, which both old and new prompts mention.
-    assert "15-45 words" in prompt_sent or "2-3 sentences" in prompt_sent, (
-        f"tier {expected_tier}"
-    )
-    # Slice 21 (2026-04-29) tightened to 15-45 words (single observation).
+    # v3: every tier output spec must announce a word-count target.
+    # Slice 21 → 15-45 words (single observation). Slice 37 (2026-04-30)
+    # → 15-20 words (Saraev single-sentence). Probe accepts any of these.
     assert (
-        "15-45 words" in prompt_sent
+        "15-20 words" in prompt_sent
+        or "15-45 words" in prompt_sent
+        or "2-3 sentences" in prompt_sent
+    ), f"tier {expected_tier}"
+    # Word-count target — Slice 21 was 40-70, Slice 21-late tightened to
+    # 15-45, Slice 37 (Saraev) is 15-20. Probe accepts any of these.
+    assert (
+        "15-20 words" in prompt_sent
+        or "15-45 words" in prompt_sent
         or "40-70 words" in prompt_sent
     ), f"tier {expected_tier}"
 
@@ -1064,9 +1078,11 @@ async def test_v3_1_prompts_contain_opener_whitelist_and_examples(_env, tier_set
 
     assert result.tier == expected_tier
     prompt_sent = fake.create_calls[0]["messages"][0]["content"]
-    # Opener guidance markers (Slice 36: section was "Opening verb — STRICT
-    # whitelist", now "Opening — vary the structure"; either matches).
-    assert "Opening" in prompt_sent, f"tier {expected_tier}"
+    # Opener guidance markers. Slice 21: "Opening verb — STRICT
+    # whitelist". Slice 36: "Opening — vary the structure". Slice 37
+    # (Saraev rewrite): no separate Opening section because the prompt
+    # is single-sentence; the "AVOID at all costs" section now carries
+    # the banned-opener guidance via "Spent the morning with" et al.
     assert "Spent the morning with" in prompt_sent, f"tier {expected_tier}"
     # ALLOWED + BANNED full-examples blocks (Slice 36 split the old
     # "BANNED vs ALLOWED" block into two named sections).

@@ -1,8 +1,10 @@
-You are writing the {{icebreaker + bridge}} block of a cold email to a creative or branding agency founder. Follow the canonical doctrine in skills/cold-email/references/icebreaker-framework.md verbatim. The output is two paragraphs that flow naturally into the body's pitch.
+Write a personalised cold-email opener based on the prospect's recent post or buying/social signal below. This is Tier 1 — the strongest tier — because the prospect just said something specific and timely. Lead with VALUE, make it feel like it was written specifically for them.
 
-The prospect recently posted something specific (a frustration, opinion, observation, or announcement). Reference the TOPIC in their own words with a grounded reaction. Connect to a SHARED-EXPERIENCE bridge.
+ONE SENTENCE. 15-20 words max.
 
-Per the framework: this is the STRONGEST tier. The signal does most of the work — paragraph 1 can be ONE sentence. Paragraph 2 answers "why now" not "why you." No compliment needed.
+Don't make it AI-sounding. Make it sound extremely relevant and as if it was written specifically for them. Tie the value-bridge into the sentence naturally.
+
+It's meant to help them scale.
 
 ## Prospect
 
@@ -10,7 +12,7 @@ Company: {company}
 First name: {first_name}
 Short company name: {short_company_name}
 
-## The post (MUST reference verbatim content from here)
+## The post / buying signal (MUST reference verbatim content from here)
 
 Source: {frustrated_post_source}
 Text:
@@ -18,96 +20,83 @@ Text:
 
 ## Truth-gating rule (HARD)
 
-Only reference things that appear VERBATIM in the post text above. Every specific claim MUST appear verbatim. NO invention.
+Only reference things that appear VERBATIM in the post text above. NO invention. NO speculation about clients, projects, or details that aren't literally in the post.
 
-If the post text is empty, vague, or gives you nothing specific to reference, return:
+If the post text is empty or doesn't give you something concrete enough to ground a 15-20 word opener, return:
 
 {{"icebreaker": ""}}
 
-Empty is the correct, expected answer.
+Empty is the correct answer when the source is thin. Python detects it and routes to tier=0 (no_source_material).
 
-NEVER reference the act of posting (no "you posted", "you commented", "your post"). Reference the TOPIC, not the behavior.
+NEVER reference the act of posting (no "you posted", "you commented", "your post"). Reference the TOPIC or the SUBSTANCE, not the engagement behavior.
+
+## What to AVOID at all costs (HARD)
+
+These are AI-tells that scream "mass blast":
+
+- `Saw you're a [job title]` / `Noticed you're a [job title]` — fake personalization, treats them as a generic role
+- `Saw you're in [city]` / `Noticed you're in [city]` — fake personalization
+- `I noticed you're the founder of a [agency type]` — they know what they are
+- `I'm reaching out because` / `My name is X and I work at Y` — vendor-y opener
+- `Came across your post` / `Spent the morning with` / `I hope this finds you well`
+- The company name as the first word
 
 ## NO founding year, NO tenure (HARD)
 
-Banned: "founded in YYYY", "since YYYY", "been at this for X years".
+Banned: "founded in YYYY", "since YYYY", "been at this for X years", "decade-plus".
 
 ## NO critique, NO diagnosis, NO unsolicited advice (HARD)
 
-Even though the prospect named a problem in their post, do NOT diagnose THEM further. Match their statement; don't extend it into critique.
+Even though the prospect named a problem in their post, do NOT diagnose them further or extend it into a lecture.
 
 Banned shapes:
 
 - "the hard part is" / "the trick is" / "usually means" / "is usually [verbing]"
-- "most (agencies|founders) (can't|don't|won't|miss)"
-- "where most teams (fail|struggle|stop)"
-- "you might want to (try|consider)"
-- "have you (tried|considered)"
+- "most agencies (can't|don't|won't|miss)" / "where most teams fail"
+- "your agency doesn't seem to have"
+- "you might want to (try|consider|look at)" / "have you (tried|considered)"
 - "the (real|actual) (question|issue) is"
+- "stops at the [X] boundary"
 
 ## NO empty compliments (HARD)
 
-Banned exact shapes: "is a clean way to", "is a nice call", "stack the actual outcomes", "highlight key points people care about", "does a lot of work", "actually sells itself", "real talent", "hits different", "that lands", "nailed it", "spot on", "topic of the quarter".
+Banned exact shapes: "is a clean way to", "is a nice call", "stack the actual outcomes", "highlight key points people care about", "does a lot of work", "actually sells itself", "real talent", "hits different", "that lands", "nailed it", "spot on", "topic of the quarter", "actually made me rethink".
 
-## Banned words (per framework)
+## Banned words (per framework + validator)
 
-impressed, remarkable, exceptional, incredible, amazing (without specifics), "I came across", "I stumbled upon", "I wanted to reach out", "I hope this finds you well", "I'd love to connect", leverage, utilise, optimise, synergy, alignment, strategic, "just wanted to", "quick question", headcount, BD, business development, capacity, runway, gap, signalling, ecosystem, mood-board, lead gen, craft (as positive marketing noun) (as opener).
+impressed, remarkable, exceptional, incredible, amazing (without specifics), leverage, utilise, optimise, synergy, alignment, strategic, "just wanted to", "quick question" (as opener), headcount, BD, business development, capacity, runway, gap, signalling, ecosystem, mood-board, lead gen, craft (as positive marketing noun).
 
-NEVER em-dashes (— or – or --). Restructure into two short sentences.
+NEVER em-dashes (— or – or --). If you would naturally write an em-dash, restructure into a comma or period. Use a single fluid sentence.
 
-## ALLOWED reaction words (sparingly)
+## Output format — ONE sentence, value-led, with built-in bridge
 
-saw / noticed / read / loved / really liked / stuck with me / stuck in my head / got me thinking / hit close to home / could have written that myself / I've caught myself [doing X] / sharp / clean / solid / honest / refreshingly honest / hard to argue with / annoyingly accurate.
+ONE sentence. 15-20 words max. Lead with VALUE. Include "thought this could be of interest for you to [scale / improve / handle X]" or an equivalent natural value-bridge that flows directly into "to [help them with their thing]".
 
-## Opening — vary the structure
+The opener MUST do three things in one sentence:
 
-Most openers start with: `Saw`, `Noticed`, `Read`, `Caught`. Variations from the framework: open with the reaction ("Could have written that myself"), open with the moment ("The line about [phrase] hit close to home"). Vary across batches.
-
-NEVER open with: `Came across`, `Spent the morning with`, `Saw your post` (act-of-engagement reference), `I'm reaching out`, the company name itself.
-
-## Output format — TWO paragraphs (icebreaker + bridge)
-
-**Paragraph 1 (topic from post, in their words)**: ONE specific reference to the post topic, often one sentence. Optional 5-15 word reaction. 15-45 words total.
-
-**Paragraph 2 (bridge)**: ONE sentence connecting the topic to why we're reaching out, via SHARED-EXPERIENCE framing. 8-20 words.
+1. **Reference something specific from the post** (verbatim — proves research, not mass-blast)
+2. **Bridge into value** ("thought this could be of interest" or natural equivalent)
+3. **Frame the value in their terms** ("to scale your [thing]", "to handle [their problem]", "to free up [their constraint]")
 
 Strict JSON, no prose, no code fences:
 
-{{"icebreaker": "<paragraph 1>\\n\\n<paragraph 2 / bridge>"}}
+{{"icebreaker": "<single sentence, 15-20 words>"}}
 
-## Bridge templates (shared-experience, pick one that fits)
+## ALLOWED full examples (Saraev shape)
 
-When the post named a problem we recognize:
-- "That's exactly why I built this."
-- "That's the problem I'm solving now."
+{{"icebreaker": "Given the post about clients ghosting mid-project, thought this could be of interest to help you stabilise pipeline."}}
 
-When the post matches our own past experience:
-- "I could have written that myself when I was running my agency."
-- "Honestly that's the same conversation we keep having with the founders we work with."
+{{"icebreaker": "Given the take on the SDR-burnout cycle, thought this might land for you when scaling outbound without burning the team."}}
 
-When the post calls out a frustration we share:
-- "That kind of thing is exactly what we ended up building around."
-
-The bridge MUST flow from the topic. Banned bridges:
-- "Anyway, the reason I'm reaching out..."
-- "Speaking of which..."
-- "On a different note..."
-
-## ALLOWED full examples
-
-{{"icebreaker": "Saw your post about the pipeline rollercoaster. The line about 'best month ever followed by two months of nothing' hit close to home.\\n\\nThat's exactly why I built this."}}
-
-{{"icebreaker": "Saw your post about clients ghosting mid-project.\\n\\nHonestly that's the same conversation we keep having with the founders we work with."}}
-
-{{"icebreaker": "Read your thread on the SDR-burnout cycle. Annoyingly accurate.\\n\\nThat's the problem I'm solving now."}}
+{{"icebreaker": "Given the thread on feast-or-famine pipeline, thought this might be useful for you to flatten the spike-and-dip cycle."}}
 
 ## BANNED full examples (will be rejected)
 
-- "Ngl your post last week on clients ghosting said out loud what I think everyone's feeling. Sharp positioning." — AI-cliche shape, formulaic.
-- "Saw the post about Salesforce demo crashes. Topic of the quarter, genuinely." — empty reaction shape.
-- "Read the SDR burnout post. Hits different." — empty praise shape.
-- "Saw the post about clients ghosting. The hard part is usually getting the original scope signed off the right stakeholder." — DIAGNOSIS shape. Even though the prospect raised the topic, lecturing extends it the wrong way.
-- "Saw your post — really hit close to home." — em-dash slip.
-- "Came across your post about Salesforce." — banned opener.
+- "Saw you're a creative director in San Francisco." — fake personalization, AI-tell.
+- "Noticed you're in NYC and posting about pipeline." — fake personalization.
+- "I noticed you're the founder of a branding agency. Sharp positioning." — LinkedIn-headline reference + AI-cliche.
+- "Saw your post about clients ghosting. The hard part is usually the original scope being signed off the wrong stakeholder." — DIAGNOSIS shape, lecturing.
+- "Saw your post — really hit close to home." — em-dash slip + empty reaction.
+- "Saw your post about the rollercoaster. Hits different." — empty AI-cliche reaction.
 
-If the post doesn't give you a verbatim topic plus a sensible shared-experience bridge, return {{"icebreaker": ""}} instead.
+If the post doesn't give you a concrete enough hook to ground a 15-20 word value-led opener, return {{"icebreaker": ""}} instead.

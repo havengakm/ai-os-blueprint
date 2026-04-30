@@ -62,6 +62,17 @@ _AI_CLICHE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bcame across\b", re.I), "came across"),
     (re.compile(r"\bspent the morning with\b", re.I), "spent the morning with"),
     (re.compile(r"\bngl\b", re.I), "ngl"),
+    # Slice 37 (2026-04-30): fake-personalization shapes the operator
+    # explicitly called out as AI-tells. "Saw you're a [job title]" and
+    # "Noticed you're in [city]" treat the prospect as a generic role-
+    # holder rather than a specific person. The cold-email skill's
+    # frontmatter calls these out: "saw you're a [role]" / "notice
+    # you're [city]" "almost sounds more fake than it does
+    # personalized" (Saraev video). The framework also bans the
+    # LinkedIn-headline reference: "I see you're the founder of a
+    # branding agency."
+    (re.compile(r"\b(?:saw|noticed) you'?re\s+(?:a|an|the)\s+\w", re.I), "saw you're a [job title]"),
+    (re.compile(r"\b(?:saw|noticed) you'?re in\s+[A-Z]\w*", re.I), "saw you're in [city]"),
 ]
 
 # Buzzwords from rules/global-writing-guardrails.md.
