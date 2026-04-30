@@ -149,6 +149,7 @@ Plus the AIOS deployment-specific operator-written canonical references (added 2
 
 - [icebreaker-framework.md](references/icebreaker-framework.md) — **The canonical icebreaker doctrine for this deployment.** Formula, tone scale, the personal-proof mechanic, 7 verified-good patterns, the "diagnosis disguised as research" trap, bridge guidance, full worked examples by niche. Operator-written. Overrides anything else here when they conflict.
 - [email-template-variations.md](references/email-template-variations.md) — 3 body-template variations per niche (Shopify/eCommerce, CRO/Growth, Creative/Branding). Pairs with the icebreaker — `{icebreaker + bridge}` slot is filled per the icebreaker framework.
+- [opener-prompt.md](references/opener-prompt.md) — **Canonical single-sentence opener prompt** for AI-column tools (Instantly, Smartlead) and as the SHAPE the AIOS runtime icebreaker_tier_*.md prompts target. INPUT: `{{linkedin}}/{{summary}}/{{headline}}`. OUTPUT: 15-20 word value-led opener, "thought this could be of interest" bridge, forward-looking framing. Includes 6 worked examples + SKIP behavior when input is too thin.
 
 Use this data to inform your writing — not as a checklist to satisfy.
 
