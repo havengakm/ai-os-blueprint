@@ -145,6 +145,11 @@ The references contain performance data if you need to make informed choices:
 - [follow-up-sequences.md](references/follow-up-sequences.md) — Cadence, angles, breakup emails
 - [frameworks.md](references/frameworks.md) — All copywriting frameworks with examples
 
+Plus the AIOS deployment-specific operator-written canonical references (added 2026-04-30):
+
+- [icebreaker-framework.md](references/icebreaker-framework.md) — **The canonical icebreaker doctrine for this deployment.** Formula, tone scale, the personal-proof mechanic, 7 verified-good patterns, the "diagnosis disguised as research" trap, bridge guidance, full worked examples by niche. Operator-written. Overrides anything else here when they conflict.
+- [email-template-variations.md](references/email-template-variations.md) — 3 body-template variations per niche (Shopify/eCommerce, CRO/Growth, Creative/Branding). Pairs with the icebreaker — `{icebreaker + bridge}` slot is filled per the icebreaker framework.
+
 Use this data to inform your writing — not as a checklist to satisfy.
 
 ---
