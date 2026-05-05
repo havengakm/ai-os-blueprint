@@ -5,6 +5,14 @@ Built once at startup via ``api/deps.py::get_registry()``. Consumers
 than constructing their own. Backends are stateless aside from the shared
 Supabase client, so a single process-wide singleton is safe.
 
+INTERIM LOCATION (Phase 1, 2026-05-05): This file used to live at
+``aios/foundation/registry.py`` and was moved here when foundation got
+extracted into the ``aios-foundation`` pip package. It depends on
+``systems.scout.supabase_backends`` so it can't ship inside the foundation
+package. Phase 3 of the AIOS reorg migrates this file to
+``clymb-co-deployment/registry.py`` (the per-deployment dependency-wiring
+location). Until Phase 3 lands, this is the canonical home.
+
 Single-writer assumptions (Item 65 S4, Task 16b Step 1 review)
 -------------------------------------------------------------
 ``SupabaseBudgetTracker.record_spend`` uses read-modify-write on
