@@ -1,60 +1,95 @@
-# Scout — Outbound Prospecting System
+# Scout
 
-## What it does
+**Plain-name label (operator-facing):** Prospect Researcher (find leads + enrich + score + screen).
 
-Finds ideal clients, writes personalised outreach in the founder's voice, sends across multiple channels, handles follow-ups, and books qualified meetings into the calendar.
+**Climbing-name (code path):** `systems/scout/`. Per the agent-naming decision (2026-05-04), code paths keep climbing names; plain names are display-only. See `docs/architecture/agent-deployment-lifecycle.md`.
 
-## How it connects to the foundation
+## What Scout does
 
-- **Context:** Reads ICP, avatars, voice, brand, case studies from context_registry
-- **Knowledge:** Queries Nick Saraev frameworks, copywriting frameworks for email generation
-- **Decisions:** Logs copy_variant, icp_threshold, template_choice, send_timing decisions
-- **Autonomy:** Checks autonomy level before sending outreach
-- **Learning:** Past decision outcomes inform future copy and targeting choices
+Finds qualified prospects matching the deployment's ICP, enriches them with structural + signal data, scores fit, screens out misfits, and renders ready-to-send drafts. Does NOT send: that's Beacon's job. Multi-channel by design: Scout's pipeline is shared across email / LinkedIn / SMS / etc. via channel sub-modules under `outreach/` (per `feedback_lead_multi_channel_module`).
 
-## Pipeline
+## Pipeline stages
 
 ```
-pull_leads → score_contacts → screen_contacts → enrich_contacts → generate_outreach → send_outreach → track_replies
+pull → score → screen → identity → enrich → render → handoff_to_beacon
 ```
 
-## Files (to migrate from base-camp-agents)
+| Stage | Purpose |
+|---|---|
+| `pull` | Discover candidate contacts from sources (Trigify monitors, Apollo, Lusha, vertical scrapers) |
+| `score` | ICP scoring 0-100 with optional UncertainZoneJudge (Haiku) for 40-60 band |
+| `screen` | Secondary ICP screen (homepage + Haiku) on remaining candidates |
+| `identity` | Resolve owner / decision-maker per contact |
+| `enrich` | Apollo + Lusha + ZeroBounce + Claude research adapters + signal-gated Deep Research |
+| `render` | Compose drafts via composer + IcebreakerAdapter; outputs to `outreach_drafts` |
+
+Drafts then get picked up by Beacon's send pipeline.
+
+## Layout
 
 ```
 systems/scout/
-├── README.md                — This file
-├── skill.py                 — ScoutSystem(BaseSystem) entry point
-├── __init__.py
-├── config.py                — Scout-specific settings
-├── pipeline/
-│   ├── pull_leads.py        — Apollo + custom scraping
-│   ├── score_contacts.py    — ICP scoring 0-100 + avatar classification
-│   ├── screen_contacts.py   — Secondary ICP screen (Haiku + homepage)
-│   ├── enrich_contacts.py   — Web research + signals + icebreaker
-│   ├── generate_outreach.py — Template fill + AI subject/icebreaker/bridge
-│   ├── send_outreach.py     — Approved drafts → Smartlead
-│   └── recycle_contacts.py  — 90-day cooling-off re-entry
-├── outreach/
-│   ├── copywriting.py       — Copy generation instructions
-│   ├── quality_gate.py      — 14-point QA check
-│   └── templates.py         — Template management
-└── icp.py                   — ICP definitions, avatars, scoring weights
+├── pipeline/             : the seven stages above (PullStage, ScoreStage, etc.)
+├── sources/              : per-source adapters (Trigify, Apollo, vertical scrapers like Clutch)
+├── enrich/               : per-vendor enrichment adapters (Apollo, Lusha, ZeroBounce, Claude research)
+├── identity/             : owner resolution
+├── score/                : ICP scoring + UncertainZoneJudge
+├── outreach/             : composer + IcebreakerAdapter (renders drafts)
+├── budget/               : per-contact cost ceiling enforcement (PerContactCeiling)
+├── supabase_backends/    : per-table Supabase write adapters
+├── sql/                  : Scout-specific migration helpers (most schema lives in scripts/sql/)
+├── skill.py              : ScoutSystem(BaseSystem) entry point
+└── __init__.py
 ```
 
-## Status
+## How Scout talks to the hub
 
-- Sprint 1 code: COMPLETE (lives in base-camp-agents repo)
-- Foundation integration: DONE (skill.py extends BaseSystem with foundation hooks)
-- Pipeline migration: PENDING (scripts need to move from base-camp-agents/scripts/ into pipeline/)
-- Handler implementation: PENDING (currently returns placeholders)
+Per the connected-system pattern (see lifecycle doc):
 
-### To complete migration:
-1. Copy pipeline scripts from base-camp-agents/scripts/ into systems/scout/pipeline/
-2. Update imports to use aios/foundation modules (DecisionLogger, PatternMatcher, etc.)
-3. Wire handlers in skill.py to call pipeline scripts
-4. Create systems/scout/sql/ with Scout-specific migrations (contacts, drafts, templates, etc.)
-5. Test end-to-end with foundation integration
+- **Reads from Supabase**: `agent_system_prompts`, `agent_skills`, `agent_frameworks` (Saraev + Allbound), `agent_guardrails`, `client_config` (ICP + tier thresholds + budgets), `knowledge_base` (expert frameworks), `business_context` + `client_facts` (per-client narrative)
+- **Writes to Supabase**: `contacts` (one row per discovered contact), `outreach_drafts` (rendered drafts ready for Beacon), `decision_log` (every score / screen / enrich / render decision with reasoning + KPI tag), `learning_events` (lead source quality patterns, cost-per-good-contact deltas)
+- **API connections** (resolved via `api_registry`): Trigify (signal source), Apollo (enrichment), Lusha (phone enrichment), ZeroBounce (email validation), Anthropic API (Haiku for batch scoring + screening, Sonnet for deep research)
+- **Subscribes to** (via `employee_subscriptions`): Optimizer's recommendations (ICP weight tuning, vendor swap signals)
+- **Subscribed by**: Beacon (lead-source quality patterns), Optimizer (whole-pipeline performance), Auditor (cross-agent integrity)
 
-## Tier
+## CLI entry points (in `scripts/`)
 
-min_tier = "self_drive" (available to all tiers)
+- `scripts/run_daemon_once.py`: single daemon tick, runs all Scout stages once
+- `scripts/run_trigify_discovery.py`: manual Trigify pull (otherwise the daemon handles it)
+- `scripts/configure_trigify_monitors.py`: operator setup tool, configures monitors per client
+- `scripts/ingest_clutch_corpus.py`: bulk Clutch directory ingest
+- `scripts/ingest_preresolved_contacts.py`: manual CSV ingest
+
+## Tests
+
+- `tests/test_scout/`: pipeline stage unit tests + integration tests for each enrichment adapter
+
+## Owning skills (per `agent_skills` Supabase rows, Phase 2)
+
+When the schema lands, Scout's row-set will activate skills under:
+- `skills/outbound/` (lead sourcing, ICP definition, signal detection)
+- `skills/operations/filter-icp-list.md` (operator-interactive ICP filtering)
+- `skills/copywriting/` (icebreaker generation, body templates, shared with Beacon)
+- `skills/meta/validate-writing.md` (fail-closed on every rendered draft)
+
+Universal library, per-agent activation. Skills do not live in this folder.
+
+## Migrations that brought Scout online
+
+- `001`-`007`: foundation tables + Scout core (contacts, ICP, drafts)
+- `008`-`013`: ICP scoring + tier thresholds + budgets + signals + escalations
+- `014`: identity resolution (owner extraction)
+- `024`: agent topology metadata
+- (Phase 2 plan) `025`: agent_context_backbone
+
+## Cloud-execution model
+
+Scout's pipeline runs daily (pull) and continuously (score/enrich for new contacts). Per the decision matrix:
+
+- **Daily Trigify pull** → Routines or Trigger.dev (either fits)
+- **Per-contact score / enrich / render** → Trigger.dev (sub-hour cadence, per-contact state)
+- **Weekly Scout performance review** → Routine (weekly cadence)
+
+When Phase 4+ ships, Scout deployment will be a mix of one Trigger.dev project + one weekly Routine.
+
+`clymb-discover` private routine repo (for the daily pull) will follow the `clymb-audit` template once that pattern is proven.

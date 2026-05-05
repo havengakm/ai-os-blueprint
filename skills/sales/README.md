@@ -32,9 +32,6 @@ None yet.
 ## Knowledge sources
 - `data/knowledge/experts/sapp/sales.md`: high-ticket close framework, objection handling
 
-## Referenced by departments
-- `departments/sales.md` (primary home)
+## Note: Sales category scope
 
-## Note: Sales department vs Sales skill category
-
-The `Sales` department (see `departments/sales.md`) activates skills from multiple categories: `outbound/`, `sales/`, `copywriting/`, `customer-success/` (for post-close hand-off). Don't confuse the skill category (this folder) with the department (cross-cutting team).
+This skill category (`sales/`) covers pipeline, qualification, enablement, and closing mechanics. It pairs with `outbound/`, `copywriting/`, and `customer-success/` in a full-cycle sales motion.

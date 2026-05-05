@@ -17,7 +17,3 @@ Atomic skills for tracking, attribution, measurement, reporting. Every skill: on
 ## Populated
 None yet.
 
-## Referenced by departments
-- `departments/marketing.md` (campaign attribution)
-- `departments/sales.md` (pipeline analytics)
-- `departments/operations.md` (reporting cadence, KPI dashboards)

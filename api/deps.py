@@ -12,8 +12,8 @@ Single-writer note (Item 65 S4, Task 16b Step 1 review)
 enforces it as long as every write goes through the API server OR the
 Scout daemon — NOT both concurrently. If future deploys run them
 side-by-side, switch ``record_spend`` to a Postgres advisory lock or a
-version-column CAS. See ``aios/foundation/registry.py`` for the matching
-note at the construction site.
+version-column CAS. See ``aios/dependency_container.py`` for the
+matching note at the construction site.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from typing import Any
 
 from supabase import create_client
 
-from aios.foundation.registry import SystemRegistry, build_registry
+from aios.dependency_container import SystemRegistry, build_registry
 from systems.scout.skill import ScoutSystem
 
 logger = logging.getLogger(__name__)

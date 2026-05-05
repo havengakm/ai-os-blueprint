@@ -38,7 +38,7 @@ from aios.daemon.client_worker import run_client_cycle
 from aios.daemon.scheduler import DEFAULT_NIGHTLY_CRON, NightlyScheduler
 
 if TYPE_CHECKING:
-    from aios.foundation.registry import SystemRegistry
+    from aios.dependency_container import SystemRegistry
 
 logger = logging.getLogger(__name__)
 

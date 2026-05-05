@@ -32,5 +32,3 @@ Atomic skills for inbound content, SEO, and lead capture. Every skill: one input
 ## Populated
 None yet.
 
-## Referenced by departments
-- `departments/marketing.md` (primary home)

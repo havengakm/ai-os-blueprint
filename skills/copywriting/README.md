@@ -31,5 +31,3 @@ None yet.
 - `data/knowledge/experts/hormozi/`: offer copy, value-stack language
 - `data/knowledge/experts/brunson/`: hook-story-offer structure
 
-## Referenced by departments
-- `departments/marketing.md`, `departments/sales.md`

@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from systems.base import BaseSystem, SystemResult
 
 if TYPE_CHECKING:
-    from aios.foundation.registry import SystemRegistry
+    from aios.dependency_container import SystemRegistry
 
 logger = logging.getLogger(__name__)
 

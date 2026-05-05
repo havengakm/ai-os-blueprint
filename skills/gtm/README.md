@@ -27,5 +27,3 @@ None yet.
 - `data/knowledge/experts/brunson/funnels.md`: funnel architecture patterns
 - `data/knowledge/experts/saraev/ai-positioning.md`: channel-fit for AI offers
 
-## Referenced by departments
-- `departments/marketing.md`, `departments/sales.md`

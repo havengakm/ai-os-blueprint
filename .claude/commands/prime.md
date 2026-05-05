@@ -7,16 +7,28 @@ Research, implement, measure, learn, improve. Repeat forever. This is what makes
 ```
 1. RESEARCH  — What could be better?
       ↓
-2. PLAN      — How to improve it? (/create-plan)
+2. EAD GATE  — Eliminate first. Then automate. Then delegate.
       ↓
-3. IMPLEMENT — Make the change (/implement)
+3. PLAN      — How to improve it? (/create-plan)
       ↓
-4. MEASURE   — Did it work? Check metrics, decision outcomes
+4. IMPLEMENT — Make the change (/implement)
       ↓
-5. LEARN     — Log outcome to decision_log. Update knowledge_base if new pattern found.
+5. MEASURE   — Did it work? Check metrics, decision outcomes
       ↓
-6. REPEAT    — Next improvement cycle
+6. LEARN     — Log outcome to decision_log. Update knowledge_base if new pattern found.
+      ↓
+7. REPEAT    — Next improvement cycle
 ```
+
+## The EAD gate (Eliminate → Automate → Delegate)
+
+Before scoping any automation, run this gate in order. The cheapest improvement is the one you don't build.
+
+1. **Eliminate.** Does this step need to exist at all? If the work itself is unnecessary, kill it. Don't automate waste.
+2. **Automate.** If the work must happen, can the AIOS run it unattended? This is where most `/prime` cycles land.
+3. **Delegate.** If automation isn't viable yet, can a human (operator or future hire) own it on a schedule? Document the SOP under `data/reference/sops/` and revisit in the next quarterly calibration.
+
+Adapted from `nateherkai/AIS-OS` `/level-up` skill (audited 2026-05-04). Forces an explicit kill-it-first decision before scope expands into engineering work.
 
 ## What to prime (priority order)
 

@@ -206,7 +206,7 @@ def test_build_registry_direct_constructs_non_none_fields():
     """Exercise build_registry directly with a stub client — no env, no
     lru_cache involvement. Verifies construction does not silently skip
     any field."""
-    from aios.foundation.registry import build_registry
+    from aios.dependency_container import build_registry
     fake_client = object()
     registry = build_registry(supabase_client=fake_client, voyage_api_key="stub")
     for f in fields(registry):
@@ -215,7 +215,7 @@ def test_build_registry_direct_constructs_non_none_fields():
 
 def test_build_registry_logs_info_on_success(caplog):
     """Log emission: build_registry logs 'SystemRegistry built' at INFO."""
-    from aios.foundation.registry import build_registry
+    from aios.dependency_container import build_registry
     with caplog.at_level("INFO"):
         build_registry(supabase_client=object(), voyage_api_key="stub")
     assert any(
@@ -258,12 +258,13 @@ def test_get_scout_system_returns_singleton_without_dependency_overrides(deps_en
 
 def test_single_writer_docstring_present_in_registry_and_deps():
     """The single-writer assumption for ``record_spend`` must be
-    documented in both ``aios/foundation/registry.py`` and
-    ``api/deps.py`` so a code-search lands on either file."""
+    documented in both ``aios/dependency_container.py`` (formerly
+    ``aios/foundation/registry.py``) and ``api/deps.py`` so a
+    code-search lands on either file."""
     repo_root = Path(__file__).resolve().parents[2]
-    registry_src = (repo_root / "aios" / "foundation" / "registry.py").read_text()
+    registry_src = (repo_root / "aios" / "dependency_container.py").read_text()
     deps_src = (repo_root / "api" / "deps.py").read_text()
-    for src, label in ((registry_src, "registry.py"), (deps_src, "deps.py")):
+    for src, label in ((registry_src, "dependency_container.py"), (deps_src, "deps.py")):
         assert "Single-writer" in src or "single-writer" in src, label
         assert "record_spend" in src, label
         assert "Item 65" in src or "S4" in src, label

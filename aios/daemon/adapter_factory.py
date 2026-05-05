@@ -43,7 +43,7 @@ from systems.scout.sources.clutch import ClutchAdapter
 from systems.scout.sources.trigify_discovery import TrigifyDiscoverySource
 
 if TYPE_CHECKING:
-    from aios.foundation.registry import SystemRegistry
+    from aios.dependency_container import SystemRegistry
     from config.settings import Settings
     from systems.scout.enrich.base import EnrichAdapter
     from systems.scout.identity.base import IdentityAdapter
