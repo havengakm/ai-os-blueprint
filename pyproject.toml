@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "AI Operating System Blueprint — productised AIOS template"
 requires-python = ">=3.11"
 dependencies = [
+    # Foundation (pinned to released tag)
+    "aios-foundation @ git+https://github.com/aios-kit/aios-foundation.git@v0.1.0",
+
     # Web framework
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -54,6 +57,16 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
 ]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["aios"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
