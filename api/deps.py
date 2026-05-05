@@ -24,7 +24,7 @@ from typing import Any
 
 from supabase import create_client
 
-from aios.foundation.registry import SystemRegistry, build_registry
+from aios.dependency_container import SystemRegistry, build_registry
 from systems.scout.skill import ScoutSystem
 
 logger = logging.getLogger(__name__)

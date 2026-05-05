@@ -206,7 +206,7 @@ def test_build_registry_direct_constructs_non_none_fields():
     """Exercise build_registry directly with a stub client — no env, no
     lru_cache involvement. Verifies construction does not silently skip
     any field."""
-    from aios.foundation.registry import build_registry
+    from aios.dependency_container import build_registry
     fake_client = object()
     registry = build_registry(supabase_client=fake_client, voyage_api_key="stub")
     for f in fields(registry):
@@ -215,7 +215,7 @@ def test_build_registry_direct_constructs_non_none_fields():
 
 def test_build_registry_logs_info_on_success(caplog):
     """Log emission: build_registry logs 'SystemRegistry built' at INFO."""
-    from aios.foundation.registry import build_registry
+    from aios.dependency_container import build_registry
     with caplog.at_level("INFO"):
         build_registry(supabase_client=object(), voyage_api_key="stub")
     assert any(
