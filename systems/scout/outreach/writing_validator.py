@@ -120,7 +120,7 @@ _TENURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 #     rejects (impressed, remarkable, etc — already covered elsewhere)
 # (c) the high-AI-tell phrases that almost-always read as flattery
 #     across human + AI writing alike.
-# See skills/cold-email/references/icebreaker-framework.md as canonical.
+# See skills/outbound/cold-email/references/icebreaker-framework.md as canonical.
 _COMPLIMENT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Operator's exact-flagged shapes from the Slice 35 Chatterkick
     # failure — these stay, they're verbatim what the operator caught.
