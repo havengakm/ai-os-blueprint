@@ -326,24 +326,42 @@ See [RUNBOOK.md](RUNBOOK.md) for upgrade procedure.
 
 ```bash
 cd ~/01_PERSONAL/10_PERSONAL_PROJECTS/aios-foundation
-uv venv
+uv sync --group dev
 source .venv/bin/activate
-uv pip install -e ".[dev]"
 python -c "import aios.foundation; import aios.memory; print('namespace OK')"
 ```
 
 Expected: `namespace OK`. If `ModuleNotFoundError`, check that `pyproject.toml` `[tool.hatch.build.targets.wheel]` points to `src/aios` and that no `src/aios/__init__.py` was accidentally created.
 
-- [ ] **Step 11: Commit the skeleton**
+**Why `uv sync --group dev` and not `uv pip install -e ".[dev]"`:** This package uses PEP 735 `[dependency-groups]` (the modern standard for dev deps) instead of PEP 621 `[project.optional-dependencies]`. The `.[dev]` extras syntax only works with the latter; with `[dependency-groups]`, uv emits a warning ("no extra named `dev`") and silently skips installing pytest, ruff, etc. `uv sync --group dev` is the correct equivalent.
+
+- [ ] **Step 11: Add `uv.lock` and `.gitkeep` files for empty scaffold dirs**
+
+Add `uv.lock` to `.gitignore` (library packages distributed via git tag don't ship lock files; downstream consumers don't use it):
 
 ```bash
 cd ~/01_PERSONAL/10_PERSONAL_PROJECTS/aios-foundation
-git add pyproject.toml README.md .gitignore src tests
+echo "" >> .gitignore
+echo "# Lock file (this is a library package; downstream consumers don't use uv.lock)" >> .gitignore
+echo "uv.lock" >> .gitignore
+```
+
+Add `.gitkeep` files so empty scaffold directories survive a fresh clone (Task 4 fills `skills/`, Task 5 fills `docs/`, Task 6 fills `.github/workflows/`):
+
+```bash
+touch skills/meta/.gitkeep skills/playbooks/.gitkeep rules/.gitkeep docs/.gitkeep .github/workflows/.gitkeep
+```
+
+- [ ] **Step 12: Commit the skeleton**
+
+```bash
+cd ~/01_PERSONAL/10_PERSONAL_PROJECTS/aios-foundation
+git add pyproject.toml README.md .gitignore src tests skills rules docs .github
 git commit -m "chore: bootstrap aios-foundation repo skeleton"
 git push origin main
 ```
 
-Expected: push succeeds, repo on GitHub shows initial commit.
+Expected: push succeeds, repo on GitHub shows initial commit. `uv.lock` is NOT in the commit (gitignored); `.gitkeep` files keep otherwise-empty dirs tracked.
 
 ---
 
@@ -537,10 +555,16 @@ git commit -m "feat: migrate aios.memory.store + test from monorepo"
 
 ## Task 4: Migrate cross-cutting skills + rules
 
+**Architectural refinement (added after Task 4 review):** Of the three monorepo playbooks under `skills/playbooks/`, only ONE is truly cross-cutting and belongs in foundation — `build-cloudflare-protected-scraper.md` (a general scraping technique, applicable to any system that needs to fetch Cloudflare-protected pages). The other two (`configure-trigify-monitors.md`, `discover-trigify-leads.md`) are Scout-specific sourcing playbooks that belong in `aios-scout` per the placement matrix in Section 4 of the plan. They stay in the monorepo for Phase 1 and migrate to `aios-scout` in Phase 2.
+
+The Cloudflare playbook also requires generic-ification: the monorepo version has 5 hard references to `systems/scout/sources/clutch.py` and dated slice markers that don't translate to a downstream consumer of `aios-foundation`. These get replaced with placeholder paths.
+
 **Files:**
 - Copy from monorepo `skills/meta/` to `aios-foundation/skills/meta/`
-- Copy from monorepo `skills/playbooks/` to `aios-foundation/skills/playbooks/`
+- Copy from monorepo `skills/playbooks/build-cloudflare-protected-scraper.md` to `aios-foundation/skills/playbooks/build-cloudflare-protected-scraper.md` (then make generic — see Step 4)
+- Copy from monorepo `skills/playbooks/README.md` to `aios-foundation/skills/playbooks/README.md`
 - Copy from monorepo `rules/global-writing-guardrails.md` to `aios-foundation/rules/global-writing-guardrails.md`
+- DO NOT copy `skills/playbooks/configure-trigify-monitors.md` or `skills/playbooks/discover-trigify-leads.md` — those go to `aios-scout` in Phase 2.
 
 - [ ] **Step 1: Copy directories**
 
@@ -751,9 +775,7 @@ jobs:
         run: pip install uv
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -e ".[dev]"
+        run: uv sync --group dev
 
       - name: Run tests
         run: |
@@ -850,7 +872,7 @@ Expected: `install OK`. If this fails, do NOT proceed to monorepo cutover; debug
 - Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/aios/foundation/` (now from pip)
 - Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/aios/memory/` (now from pip)
 - Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/skills/meta/` (now in foundation)
-- Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/skills/playbooks/` (now in foundation)
+- Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/skills/playbooks/build-cloudflare-protected-scraper.md` and `skills/playbooks/README.md` (now in foundation). Keep `skills/playbooks/configure-trigify-monitors.md` and `skills/playbooks/discover-trigify-leads.md` in the monorepo — those move to `aios-scout` in Phase 2.
 - Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/rules/global-writing-guardrails.md` (now in foundation)
 - Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/tests/test_foundation/` (now in foundation)
 - Delete: `~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint/tests/test_memory/` (now in foundation)
@@ -914,11 +936,37 @@ cd ~/01_PERSONAL/10_PERSONAL_PROJECTS/ai-os-blueprint
 rm aios/__init__.py
 ```
 
-- [ ] **Step 6: Delete the migrated module directories**
+- [ ] **Step 6: Move `registry.py` out of the foundation namespace, then delete the migrated module directories**
+
+**Why this isn't a clean `rm -rf`:** `aios/foundation/registry.py` is referenced by 7 files in the monorepo (`api/deps.py`, `aios/daemon/*.py`, `systems/scout/skill.py`, `tests/test_api/test_deps.py`). It depends on `systems.scout.supabase_backends` so it can't migrate to the foundation package. But leaving it inside `aios/foundation/` while the pip-installed `aios.foundation` is a regular package (with its own `__init__.py`) creates a namespace conflict — Python picks one source. The fix is to move `registry.py` OUT of the foundation namespace entirely.
 
 ```bash
+# Move registry.py to a new location (still in monorepo, but not inside aios/foundation/)
+git mv aios/foundation/registry.py aios/dependency_container.py
+
+# Update the 7 import sites
+sed -i 's|from aios.foundation.registry import|from aios.dependency_container import|g' \
+  api/deps.py \
+  aios/daemon/client_registry.py \
+  aios/daemon/adapter_factory.py \
+  aios/daemon/main.py \
+  systems/scout/skill.py \
+  tests/test_api/test_deps.py
+
+# Confirm no remaining references
+grep -rn "aios.foundation.registry" --include="*.py" && echo "FAIL: stale references" || echo "OK: all moved"
+
+# Now delete the directories (registry.py already moved, foundation dir should be empty)
 rm -rf aios/foundation aios/memory
 ```
+
+**Class names:** `aios/foundation/registry.py` exports `class SystemRegistry` (a dataclass that bundles foundation modules + supabase backends). The top-level `aios/registry.py` ALSO exports `class SystemRegistry` (a different class — the system dispatcher). The two have the same class name in different modules. After the move:
+- `from aios.dependency_container import SystemRegistry` (the dependency-bundle dataclass)
+- `from aios.registry import SystemRegistry` (the system dispatcher)
+
+If any import sites need disambiguation, alias on import: `from aios.dependency_container import SystemRegistry as DependencyRegistry`. The existing `from aios.foundation.registry import SystemRegistry` was already disambiguated by the `foundation.` part of the path, so the same disambiguation by `dependency_container` works without renaming the class.
+
+**Note:** This file (`aios/dependency_container.py`) is destined to migrate to `clymb-co-deployment/registry.py` in Phase 3 (per the deployment template plan). For Phase 1 it stays in the monorepo at this new path.
 
 - [ ] **Step 7: Delete the migrated skills + rules**
 
