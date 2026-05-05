@@ -25,16 +25,55 @@ Source of truth for operating principles: `CLAUDE.md` (repo root, always loaded)
 
 ## Architecture Summary
 
-Three-layer operating system: Context, Data, Systems. See `CLAUDE.md` for the full model.
+**Three layers, bottom up:**
 
-Skill library has three tiers:
-- **Capabilities** (atomic, one input to one output) in `skills/<category>/`.
-- **Composites** (3 to 8 chained capabilities) in `skills/composites/`.
-- **Playbooks** (end-to-end with human gates) in `skills/playbooks/`.
+1. **Context** = WHAT THE DEPLOYMENT IS. Brand, integrations, active projects. Loaded from `context/`. Per-company silo, never shared.
+2. **Data** = WHAT THE DEPLOYMENT KNOWS. Knowledge (personal/company/experts), captures, plans, outputs, reference. In `data/` and Supabase.
+3. **Systems** = THE LIMBS. Outbound prospecting, inbound response, content, ad management, reporting. Each system reads from context + data, logs decisions, writes outcomes back. Lives in `systems/`.
+
+No system works in isolation. Every system makes the foundation smarter.
+
+**Each system contract:**
+
+1. Extends `BaseSystem` with a single entry point via `skill.py`
+2. Reads from foundation (context + knowledge + past decisions). Mandatory.
+3. Logs every significant action to `decision_log`. Mandatory.
+4. Checks autonomy level before acting. Mandatory.
+5. Writes outcomes back so other systems can learn from them
+6. Has a README explaining what it does, what data it uses, how to enable
+
+**Skill library is three-tier:**
+- **Capabilities** (atomic, one input to one output) in `skills/<category>/`
+- **Composites** (3 to 8 chained capabilities) in `skills/composites/`
+- **Playbooks** (end-to-end with human gates) in `skills/playbooks/`
 
 15 capability categories: meta, market-intelligence, offer-positioning, gtm, outbound, inbound, copywriting, sales, customer-success, data-analytics, revops-automation, finance, legal, operations, admin, brand.
 
-Seven departments (manifests only, activation layer for skills): admin, finance, tax, legal, sales, marketing, operations.
+Seven departments (manifests only, activation layer for skills): admin, finance, tax, legal, sales, marketing, operations. Vertical-specific manifests (creative_branding, property_management, etc.) live alongside as starter packs that seed Supabase rows at provisioning time.
+
+## File Layout
+
+```
+context/          : per-company silo identity (brand, integrations, active projects). Never shared across deployments.
+data/             : knowledge (personal/company/experts/verticals), captures, plans, outputs, reference (sops, sequences, frameworks).
+memory/           : MEMORY.md (this file, stable context), INDEX.md (recent decisions + open loops), sessions/ (daily logs).
+rules/            : global guardrails (writing standards) every content-producing skill enforces.
+skills/           : three-tier library (capabilities/, composites/, playbooks/). Universal across deployments.
+departments/      : manifests that activate subsets of skills + systems per vertical or business function.
+agents/           : named personas (Scout, Beacon, Optimizer, etc.) wrapping systems on a schedule.
+aios/             : foundation (decision_logger, autonomy_gate, knowledge_store, embedder, etc.). Extracted to pip package per Cloud-Execution plan.
+systems/          : the limbs. scout, beacon, optimizer, future linkedin/meta_ads/auditor.
+scripts/          : utilities: migrations (sql/), provisioning, dashboards.
+api/              : webhooks + pipeline triggers.
+config/           : environment + API key loading.
+.claude/commands/ : the five operational commands (build-context, create-plan, decide, implement, prime).
+```
+
+**Library tier (universal, productised):** `skills/`, `rules/`, `aios/foundation/`, `scripts/sql/` migrations, `data/knowledge/verticals/<vertical>/` templates. Same across every client.
+
+**Activation tier (per-deployment):** `departments/<vertical>.md` manifests + Supabase rows seeded at provisioning. Picks the subset of universal capability that this deployment runs.
+
+**Content tier (per-deployment, never shared):** `context/<client_id>/`, `data/knowledge/personal/<client_id>/`, `data/knowledge/company/<client_id>/`, plus per-client Supabase rows. The deployment's identity + facts.
 
 ## Development Preferences
 
@@ -43,6 +82,18 @@ Seven departments (manifests only, activation layer for skills): admin, finance,
 - **Communication with operator:** Lead with the answer, not the reasoning. No preamble. One sentence if one sentence will do.
 - **Cost:** Haiku for batch (~$0.0003 per contact). Sonnet for conversations. Never Opus. `--limit 2` + `--dry-run` before any write operation.
 - **Tools:** Prefer CLI / REST over MCP for token efficiency. MCP only when the CLI cannot cover.
+
+## Autonomy distribution target: 60 / 30 / 10
+
+For a mature AIOS, work across all action types should land roughly:
+
+- **~60% autonomous.** System acts and logs. Operator reviews in weekly recap, not in real time.
+- **~30% AI-assisted with human review.** System drafts. Operator approves before commit.
+- **~10% manual.** Strategic decisions, novel client situations, escalations.
+
+This is a target, not a quota. Brand-new deployments start near 0/10/90 (everything `suggest`-level) and progress through the autonomy ladder over 30+ days per action type. The 60/30/10 ratio is the steady state for a Compounding-stage deployment (per Four-Cs audit).
+
+A weekly drift check belongs in the Friday operator review: if too much work is stuck at manual, automation is not progressing. If too much is autonomous and quality is dropping, a downgrade is overdue. Reference: `feedback_autonomous_agent_goal` + Nate Herk AI's `/audit` framework (adopted 2026-05-04).
 
 ## Hard Rules
 
