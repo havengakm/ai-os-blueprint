@@ -258,12 +258,13 @@ def test_get_scout_system_returns_singleton_without_dependency_overrides(deps_en
 
 def test_single_writer_docstring_present_in_registry_and_deps():
     """The single-writer assumption for ``record_spend`` must be
-    documented in both ``aios/foundation/registry.py`` and
-    ``api/deps.py`` so a code-search lands on either file."""
+    documented in both ``aios/dependency_container.py`` (formerly
+    ``aios/foundation/registry.py``) and ``api/deps.py`` so a
+    code-search lands on either file."""
     repo_root = Path(__file__).resolve().parents[2]
-    registry_src = (repo_root / "aios" / "foundation" / "registry.py").read_text()
+    registry_src = (repo_root / "aios" / "dependency_container.py").read_text()
     deps_src = (repo_root / "api" / "deps.py").read_text()
-    for src, label in ((registry_src, "registry.py"), (deps_src, "deps.py")):
+    for src, label in ((registry_src, "dependency_container.py"), (deps_src, "deps.py")):
         assert "Single-writer" in src or "single-writer" in src, label
         assert "record_spend" in src, label
         assert "Item 65" in src or "S4" in src, label
