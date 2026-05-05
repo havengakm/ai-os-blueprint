@@ -18,5 +18,3 @@ None yet.
 
 Every legal skill output is a DRAFT. It never bypasses human review. No legal skill can be invoked at autonomy level `autonomous` per CLAUDE.md hard rules.
 
-## Referenced by departments
-- `departments/operations.md`

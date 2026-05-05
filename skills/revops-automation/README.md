@@ -30,6 +30,3 @@ Atomic skills for CRM design, workflows, integrations, AI-system tooling. Every 
 ## Populated
 None yet.
 
-## Referenced by departments
-- `departments/operations.md` (primary home)
-- Cross-cutting: every department touches RevOps when it scales.

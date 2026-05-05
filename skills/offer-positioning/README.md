@@ -31,5 +31,3 @@ None yet.
 - `data/knowledge/experts/hormozi/`: offers, delivery, grand-slam framework
 - `data/knowledge/experts/brunson/`: funnel-aligned positioning
 
-## Referenced by departments
-- `departments/marketing.md`, `departments/sales.md`, `departments/operations.md`

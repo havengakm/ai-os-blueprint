@@ -30,7 +30,3 @@ Atomic skills for understanding the customer, the market, and the voice of the c
 ## Populated
 None yet. Skills are written when the system needs them.
 
-## Referenced by departments
-- `departments/marketing.md` (personas, VoC for content)
-- `departments/sales.md` (ICP traits, objection clusters)
-- `departments/operations.md` (competitor intel, pricing benchmarks)

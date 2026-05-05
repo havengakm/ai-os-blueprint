@@ -17,6 +17,3 @@ Atomic skills for onboarding, activation, retention, expansion. Every skill: one
 ## Populated
 None yet.
 
-## Referenced by departments
-- `departments/sales.md` (post-close hand-off)
-- `departments/operations.md` (retention systems)

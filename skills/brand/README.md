@@ -16,5 +16,3 @@ None yet.
 ## Knowledge sources
 - `context/brand/`: the client-specific brand guide, voice, and identity that these skills operate on.
 
-## Referenced by departments
-- `departments/marketing.md` (primary home)

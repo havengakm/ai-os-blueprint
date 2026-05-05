@@ -57,7 +57,7 @@ The score is not the goal. The trend is. A deployment that goes from 42 (Built) 
 | Criterion | Points | What "yes" looks like |
 |---|---|---|
 | Skill library populated | 5 | At least 3 atomic skills per active category; meta + composites + playbooks tiers all have entries |
-| Active systems have agent manifests | 5 | Every running `systems/<name>/` has matching `agents/<name>.md` with autonomy levels declared |
+| Active systems have agent manifests | 5 | Every running system has its own repo (e.g. `aios-scout`, `aios-beacon`) with autonomy levels declared in its README + the deployment's `client_config.yaml`. |
 | QA validators fail-closed | 5 | `validate-writing`, icebreaker validator, ICP validator all wired to short-circuit before send |
 | Cost optimiser running | 5 | `scripts/run_optimizer_weekly.py` last successful run within 7d; per-contact cost tracked |
 | Reply classifier calibrated | 5 | Classifier accuracy >=80% over rolling 30d, or `suggest`-level placeholder if not yet calibrated |
@@ -91,7 +91,7 @@ A deployment can be Compounding overall while one C is at Foundation. The gap re
 2. **Load context.**
    - Read `memory/MEMORY.md`, `memory/INDEX.md`, latest `memory/sessions/*.md`.
    - Read `CLAUDE.md` for the autonomy + hard-rules baseline.
-   - List `skills/`, `systems/`, `agents/`, `data/knowledge/personal/{client_id}/`, `data/knowledge/company/{client_id}/`.
+   - List `skills/`, `systems/`, the deployment's pinned `aios-*` repos, `data/knowledge/personal/{client_id}/`, `data/knowledge/company/{client_id}/`.
 
 3. **Score each criterion.** For each of the 24 criteria, decide pass / partial / fail. Pass = full points, partial = half (round down), fail = 0. Be strict: "exists but empty" is a fail.
 

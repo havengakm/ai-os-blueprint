@@ -49,7 +49,7 @@ No system works in isolation. Every system makes the foundation smarter.
 
 15 capability categories: meta, market-intelligence, offer-positioning, gtm, outbound, inbound, copywriting, sales, customer-success, data-analytics, revops-automation, finance, legal, operations, admin, brand.
 
-Seven departments (manifests only, activation layer for skills): admin, finance, tax, legal, sales, marketing, operations. Vertical-specific manifests (creative_branding, property_management, etc.) live alongside as starter packs that seed Supabase rows at provisioning time.
+Operational specialisation lives in the deployment repo's `client_config.yaml` (per Phase 3 of the productised AIOS plan), not in monorepo-level `departments/` manifests. Vertical-specific seed content lives in `<client>-brain` Obsidian vault.
 
 ## File Layout
 
@@ -59,9 +59,7 @@ data/             : knowledge (personal/company/experts/verticals), captures, pl
 memory/           : MEMORY.md (this file, stable context), INDEX.md (recent decisions + open loops), sessions/ (daily logs).
 rules/            : global guardrails (writing standards) every content-producing skill enforces.
 skills/           : three-tier library (capabilities/, composites/, playbooks/). Universal across deployments.
-departments/      : manifests that activate subsets of skills + systems per vertical or business function.
-agents/           : named personas (Scout, Beacon, Optimizer, etc.) wrapping systems on a schedule.
-aios/             : foundation (decision_logger, autonomy_gate, knowledge_store, embedder, etc.). Extracted to pip package per Cloud-Execution plan.
+aios/             : monorepo-side dependency wiring (`dependency_container.py`) + daemon code (`daemon/`). Foundation modules now installed from `aios-foundation` pip package (see Phase 1 PR #4).
 systems/          : the limbs. scout, beacon, optimizer, future linkedin/meta_ads/auditor.
 scripts/          : utilities: migrations (sql/), provisioning, dashboards.
 api/              : webhooks + pipeline triggers.
@@ -71,7 +69,7 @@ config/           : environment + API key loading.
 
 **Library tier (universal, productised):** `skills/`, `rules/`, `aios/foundation/`, `scripts/sql/` migrations, `data/knowledge/verticals/<vertical>/` templates. Same across every client.
 
-**Activation tier (per-deployment):** `departments/<vertical>.md` manifests + Supabase rows seeded at provisioning. Picks the subset of universal capability that this deployment runs.
+**Activation tier (per-deployment):** `<client>-deployment/client_config.yaml` + Supabase rows seeded at provisioning. Picks which `aios-*` system repos run + which skills activate for this deployment.
 
 **Content tier (per-deployment, never shared):** `context/<client_id>/`, `data/knowledge/personal/<client_id>/`, `data/knowledge/company/<client_id>/`, plus per-client Supabase rows. The deployment's identity + facts.
 
@@ -106,7 +104,7 @@ From `CLAUDE.md`:
 - Three QA failures = flag for human review.
 
 From memory:
-- Productised service, no custom code per client. Customisation lives in `context/` + `data/knowledge/` + `departments/` manifests.
+- Productised service, no custom code per client. Customisation lives in the per-deployment repo (`<client>-deployment`) + the per-client Obsidian vault (`<client>-brain`). Never in shared-core code.
 - Per-company silo. `context/` + `data/` content NEVER copies across deployments.
 - Human-written templates with AI-filled placeholders, never AI-generated copy.
 - Web app (Next.js + Supabase) as client-facing UX. Slack alternative. Telegram operator-only.
@@ -127,4 +125,3 @@ From memory:
 - `data/knowledge/personal/`: Kirsten's operator principles, voice, bio.
 - `data/knowledge/company/`: Clymb's facts (services, pricing, ICP, strategy, metrics, research).
 - `skills/README.md`: three-tier skill model + frontmatter convention + tag vocabulary.
-- `departments/README.md`: department manifest convention + display order.

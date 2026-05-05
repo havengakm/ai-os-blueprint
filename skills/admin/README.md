@@ -14,5 +14,3 @@ Atomic skills for internal organisation: filesystem, naming, knowledge-base main
 ## Populated
 None yet.
 
-## Referenced by departments
-- `departments/operations.md` (primary home)

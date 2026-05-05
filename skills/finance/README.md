@@ -16,6 +16,3 @@ Atomic skills for forecasting, unit economics, pricing experiments. Every skill:
 ## Populated
 None yet.
 
-## Referenced by departments
-- `departments/operations.md` (primary home)
-- `departments/sales.md` (pricing experiments, discount logic)

@@ -35,8 +35,6 @@ The 15 atomic capability categories: `market-intelligence/`, `offer-positioning/
 |---|---|---|
 | `skills/` (here) | Atomic capabilities, composites, playbooks | Everything invokable |
 | `rules/` | Global rule files | Guardrails every skill enforces |
-| `departments/` | Department manifests | Which skills each team activates |
-| `agents/` | Agent persona manifests | Named workers that run on a schedule |
 | `systems/` | Python code | The runtime that executes skills |
 | `data/reference/` | Human-facing system documentation | Specs, guides, deep explanations (not invokable) |
 | `data/knowledge/` | Knowledge base | Personal, company, expert facts skills read |
@@ -121,7 +119,7 @@ Don't backfill empty skills. Mark the category README "populated" when authored.
 
 ## Productised library, per-deployment activation
 
-Every AIOS deployment inherits the full `skills/` library and `rules/`. Client deployments activate a subset via their own `departments/` manifests. Customisation stays in `context/` and `data/knowledge/`. Never fork a skill per client.
+Every AIOS deployment inherits the full `skills/` library and `rules/`. Client deployments activate a subset via the deployment repo's `client_config.yaml` (Phase 3 of the productised AIOS plan; see `docs/superpowers/plans/2026-05-05-phase1-foundation-extraction.md`). Customisation stays in `context/` and `data/knowledge/`. Never fork a skill per client.
 
 ## Gooseworks alignment
 
@@ -129,7 +127,7 @@ The three-tier model (capability / composite / playbook) is adapted from the pub
 
 ## Legacy folders
 
-`skills/onboarding/`, `skills/authoring/`, `skills/analysis/` remain from earlier scaffolding. They describe planned system-level runbooks that are actually playbooks by the new taxonomy. Relocation to `skills/playbooks/` happens when each is authored; `agents/scout.md` still references their old paths until then.
+`skills/onboarding/`, `skills/authoring/`, `skills/analysis/` remain from earlier scaffolding. They describe planned system-level runbooks that are actually playbooks by the new taxonomy. Relocation to `skills/playbooks/` happens when each is authored.
 
 ## Source
 
