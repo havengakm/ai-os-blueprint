@@ -159,20 +159,20 @@ def _validate_response_body(body: str) -> tuple[bool, str]:
       - URL fragments (calendly URLs are required for some classifications)
       - Anti-stalker phrases (irrelevant for replies)
     """
-    from aios.scout.enrich.icebreaker_adapter import (
-        _BANNED_CHARS,
-        _BANNED_DIAGNOSTIC_PHRASES,
-        _BANNED_WORDS_RE,
+    from aios.foundation.writing_rules import (
+        BANNED_CHARS,
+        BANNED_DIAGNOSTIC_PHRASES,
+        BANNED_WORDS_RE,
     )
 
-    for ch in _BANNED_CHARS:
+    for ch in BANNED_CHARS:
         if ch in body:
             return False, f"banned_char:{ch!r}"
-    if _BANNED_WORDS_RE.search(body):
-        match = _BANNED_WORDS_RE.search(body)
+    if BANNED_WORDS_RE.search(body):
+        match = BANNED_WORDS_RE.search(body)
         return False, f"banned_word:{match.group(0) if match else '?'}"
     lower = body.lower()
-    for phrase in _BANNED_DIAGNOSTIC_PHRASES:
+    for phrase in BANNED_DIAGNOSTIC_PHRASES:
         if phrase.lower() in lower:
             return False, f"banned_phrase:{phrase}"
     return True, "ok"

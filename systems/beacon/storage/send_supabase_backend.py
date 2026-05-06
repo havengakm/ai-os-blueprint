@@ -36,7 +36,7 @@ from datetime import date
 from uuid import uuid4
 
 from systems.beacon.pipeline.send_stage import EligibleContact, SendAccount
-from aios.scout.supabase_backends._base import SupabaseLike
+from aios.foundation.storage import SupabaseLike
 
 
 _ELIGIBLE_TIERS = ("A", "B", "C")
