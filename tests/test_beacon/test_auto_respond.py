@@ -492,7 +492,7 @@ async def test_validator_failure_blocks_send(tmp_path, standard_backend):
 async def test_validator_rejects_banned_word(tmp_path, standard_backend):
     bad_dir = tmp_path / "bad"
     bad_dir.mkdir()
-    # "leverage" is banned per icebreaker_adapter._BANNED_WORDS_RE
+    # "leverage" is banned per aios.foundation.writing_rules.BANNED_WORDS_RE
     (bad_dir / "objection_pricing.md").write_text(
         "Hi {first_name},\n\nLet me leverage our work for {company}.\n\n{sender_name}\n"
     )
