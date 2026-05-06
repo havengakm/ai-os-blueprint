@@ -21,8 +21,8 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from systems.scout.outreach.composer import ComposerStorageBackend
-    from systems.scout.skill import ScoutSystem
+    from aios.scout.outreach.composer import ComposerStorageBackend
+    from aios.scout.skill import ScoutSystem
 
 logger = logging.getLogger(__name__)
 

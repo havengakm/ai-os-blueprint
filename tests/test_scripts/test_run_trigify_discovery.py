@@ -12,9 +12,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 import scripts.run_trigify_discovery as mod  # noqa: E402
-from systems.scout.pipeline.pull import PullResult, SourceSummary  # noqa: E402
-from systems.scout.sources.base import RawCompanyContact  # noqa: E402
-from systems.scout.sources.trigify_discovery import DiscoverySummary  # noqa: E402
+from aios.scout.pipeline.pull import PullResult, SourceSummary  # noqa: E402
+from aios.scout.sources.base import RawCompanyContact  # noqa: E402
+from aios.scout.sources.trigify_discovery import DiscoverySummary  # noqa: E402
 
 
 class _FakeSource:

@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any
 
 from systems.optimizer.recommendations import RecommendationRow
-from systems.scout.supabase_backends._base import SupabaseLike
+from aios.scout.supabase_backends._base import SupabaseLike
 
 
 def _parse_iso(value: Any) -> datetime | None:

@@ -36,7 +36,7 @@ from pydantic import BaseModel
 
 from api.deps import get_scout_system
 from api.middleware.verify_signatures import cron_secret_dep
-from systems.scout.skill import ScoutSystem
+from aios.scout.skill import ScoutSystem
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 

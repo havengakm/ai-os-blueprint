@@ -5,21 +5,21 @@ import logging
 from unittest.mock import MagicMock
 
 from aios.daemon.adapter_factory import AdapterFactory
-from systems.scout.enrich.apollo_enrich import ApolloEnrichAdapter
-from systems.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
-from systems.scout.enrich.claude_research import ClaudeResearchAdapter
-from systems.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
-from systems.scout.enrich.orchestrator import EnrichOrchestrator
-from systems.scout.enrich.trigify import TrigifyAdapter
-from systems.scout.enrich.zerobounce import ZeroBounceAdapter
-from systems.scout.identity.apollo_people import ApolloPeopleAdapter
-from systems.scout.identity.claude_identity_scraper import ClaudeIdentityScraper
-from systems.scout.identity.hunter_domain import HunterDomainAdapter
-from systems.scout.identity.orchestrator import IdentityOrchestrator
-from systems.scout.pipeline.pull import PullOrchestrator
-from systems.scout.sources.apollo_company import ApolloCompanyAdapter
-from systems.scout.sources.clutch import ClutchAdapter
-from systems.scout.sources.trigify_discovery import TrigifyDiscoverySource
+from aios.scout.enrich.apollo_enrich import ApolloEnrichAdapter
+from aios.scout.enrich.claude_deep_research import ClaudeDeepResearchAdapter
+from aios.scout.enrich.claude_research import ClaudeResearchAdapter
+from aios.scout.enrich.claude_web_triggers import ClaudeWebTriggersAdapter
+from aios.scout.enrich.orchestrator import EnrichOrchestrator
+from aios.scout.enrich.trigify import TrigifyAdapter
+from aios.scout.enrich.zerobounce import ZeroBounceAdapter
+from aios.scout.identity.apollo_people import ApolloPeopleAdapter
+from aios.scout.identity.claude_identity_scraper import ClaudeIdentityScraper
+from aios.scout.identity.hunter_domain import HunterDomainAdapter
+from aios.scout.identity.orchestrator import IdentityOrchestrator
+from aios.scout.pipeline.pull import PullOrchestrator
+from aios.scout.sources.apollo_company import ApolloCompanyAdapter
+from aios.scout.sources.clutch import ClutchAdapter
+from aios.scout.sources.trigify_discovery import TrigifyDiscoverySource
 
 
 def _build_settings(

@@ -13,6 +13,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aios-foundation" },
+    { name = "aios-scout" },
     { name = "anthropic" },
     { name = "apscheduler" },
     { name = "asyncpg" },
@@ -46,7 +47,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aios-foundation", git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.1.0" },
+    { name = "aios-foundation", git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.2.0" },
+    { name = "aios-scout", git = "https://github.com/aios-kit/aios-scout.git?rev=v0.1.0" },
     { name = "anthropic", specifier = ">=0.34.0" },
     { name = "apscheduler", specifier = ">=3.10" },
     { name = "asyncpg", specifier = ">=0.29.0" },
@@ -200,8 +202,8 @@ wheels = [
 
 [[package]]
 name = "aios-foundation"
-version = "0.1.0"
-source = { git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.1.0#1b3b4acdc9e3fc90a3a35ed0271435015df3947e" }
+version = "0.2.0"
+source = { git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.2.0#ff27c93b6796db8502b435279beda44069b2de62" }
 dependencies = [
     { name = "anthropic" },
     { name = "asyncpg" },
@@ -213,6 +215,27 @@ dependencies = [
     { name = "supabase" },
     { name = "tenacity" },
     { name = "voyageai" },
+]
+
+[[package]]
+name = "aios-scout"
+version = "0.1.0"
+source = { git = "https://github.com/aios-kit/aios-scout.git?rev=v0.1.0#3db54535ce9df78f597b6132ffdf1301f980156d" }
+dependencies = [
+    { name = "aios-foundation" },
+    { name = "anthropic" },
+    { name = "httpx" },
+    { name = "pgvector" },
+    { name = "playwright" },
+    { name = "playwright-stealth" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "python-slugify" },
+    { name = "pyyaml" },
+    { name = "structlog" },
+    { name = "supabase" },
+    { name = "tenacity" },
 ]
 
 [[package]]

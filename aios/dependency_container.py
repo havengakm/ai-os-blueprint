@@ -37,7 +37,7 @@ from aios.foundation.feedback_loop import FeedbackLoop
 from aios.foundation.knowledge import KnowledgeStore
 from aios.foundation.pattern_matcher import PatternMatcher
 from aios.memory.store import MemoryStore
-from systems.scout.supabase_backends import (
+from aios.scout.supabase_backends import (
     SupabaseBudgetTracker,
     SupabaseCheapResolveBackend,
     SupabaseComponentStoreBackend,

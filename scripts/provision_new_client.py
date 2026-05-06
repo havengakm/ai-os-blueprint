@@ -54,7 +54,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
-from systems.scout.pipeline.validate_config import assert_valid_client_config  # noqa: E402
+from aios.scout.pipeline.validate_config import assert_valid_client_config  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

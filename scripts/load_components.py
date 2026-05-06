@@ -36,13 +36,13 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from systems.scout.outreach.component_store import (  # noqa: E402
+from aios.scout.outreach.component_store import (  # noqa: E402
     ComponentStore,
     ComponentVariant,
     SyncSummary,
     VariantKeyTuple,
 )
-from systems.scout.supabase_backends.component_store import (  # noqa: E402
+from aios.scout.supabase_backends.component_store import (  # noqa: E402
     SupabaseComponentStoreBackend,
 )
 

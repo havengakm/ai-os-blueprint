@@ -12,7 +12,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 import scripts.configure_trigify_monitors as mod  # noqa: E402
-from systems.scout.sources.trigify_monitors import (  # noqa: E402
+from aios.scout.sources.trigify_monitors import (  # noqa: E402
     MonitorSpec,
     ProvisioningResult,
 )

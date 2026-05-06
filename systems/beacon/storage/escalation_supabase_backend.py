@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from systems.scout.supabase_backends._base import SupabaseLike
+from aios.scout.supabase_backends._base import SupabaseLike
 
 
 class SupabaseEscalationBackend:

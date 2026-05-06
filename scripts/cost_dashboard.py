@@ -158,7 +158,7 @@ async def fetch_cost_report(
 async def fetch_coverage_report(client: Any, client_id: str) -> list[dict]:
     """Pull the enrichment coverage rollup via the
     ``get_enrichment_coverage`` RPC (migration 021)."""
-    from systems.scout.supabase_backends.coverage import EnrichmentCoverageBackend
+    from aios.scout.supabase_backends.coverage import EnrichmentCoverageBackend
 
     backend = EnrichmentCoverageBackend(client)
     return await backend.get_enrichment_coverage(client_id)

@@ -1,1 +1,0 @@
-# Scout — Outbound Prospecting System

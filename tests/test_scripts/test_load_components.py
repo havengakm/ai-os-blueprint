@@ -14,7 +14,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 import scripts.load_components as mod  # noqa: E402
-from systems.scout.outreach.component_store import (  # noqa: E402
+from aios.scout.outreach.component_store import (  # noqa: E402
     ComponentVariant,
     VariantKeyTuple,
 )

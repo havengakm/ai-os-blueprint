@@ -1,1 +1,0 @@
-../../../scripts/sql/002_scout.sql

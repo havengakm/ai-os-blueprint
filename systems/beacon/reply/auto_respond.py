@@ -159,7 +159,7 @@ def _validate_response_body(body: str) -> tuple[bool, str]:
       - URL fragments (calendly URLs are required for some classifications)
       - Anti-stalker phrases (irrelevant for replies)
     """
-    from systems.scout.enrich.icebreaker_adapter import (
+    from aios.scout.enrich.icebreaker_adapter import (
         _BANNED_CHARS,
         _BANNED_DIAGNOSTIC_PHRASES,
         _BANNED_WORDS_RE,
