@@ -120,7 +120,7 @@ def test_build_scout_for_client_wires_icebreaker_adapter():
     runs and every contact lands with icebreaker_tier=None.
     """
     from aios.daemon.main import _build_scout_for_client
-    from systems.scout.enrich.icebreaker_adapter import IcebreakerAdapter
+    from aios.scout.enrich.icebreaker_adapter import IcebreakerAdapter
 
     registry = MagicMock()
     factory = MagicMock()

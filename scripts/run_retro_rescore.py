@@ -69,7 +69,7 @@ async def _rescore_one_client(
     supabase: Any, client_id: str, *, apply: bool,
 ) -> dict[str, Any]:
     """Re-score every contact for ``client_id``. Returns summary dict."""
-    from systems.scout.pipeline.score import assign_tier, score_v2
+    from aios.scout.pipeline.score import assign_tier, score_v2
 
     cfg_resp = (
         supabase.table("client_config")

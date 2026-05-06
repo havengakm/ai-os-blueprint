@@ -27,11 +27,11 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from systems.scout.sources.trigify_monitors import (  # noqa: E402
+from aios.scout.sources.trigify_monitors import (  # noqa: E402
     ProvisioningResult,
     TrigifyMonitorCreator,
 )
-from systems.scout.supabase_backends.trigify import (  # noqa: E402
+from aios.scout.supabase_backends.trigify import (  # noqa: E402
     SupabaseTrigifyMonitorStorage,
 )
 

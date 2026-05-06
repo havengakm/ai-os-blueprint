@@ -125,7 +125,7 @@ def test_build_default_client_config_uses_default_tier_thresholds():
     )
     assert cfg["tier_thresholds"] == DEFAULT_TIER_THRESHOLDS
     # Validator will pass against the defaults.
-    from systems.scout.pipeline.validate_config import validate_client_config
+    from aios.scout.pipeline.validate_config import validate_client_config
     assert validate_client_config(cfg) == []
 
 

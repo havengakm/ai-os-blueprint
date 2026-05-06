@@ -30,7 +30,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from systems.scout.skill import ScoutSystem
+from aios.scout.skill import ScoutSystem
 
 
 # --------------------------------------------------------------------------- #
@@ -158,7 +158,7 @@ async def test_full_pipeline_foundation_calls_in_order() -> None:
     }
 
     # Composer mock — per-contact fan out. One contact = one compose call.
-    from systems.scout.outreach.composer import ComposedDraft
+    from aios.scout.outreach.composer import ComposedDraft
     draft = ComposedDraft(
         contact_id="X",
         subject="hi",

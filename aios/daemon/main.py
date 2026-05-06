@@ -57,15 +57,15 @@ def _build_scout_for_client(
     zero-adapter orchestrators (safe defaults for API-triggered runs).
     The daemon needs real adapters for each client's active_directories.
     """
-    from systems.scout.enrich.icebreaker_adapter import IcebreakerAdapter
-    from systems.scout.outreach.composer import Composer
-    from systems.scout.outreach.research import ResearchSelector
-    from systems.scout.pipeline.cheap_resolve import CheapResolveStage
-    from systems.scout.pipeline.enrich import EnrichStage
-    from systems.scout.pipeline.identity import IdentityStage
-    from systems.scout.pipeline.score_stage import ScoreStage
-    from systems.scout.pipeline.screen import ScreenStage
-    from systems.scout.skill import ScoutSystem
+    from aios.scout.enrich.icebreaker_adapter import IcebreakerAdapter
+    from aios.scout.outreach.composer import Composer
+    from aios.scout.outreach.research import ResearchSelector
+    from aios.scout.pipeline.cheap_resolve import CheapResolveStage
+    from aios.scout.pipeline.enrich import EnrichStage
+    from aios.scout.pipeline.identity import IdentityStage
+    from aios.scout.pipeline.score_stage import ScoreStage
+    from aios.scout.pipeline.screen import ScreenStage
+    from aios.scout.skill import ScoutSystem
 
     return ScoutSystem(
         memory_store=registry.memory_store,

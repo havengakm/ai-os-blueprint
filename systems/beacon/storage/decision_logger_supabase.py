@@ -29,7 +29,7 @@ import logging
 from typing import Awaitable, Callable
 from uuid import uuid4
 
-from systems.scout.supabase_backends._base import SupabaseLike
+from aios.scout.supabase_backends._base import SupabaseLike
 
 
 logger = logging.getLogger(__name__)

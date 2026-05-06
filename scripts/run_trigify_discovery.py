@@ -26,14 +26,14 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from systems.scout.pipeline.pull import PullOrchestrator, PullResult  # noqa: E402
-from systems.scout.sources.base import CompanySourceAdapter, RawCompanyContact  # noqa: E402
-from systems.scout.sources.trigify_discovery import (  # noqa: E402
+from aios.scout.pipeline.pull import PullOrchestrator, PullResult  # noqa: E402
+from aios.scout.sources.base import CompanySourceAdapter, RawCompanyContact  # noqa: E402
+from aios.scout.sources.trigify_discovery import (  # noqa: E402
     DiscoverySummary,
     TrigifyDiscoverySource,
 )
-from systems.scout.supabase_backends.pull import SupabasePullBackend  # noqa: E402
-from systems.scout.supabase_backends.trigify import (  # noqa: E402
+from aios.scout.supabase_backends.pull import SupabasePullBackend  # noqa: E402
+from aios.scout.supabase_backends.trigify import (  # noqa: E402
     SupabaseDiscoveryStorage,
 )
 

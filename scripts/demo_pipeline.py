@@ -9,13 +9,13 @@ Run with:
 """
 from __future__ import annotations
 
-from systems.scout.pipeline.score import (
+from aios.scout.pipeline.score import (
     DEFAULT_TIER_THRESHOLDS,
     DEFAULT_WEIGHTS,
     assign_tier,
     score_v1,
 )
-from systems.scout.pipeline.screen import screen_contact
+from aios.scout.pipeline.screen import screen_contact
 
 
 # ---------------------------------------------------------------------------

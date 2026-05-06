@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from systems.scout.outreach.component_store import (
+from aios.scout.outreach.component_store import (
     ComponentStore,
     ComponentStoreBackend,
     ComponentVariant,

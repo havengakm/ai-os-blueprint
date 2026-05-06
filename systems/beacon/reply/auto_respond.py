@@ -151,7 +151,7 @@ class DecisionLogger(Protocol):
 def _validate_response_body(body: str) -> tuple[bool, str]:
     """Apply the writing rules to a rendered reply response.
 
-    Reuses the regex from ``systems.scout.enrich.icebreaker_adapter``
+    Reuses the regex from ``aios.scout.enrich.icebreaker_adapter``
     so banned words, em-dashes, and diagnostic phrases stay consistent
     across the icebreaker + reply-response surfaces.
 
@@ -159,7 +159,7 @@ def _validate_response_body(body: str) -> tuple[bool, str]:
       - URL fragments (calendly URLs are required for some classifications)
       - Anti-stalker phrases (irrelevant for replies)
     """
-    from systems.scout.enrich.icebreaker_adapter import (
+    from aios.scout.enrich.icebreaker_adapter import (
         _BANNED_CHARS,
         _BANNED_DIAGNOSTIC_PHRASES,
         _BANNED_WORDS_RE,
