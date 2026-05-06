@@ -47,8 +47,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aios-foundation", git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.2.0" },
-    { name = "aios-scout", git = "https://github.com/aios-kit/aios-scout.git?rev=v0.1.0" },
+    { name = "aios-foundation", git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.3.0" },
+    { name = "aios-scout", git = "https://github.com/aios-kit/aios-scout.git?rev=v0.2.0" },
     { name = "anthropic", specifier = ">=0.34.0" },
     { name = "apscheduler", specifier = ">=3.10" },
     { name = "asyncpg", specifier = ">=0.29.0" },
@@ -202,8 +202,8 @@ wheels = [
 
 [[package]]
 name = "aios-foundation"
-version = "0.2.0"
-source = { git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.2.0#ff27c93b6796db8502b435279beda44069b2de62" }
+version = "0.3.0"
+source = { git = "https://github.com/aios-kit/aios-foundation.git?rev=v0.3.0#9afdd4428adea80ac55a26c3082aed46c8e76e08" }
 dependencies = [
     { name = "anthropic" },
     { name = "asyncpg" },
@@ -219,8 +219,8 @@ dependencies = [
 
 [[package]]
 name = "aios-scout"
-version = "0.1.0"
-source = { git = "https://github.com/aios-kit/aios-scout.git?rev=v0.1.0#3db54535ce9df78f597b6132ffdf1301f980156d" }
+version = "0.2.0"
+source = { git = "https://github.com/aios-kit/aios-scout.git?rev=v0.2.0#9a8fd53df4bc3ac357602ebbf38fd08ddf18a276" }
 dependencies = [
     { name = "aios-foundation" },
     { name = "anthropic" },

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from systems.beacon.reply.cool_off import CoolOffContactRef
-from aios.scout.supabase_backends._base import SupabaseLike
+from aios.foundation.storage import SupabaseLike
 
 
 _BLOCKED_STATUSES = frozenset(

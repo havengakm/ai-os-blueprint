@@ -5,10 +5,10 @@ description = "AI Operating System Blueprint — productised AIOS template"
 requires-python = ">=3.11"
 dependencies = [
     # Foundation (pinned to released tag)
-    "aios-foundation @ git+https://github.com/aios-kit/aios-foundation.git@v0.2.0",
+    "aios-foundation @ git+https://github.com/aios-kit/aios-foundation.git@v0.3.0",
 
     # Scout — outbound prospecting (extracted Phase 2)
-    "aios-scout @ git+https://github.com/aios-kit/aios-scout.git@v0.1.0",
+    "aios-scout @ git+https://github.com/aios-kit/aios-scout.git@v0.2.0",
 
     # Web framework
     "fastapi>=0.115.0",

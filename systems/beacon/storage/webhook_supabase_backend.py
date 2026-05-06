@@ -17,7 +17,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from systems.beacon.pipeline.webhook_handler import SendLogRef
-from aios.scout.supabase_backends._base import SupabaseLike
+from aios.foundation.storage import SupabaseLike
 
 
 class SupabaseWebhookBackend:
